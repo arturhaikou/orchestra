@@ -124,6 +124,7 @@ Have ideas? [Open an issue](https://github.com/arturhaikou/orchestra/issues) or 
 <img width="1314" height="443" alt="image" src="https://github.com/user-attachments/assets/dccade8b-3c4f-4bd4-ac8c-8d0735be28e2" />
 
 ### Create specific agent
-<img width="1028" height="870" alt="image" src="https://github.com/user-attachments/assets/a4d3f5de-d0b6-49c2-b608-35f97ed2f2ca" />
+<img width="1028" height="863" alt="image" src="https://github.com/user-attachments/assets/7b8f313d-e873-4f14-bf45-9840fef74d50" />
+
 
 
