@@ -48,7 +48,7 @@ Orchestra connects several microservices using **.NET Aspire**:
 
 ## 🛠️ Tech Stack
 
-- **Framework:** .NET 10 (Preview), .NET Aspire 13.1 (Preview)
+- **Framework:** .NET 10, .NET Aspire 13.1
 - **Frontend:** React 19, Vite, TypeScript, Tailwind, React Flow, Recharts
 - **Database:** PostgreSQL (with Entity Framework Core)
 - **AI:** Microsoft Agents Framework, Azure OpenAI
@@ -78,7 +78,7 @@ Have ideas? [Open an issue](https://github.com/arturhaikou/orchestra/issues) or 
 
 ### Prerequisites
 
-*   **[.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)** (Preview)
+*   **[.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)**
 *   **[.NET Aspire](https://aspire.dev)** workload
 *   **[Docker](https://www.docker.com/) or [Podman](https://podman.io/)** (Required for Aspire & PostgreSQL containers)
 *   **[Node.js](https://nodejs.org/)** (v22+)
