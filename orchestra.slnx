@@ -1,9 +1,9 @@
 <Solution>
-  <Project Path="Orchestra.ApiService/Orchestra.ApiService.csproj" />
-  <Project Path="Orchestra.AppHost/Orchestra.AppHost.csproj" />
-  <Project Path="Orchestra.Application/Orchestra.Application.csproj" />
-  <Project Path="Orchestra.Domain/Orchestra.Domain.csproj" />
-  <Project Path="Orchestra.Infrastructure/Orchestra.Infrastructure.csproj" />
-  <Project Path="Orchestra.ServiceDefaults/Orchestra.ServiceDefaults.csproj" />
-  <Project Path="Orchestra.Worker/Orchestra.Worker.csproj" />
+  <Project Path="src/Orchestra.ApiService/Orchestra.ApiService.csproj" />
+  <Project Path="src/Orchestra.AppHost/Orchestra.AppHost.csproj" />
+  <Project Path="src/Orchestra.Application/Orchestra.Application.csproj" />
+  <Project Path="src/Orchestra.Domain/Orchestra.Domain.csproj" />
+  <Project Path="src/Orchestra.Infrastructure/Orchestra.Infrastructure.csproj" />
+  <Project Path="src/Orchestra.ServiceDefaults/Orchestra.ServiceDefaults.csproj" />
+  <Project Path="src/Orchestra.Worker/Orchestra.Worker.csproj" />
 </Solution>

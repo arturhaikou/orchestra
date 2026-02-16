@@ -1,3 +1,3 @@
 {
-  "appHostPath": "../Orchestra.AppHost/Orchestra.AppHost.csproj"
+  "appHostPath": "../src/Orchestra.AppHost/Orchestra.AppHost.csproj"
 }
