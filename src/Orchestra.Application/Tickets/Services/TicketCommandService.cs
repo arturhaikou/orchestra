@@ -132,7 +132,7 @@ public class TicketCommandService : ITicketCommandService
             AssignedAgentId: ticket.AssignedAgentId,
             AssignedWorkflowId: ticket.AssignedWorkflowId,
             Comments: new List<CommentDto>(),
-            Satisfaction: null,
+            Satisfaction: ticket.IsInternal ? 100 : (int?)null,
             Summary: null
         );
     }

@@ -126,6 +126,9 @@ public class TicketCommandServiceTests : ServiceTestFixture<TicketCommandService
         Assert.Equal(request.WorkspaceId, result.WorkspaceId);
         Assert.Equal(status.Id, result.Status.Id);
         Assert.Equal(priority.Id, result.Priority.Id);
+        // New: Internal tickets should have satisfaction 100
+        Assert.True(request.Internal, "Test expects internal ticket");
+        Assert.Equal(100, result.Satisfaction);
     }
 
     [Fact]

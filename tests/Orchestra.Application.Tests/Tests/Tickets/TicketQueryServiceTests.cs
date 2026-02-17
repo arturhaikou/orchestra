@@ -24,6 +24,7 @@ public class TicketQueryServiceTests
     private readonly ITicketEnrichmentService _ticketEnrichmentService = Substitute.For<ITicketEnrichmentService>();
     private readonly IExternalTicketFetchingService _externalFetchingService = Substitute.For<IExternalTicketFetchingService>();
     private readonly ISentimentAnalysisService _sentimentAnalysisService = Substitute.For<ISentimentAnalysisService>();
+    private readonly ITicketPaginationService _ticketPaginationService = Substitute.For<ITicketPaginationService>();
     private readonly ILogger<TicketQueryService> _logger = Substitute.For<ILogger<TicketQueryService>>();
 
     private TicketQueryService CreateService() => new(
@@ -36,14 +37,23 @@ public class TicketQueryServiceTests
         _ticketEnrichmentService,
         _externalFetchingService,
         _sentimentAnalysisService,
+        _ticketPaginationService,
         _logger
     );
+
+    private void SetupPaginationService(string phase = "internal", int offset = 0)
+    {
+        _ticketPaginationService.ParsePageToken(Arg.Any<string>()).Returns(new TicketPageToken { Phase = phase, InternalOffset = offset });
+        _ticketPaginationService.NormalizePageSize(Arg.Any<int>()).Returns(x => (int)x[0]);
+        _ticketPaginationService.SerializePageToken(Arg.Any<TicketPageToken>()).Returns("next-token");
+    }
 
     [Fact]
     public async Task GetTicketsAsync_HandlesInvalidPageToken_Gracefully()
     {
         var workspaceId = Guid.NewGuid();
         var userId = Guid.NewGuid();
+        SetupPaginationService();
         _workspaceAuth.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
         _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, 0, 50, Arg.Any<CancellationToken>()).Returns(new List<Ticket>());
         _ticketDataAccess.GetAllStatusesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketStatus>());
@@ -105,6 +115,7 @@ public class TicketQueryServiceTests
     {
         var workspaceId = Guid.NewGuid();
         var userId = Guid.NewGuid();
+        SetupPaginationService();
         _workspaceAuth.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
         var ticketId = Guid.NewGuid();
         var ticket = new Orchestra.Application.Tests.Builders.TicketBuilder()
@@ -127,6 +138,7 @@ public class TicketQueryServiceTests
     {
         var workspaceId = Guid.NewGuid();
         var userId = Guid.NewGuid();
+        SetupPaginationService();
         _workspaceAuth.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
         var ticket = new Orchestra.Application.Tests.Builders.TicketBuilder()
             .WithId(Guid.NewGuid())
@@ -220,6 +232,18 @@ public class TicketQueryServiceTests
         var workspaceId = Guid.NewGuid();
         var userId = Guid.NewGuid();
         var integrationId = Guid.NewGuid();
+        // Setup pagination service to simulate phase/offset changes
+        int parsePageTokenCall = 0;
+        _ticketPaginationService.ParsePageToken(Arg.Any<string>()).Returns(ci =>
+        {
+            parsePageTokenCall++;
+            if (parsePageTokenCall == 1)
+                return new TicketPageToken { Phase = "internal", InternalOffset = 0 };
+            else
+                return new TicketPageToken { Phase = "external", InternalOffset = 1 };
+        });
+        _ticketPaginationService.NormalizePageSize(Arg.Any<int>()).Returns(x => (int)x[0]);
+        _ticketPaginationService.SerializePageToken(Arg.Any<TicketPageToken>()).Returns("next-token");
         _workspaceAuth.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
         // 1 internal ticket
         var internalTicket = new Orchestra.Application.Tests.Builders.TicketBuilder()
@@ -317,6 +341,22 @@ public class TicketQueryServiceTests
         var workspaceId = Guid.NewGuid();
         var userId = Guid.NewGuid();
         var integrationId = Guid.NewGuid();
+        // Setup pagination service to simulate phase/offset changes
+        int parsePageTokenCall = 0;
+        _ticketPaginationService.ParsePageToken(Arg.Any<string>()).Returns(ci =>
+        {
+            parsePageTokenCall++;
+            if (parsePageTokenCall == 1)
+                return new TicketPageToken { Phase = "internal", InternalOffset = 0 };
+            else if (parsePageTokenCall == 2)
+                return new TicketPageToken { Phase = "internal", InternalOffset = 5 };
+            else if (parsePageTokenCall == 3)
+                return new TicketPageToken { Phase = "internal", InternalOffset = 10 };
+            else
+                return new TicketPageToken { Phase = "external", InternalOffset = 10 };
+        });
+        _ticketPaginationService.NormalizePageSize(Arg.Any<int>()).Returns(x => (int)x[0]);
+        _ticketPaginationService.SerializePageToken(Arg.Any<TicketPageToken>()).Returns("next-token");
         _workspaceAuth.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
         // 11 internal tickets
         var internalTickets = Enumerable.Range(1, 11).Select(i =>

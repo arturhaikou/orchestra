@@ -13,6 +13,7 @@ using System.Text.Json;
 
 namespace Orchestra.Application.Tickets.Services;
 
+
 public class TicketQueryService : ITicketQueryService
 {
     private readonly ITicketDataAccess _ticketDataAccess;
@@ -24,6 +25,7 @@ public class TicketQueryService : ITicketQueryService
     private readonly ITicketEnrichmentService _ticketEnrichmentService;
     private readonly IExternalTicketFetchingService _externalFetchingService;
     private readonly ISentimentAnalysisService _sentimentAnalysisService;
+    private readonly ITicketPaginationService _ticketPaginationService;
     private readonly ILogger<TicketQueryService> _logger;
 
     public TicketQueryService(
@@ -36,6 +38,7 @@ public class TicketQueryService : ITicketQueryService
         ITicketEnrichmentService ticketEnrichmentService,
         IExternalTicketFetchingService externalFetchingService,
         ISentimentAnalysisService sentimentAnalysisService,
+        ITicketPaginationService ticketPaginationService,
         ILogger<TicketQueryService> logger)
     {
         _ticketDataAccess = ticketDataAccess;
@@ -47,6 +50,7 @@ public class TicketQueryService : ITicketQueryService
         _ticketEnrichmentService = ticketEnrichmentService;
         _externalFetchingService = externalFetchingService;
         _sentimentAnalysisService = sentimentAnalysisService;
+        _ticketPaginationService = ticketPaginationService;
         _logger = logger;
     }
 
@@ -57,18 +61,12 @@ public class TicketQueryService : ITicketQueryService
         int pageSize = 50,
         CancellationToken cancellationToken = default)
     {
-        // Parameter validation
+        // Parameter validation (delegated to validation service or utility)
         if (workspaceId == Guid.Empty)
             throw new ArgumentException("Workspace ID is required.", nameof(workspaceId));
-        
         if (userId == Guid.Empty)
             throw new ArgumentException("User ID is required.", nameof(userId));
-        
-        // Enforce max page size
-        if (pageSize > 100)
-            pageSize = 100;
-        if (pageSize < 1)
-            pageSize = 50;
+        pageSize = _ticketPaginationService.NormalizePageSize(pageSize);
         
         // Validate workspace access
         var hasAccess = await _workspaceAuthorizationService.IsMemberAsync(
@@ -83,26 +81,12 @@ public class TicketQueryService : ITicketQueryService
                 $"workspace:{workspaceId}");
         }
 
-        // Parse page token to determine current phase and offset
-        var currentToken = new PageToken();
-        if (!string.IsNullOrWhiteSpace(pageToken))
-        {
-            try
-            {
-                var tokenBytes = Convert.FromBase64String(pageToken);
-                var tokenJson = Encoding.UTF8.GetString(tokenBytes);
-                currentToken = JsonSerializer.Deserialize<PageToken>(tokenJson) ?? new PageToken();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Invalid page token provided, starting from beginning");
-                currentToken = new PageToken();
-            }
-        }
+        // Parse page token to determine current phase and offset (delegated to pagination service)
+        var currentToken = _ticketPaginationService.ParsePageToken(pageToken);
 
         var resultTickets = new List<TicketDto>();
         var isLastPage = false;
-        PageToken? nextToken = null;
+        TicketPageToken? nextToken = null;
 
         // PHASE 1: Fetch only pure internal tickets (no externalId)
         if (currentToken.Phase == "internal")
@@ -144,7 +128,7 @@ public class TicketQueryService : ITicketQueryService
             if (resultTickets.Count == pageSize)
             {
                 // Page full - prepare next token for more internal tickets
-                nextToken = new PageToken
+                nextToken = new TicketPageToken
                 {
                     Phase = "internal",
                     InternalOffset = currentToken.InternalOffset + pageSize
@@ -214,7 +198,7 @@ public class TicketQueryService : ITicketQueryService
                     if (externalTickets.HasMore)
                     {
                         // More external tickets available - prepare next token for external phase
-                        nextToken = new PageToken
+                        nextToken = new TicketPageToken
                         {
                             Phase = "external",
                             InternalOffset = currentToken.InternalOffset + resultTickets.Count,
@@ -269,7 +253,7 @@ public class TicketQueryService : ITicketQueryService
                 // Determine if more external tickets available
                 if (externalTickets.HasMore)
                 {
-                    nextToken = new PageToken
+                    nextToken = new TicketPageToken
                     {
                         Phase = "external",
                         InternalOffset = currentToken.InternalOffset,
@@ -289,13 +273,11 @@ public class TicketQueryService : ITicketQueryService
             }
         }
 
-        // Generate next page token
+        // Generate next page token (delegated to pagination service)
         string? nextPageTokenString = null;
         if (nextToken != null && !isLastPage)
         {
-            var tokenJson = JsonSerializer.Serialize(nextToken);
-            var tokenBytes = Encoding.UTF8.GetBytes(tokenJson);
-            nextPageTokenString = Convert.ToBase64String(tokenBytes);
+            nextPageTokenString = _ticketPaginationService.SerializePageToken(nextToken);
         }
 
         // Deduplicate tickets by ID (defensive measure)
@@ -894,14 +876,5 @@ public class TicketQueryService : ITicketQueryService
         }
     }
 
-    /// <summary>
-    /// Internal structure for pagination token.
-    /// Serialized to base64-encoded JSON for opaque cursor-based pagination.
-    /// </summary>
-    private class PageToken
-    {
-        public string Phase { get; set; } = "internal";
-        public int InternalOffset { get; set; } = 0;
-        public ExternalPaginationState? ExternalState { get; set; }
-    }
+    // Pagination token structure is now handled by TicketPageToken in ITicketPaginationService
 }
