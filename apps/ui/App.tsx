@@ -272,7 +272,7 @@ const App: React.FC = () => {
       case 'integrations': return <Integrations workspaceId={activeWorkspaceId} />;
       case 'tickets': return <TicketList workspaceId={activeWorkspaceId} onNavigateToTickets={() => setActiveView('tickets')} />;
       case 'agents': return <AgentsList workspaceId={activeWorkspaceId} />;
-      case 'workflows': return <WorkflowBuilder workspaceId={activeWorkspaceId} isDarkMode={isDarkMode} />;
+      // case 'workflows': return <WorkflowBuilder workspaceId={activeWorkspaceId} isDarkMode={isDarkMode} />;
       default: return <TicketList workspaceId={activeWorkspaceId} onNavigateToTickets={() => setActiveView('tickets')} />;
     }
   };

@@ -190,7 +190,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           <SidebarItem icon={GitBranch} label="Integrations" active={activeView === 'integrations'} onClick={() => { setActiveView('integrations'); onClose(); }} />
           <SidebarItem icon={TicketIcon} label="Tickets" active={activeView === 'tickets'} onClick={() => { setActiveView('tickets'); onClose(); }} />
           <SidebarItem icon={Bot} label="Agents" active={activeView === 'agents'} onClick={() => { setActiveView('agents'); onClose(); }} />
-          <SidebarItem icon={Layers} label="Workflows" active={activeView === 'workflows'} onClick={() => { setActiveView('workflows'); onClose(); }} />
+          {/* <SidebarItem icon={Layers} label="Workflows" active={activeView === 'workflows'} onClick={() => { setActiveView('workflows'); onClose(); }} /> */}
         </nav>
 
         <div className="p-4 border-t border-border">
