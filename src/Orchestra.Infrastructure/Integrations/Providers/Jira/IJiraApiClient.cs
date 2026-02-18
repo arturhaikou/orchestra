@@ -87,4 +87,22 @@ public interface IJiraApiClient
     /// <returns>List of available issue types.</returns>
     Task<List<IssueType>> GetIssueTypesAsync(
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves all accessible projects.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>List of projects.</returns>
+    Task<List<Project>> GetProjectsAsync(
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Resolves a project key to its ID.
+    /// </summary>
+    /// <param name="projectKey">The project key (e.g., PROJ).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The project ID, or null if not found.</returns>
+    Task<string?> GetProjectIdByKeyAsync(
+        string projectKey,
+        CancellationToken cancellationToken = default);
 }

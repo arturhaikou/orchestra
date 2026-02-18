@@ -228,6 +228,66 @@ public class JiraOnPremiseApiClient : IJiraApiClient
         }
     }
 
+    public async Task<List<Project>> GetProjectsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync("/rest/api/2/project", cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            var content = await response.Content.ReadAsStringAsync(cancellationToken);
+            
+            // On-Premise v2 API returns a direct array of projects
+            var projects = JsonSerializer.Deserialize<List<Project>>(
+                content,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<Project>();
+
+            return projects;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get projects from Jira On-Premise");
+            throw;
+        }
+    }
+
+    public async Task<string?> GetProjectIdByKeyAsync(
+        string projectKey,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync(
+                $"/rest/api/2/project/{projectKey}",
+                cancellationToken);
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                _logger.LogWarning("Project {ProjectKey} not found in Jira On-Premise", projectKey);
+                return null;
+            }
+
+            response.EnsureSuccessStatusCode();
+
+            var content = await response.Content.ReadAsStringAsync(cancellationToken);
+            using var doc = JsonDocument.Parse(content);
+
+            if (doc.RootElement.TryGetProperty("id", out var idElement))
+            {
+                return idElement.GetString();
+            }
+
+            _logger.LogWarning("Project {ProjectKey} response missing 'id' field in Jira On-Premise", projectKey);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get project {ProjectKey} from Jira On-Premise", projectKey);
+            throw;
+        }
+    }
+
     private void HandleCreateIssueErrors(HttpResponseMessage response)
     {
         if (response.StatusCode == HttpStatusCode.Unauthorized)

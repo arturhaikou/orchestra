@@ -230,6 +230,72 @@ public class JiraCloudApiClient : IJiraApiClient
         }
     }
 
+    public async Task<List<Project>> GetProjectsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync("/rest/api/3/projects", cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            var content = await response.Content.ReadAsStringAsync(cancellationToken);
+            
+            // Cloud API returns a wrapper object with "values" property
+            using var doc = JsonDocument.Parse(content);
+            var projects = new List<Project>();
+
+            if (doc.RootElement.TryGetProperty("values", out var valuesElement))
+            {
+                projects = JsonSerializer.Deserialize<List<Project>>(
+                    valuesElement.GetRawText(),
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<Project>();
+            }
+
+            return projects;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get projects from Jira Cloud");
+            throw;
+        }
+    }
+
+    public async Task<string?> GetProjectIdByKeyAsync(
+        string projectKey,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync(
+                $"/rest/api/3/project/{projectKey}",
+                cancellationToken);
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                _logger.LogWarning("Project {ProjectKey} not found in Jira Cloud", projectKey);
+                return null;
+            }
+
+            response.EnsureSuccessStatusCode();
+
+            var content = await response.Content.ReadAsStringAsync(cancellationToken);
+            using var doc = JsonDocument.Parse(content);
+
+            if (doc.RootElement.TryGetProperty("id", out var idElement))
+            {
+                return idElement.GetString();
+            }
+
+            _logger.LogWarning("Project {ProjectKey} response missing 'id' field in Jira Cloud", projectKey);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get project {ProjectKey} from Jira Cloud", projectKey);
+            throw;
+        }
+    }
+
     private void HandleCreateIssueErrors(HttpResponseMessage response)
     {
         if (response.StatusCode == HttpStatusCode.Unauthorized)

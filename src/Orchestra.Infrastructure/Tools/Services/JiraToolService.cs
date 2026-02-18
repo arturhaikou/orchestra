@@ -1,10 +1,6 @@
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Http.Headers;
-using System.Net.Http.Json;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using System.Web;
 using Orchestra.Application.Common.Exceptions;
@@ -12,32 +8,29 @@ using Orchestra.Application.Common.Interfaces;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
 using Orchestra.Domain.Interfaces;
+using Orchestra.Infrastructure.Integrations.Providers.Jira;
 using Orchestra.Infrastructure.Integrations.Providers.Jira.Models;
-using Orchestra.Infrastructure.Integrations.Services;
 using Orchestra.Infrastructure.Tools.Models.Jira;
 
 namespace Orchestra.Infrastructure.Tools.Services;
 
 public class JiraToolService : IJiraToolService
 {
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly ICredentialEncryptionService _credentialEncryptionService;
+    private readonly JiraApiClientFactory _apiClientFactory;
     private readonly IIntegrationDataAccess _integrationDataAccess;
     private readonly ILogger<JiraToolService> _logger;
-    private readonly IAdfConversionService _adfConversionService;
+    private readonly IJiraTextContentConverter _contentConverter;
 
     public JiraToolService(
-        IHttpClientFactory httpClientFactory,
-        ICredentialEncryptionService credentialEncryptionService,
+        JiraApiClientFactory apiClientFactory,
         IIntegrationDataAccess integrationDataAccess,
         ILogger<JiraToolService> logger,
-        IAdfConversionService adfConversionService)
+        IJiraTextContentConverter contentConverter)
     {
-        _httpClientFactory = httpClientFactory;
-        _credentialEncryptionService = credentialEncryptionService;
+        _apiClientFactory = apiClientFactory;
         _integrationDataAccess = integrationDataAccess;
         _logger = logger;
-        _adfConversionService = adfConversionService;
+        _contentConverter = contentConverter;
     }
 
     public async Task<object> CreateIssueAsync(
@@ -68,21 +61,25 @@ public class JiraToolService : IJiraToolService
             // Step 1: Load and validate integration
             var integration = await GetAndValidateIntegrationAsync(workspaceGuid);
 
-            // Step 2: Get project ID from parameter, filter query, or throw
-            var resolvedProjectId = await GetProjectIdAsync(integration, projectId);
+            // Step 2: Create API client
+            var apiClient = _apiClientFactory.CreateClient(integration);
 
-            // Step 3: Resolve issue type name to ID
-            var issueTypeId = await GetIssueTypeIdAsync(integration, issueTypeName);
+            // Step 3: Get project ID from parameter, filter query, or throw
+            var resolvedProjectId = await GetProjectIdAsync(apiClient, integration, projectId);
 
-            // Step 4: Create the issue
+            // Step 4: Resolve issue type name to ID
+            var issueTypeId = await GetIssueTypeIdAsync(apiClient, issueTypeName);
+
+            // Step 5: Create the issue
             var issueKey = await CreateSingleIssueAsync(
+                apiClient,
                 integration,
                 resolvedProjectId,
                 summary,
                 description,
                 issueTypeId);
 
-            // Step 5: Build success response
+            // Step 6: Build success response
             var issueUrl = $"{integration.Url.TrimEnd('/')}/browse/{issueKey}";
             
             _logger.LogInformation(
@@ -248,8 +245,8 @@ public class JiraToolService : IJiraToolService
             // Step 1: Validate integration
             var integration = await GetAndValidateIntegrationAsync(workspaceGuid);
 
-            // Step 2: Get authenticated HTTP client
-            using var client = GetHttpClient(integration);
+            // Step 2: Create API client
+            var apiClient = _apiClientFactory.CreateClient(integration);
 
             // Step 3: Build update request with only provided fields
             var updateRequest = new UpdateIssueRequest
@@ -264,79 +261,26 @@ public class JiraToolService : IJiraToolService
 
             if (!string.IsNullOrEmpty(description))
             {
-                updateRequest.Fields.Description = await _adfConversionService.ConvertMarkdownToAdfAsync(description, CancellationToken.None);
+                var convertedDescription = await _contentConverter.ConvertMarkdownToDescriptionAsync(
+                    description,
+                    integration.JiraType.GetValueOrDefault());
+                
+                // Convert object result to JsonElement if needed
+                if (convertedDescription is JsonElement je)
+                {
+                    updateRequest.Fields.Description = je;
+                }
+                else
+                {
+                    var json = JsonSerializer.Serialize(convertedDescription);
+                    updateRequest.Fields.Description = JsonSerializer.Deserialize<JsonElement>(json);
+                }
             }
 
-            // Step 4: PUT request to JIRA API
-            var response = await client.PutAsJsonAsync(
-                $"/rest/api/3/issue/{issueKey}",
-                updateRequest);
+            // Step 4: Update issue via API client
+            await apiClient.UpdateIssueAsync(issueKey, updateRequest.Fields);
 
             var issueUrl = $"{integration.Url.TrimEnd('/')}/browse/{issueKey}";
-
-            // Handle specific HTTP status codes before EnsureSuccessStatusCode
-            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-            {
-                _logger.LogError(
-                    "Failed to authenticate with JIRA for workspace {WorkspaceId}",
-                    workspaceId);
-                throw new InvalidOperationException(
-                    "Failed to authenticate with JIRA. Please verify the API key.");
-            }
-
-            if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
-            {
-                _logger.LogError(
-                    "Access forbidden updating JIRA issue {IssueKey} in workspace {WorkspaceId}",
-                    issueKey,
-                    workspaceId);
-                throw new InvalidOperationException(
-                    $"You do not have permission to update JIRA issue '{issueKey}'.");
-            }
-
-            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
-            {
-                _logger.LogError(
-                    "JIRA issue {IssueKey} not found in workspace {WorkspaceId}",
-                    issueKey,
-                    workspaceId);
-                throw new InvalidOperationException(
-                    $"JIRA issue '{issueKey}' not found or you do not have access to it.");
-            }
-
-            if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
-            {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                _logger.LogError(
-                    "JIRA API validation error updating issue {IssueKey} in workspace {WorkspaceId}: {ErrorContent}",
-                    issueKey,
-                    workspaceId,
-                    errorContent);
-
-                try
-                {
-                    var jiraError = JsonSerializer.Deserialize<JiraErrorResponse>(errorContent);
-                    var errorMessage = jiraError?.GetFormattedMessage() ?? errorContent;
-                    throw new ArgumentException($"JIRA validation failed: {errorMessage}");
-                }
-                catch (JsonException)
-                {
-                    throw new ArgumentException($"JIRA validation failed: {errorContent}");
-                }
-            }
-
-            if ((int)response.StatusCode >= 500)
-            {
-                _logger.LogError(
-                    "JIRA server error {StatusCode} updating issue {IssueKey} in workspace {WorkspaceId}",
-                    response.StatusCode,
-                    issueKey,
-                    workspaceId);
-                throw new HttpRequestException(
-                    "JIRA server error occurred. Please try again later.");
-            }
-
-            response.EnsureSuccessStatusCode();
 
             _logger.LogInformation(
                 "Successfully updated JIRA issue {IssueKey} in workspace {WorkspaceId}",
@@ -495,77 +439,12 @@ public class JiraToolService : IJiraToolService
             // Step 1: Validate integration
             var integration = await GetAndValidateIntegrationAsync(workspaceGuid);
 
-            // Step 2: Get authenticated HTTP client
-            using var client = GetHttpClient(integration);
+            // Step 2: Create API client
+            var apiClient = _apiClientFactory.CreateClient(integration);
 
-            // Step 3: DELETE request to JIRA API
-            var response = await client.DeleteAsync($"/rest/api/3/issue/{issueKey}");
+            // Step 3: Delete issue via API client
+            await apiClient.DeleteIssueAsync(issueKey);
 
-            // Handle specific HTTP status codes before EnsureSuccessStatusCode
-            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-            {
-                _logger.LogError(
-                    "Failed to authenticate with JIRA for workspace {WorkspaceId}",
-                    workspaceId);
-                throw new InvalidOperationException(
-                    "Failed to authenticate with JIRA. Please verify the API key.");
-            }
-
-            if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
-            {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                _logger.LogError(
-                    "JIRA API validation error deleting issue {IssueKey} in workspace {WorkspaceId}: {ErrorContent}",
-                    issueKey,
-                    workspaceId,
-                    errorContent);
-
-                try
-                {
-                    var jiraError = JsonSerializer.Deserialize<JiraErrorResponse>(errorContent);
-                    var errorMessage = jiraError?.GetFormattedMessage() ?? errorContent;
-                    throw new ArgumentException($"JIRA validation failed: {errorMessage}");
-                }
-                catch (JsonException)
-                {
-                    throw new ArgumentException($"JIRA validation failed: {errorContent}");
-                }
-            }
-
-            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
-            {
-                _logger.LogError(
-                    "JIRA issue {IssueKey} not found in workspace {WorkspaceId}",
-                    issueKey,
-                    workspaceId);
-                throw new InvalidOperationException(
-                    $"JIRA issue '{issueKey}' not found or you do not have access to it.");
-            }
-
-            if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
-            {
-                _logger.LogError(
-                    "Permission denied deleting JIRA issue {IssueKey} in workspace {WorkspaceId}",
-                    issueKey,
-                    workspaceId);
-                throw new InvalidOperationException(
-                    $"You do not have permission to delete JIRA issue '{issueKey}'.");
-            }
-
-            if ((int)response.StatusCode >= 500)
-            {
-                _logger.LogError(
-                    "JIRA server error {StatusCode} deleting issue {IssueKey} in workspace {WorkspaceId}",
-                    response.StatusCode,
-                    issueKey,
-                    workspaceId);
-                throw new HttpRequestException(
-                    "JIRA server error occurred. Please try again later.");
-            }
-
-            response.EnsureSuccessStatusCode();
-
-            // JIRA returns 204 No Content on successful deletion
             _logger.LogInformation(
                 "Successfully deleted JIRA issue {IssueKey} in workspace {WorkspaceId}",
                 issueKey,
@@ -720,113 +599,45 @@ public class JiraToolService : IJiraToolService
             // Step 1: Load and validate integration
             var integration = await GetAndValidateIntegrationAsync(workspaceGuid);
 
-            // Step 2: Create authenticated HTTP client
-            using var client = GetHttpClient(integration);
+            // Step 2: Create API client
+            var apiClient = _apiClientFactory.CreateClient(integration);
 
-            // Step 3: Send GET request with explicit field selection for performance
+            // Step 3: Send request with explicit field selection for performance
             var fields = "summary,description,status,assignee,priority,issuetype";
-            var endpoint = $"/rest/api/3/issue/{issueKey}?fields={fields}";
-            
-            _logger.LogDebug(
-                "Fetching JIRA issue from endpoint: {Endpoint}",
-                endpoint);
-
-            var response = await client.GetAsync(endpoint);
-
-            // Handle specific HTTP status codes before EnsureSuccessStatusCode
-            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-            {
-                _logger.LogError(
-                    "Failed to authenticate with JIRA for workspace {WorkspaceId}",
-                    workspaceId);
-                throw new InvalidOperationException(
-                    "Failed to authenticate with JIRA. Please verify the API key.");
-            }
-
-            if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
-            {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                _logger.LogError(
-                    "JIRA API validation error getting issue {IssueKey} in workspace {WorkspaceId}: {ErrorContent}",
-                    issueKey,
-                    workspaceId,
-                    errorContent);
-
-                try
-                {
-                    var jiraError = JsonSerializer.Deserialize<JiraErrorResponse>(errorContent);
-                    var errorMessage = jiraError?.GetFormattedMessage() ?? errorContent;
-                    throw new ArgumentException($"JIRA validation failed: {errorMessage}");
-                }
-                catch (JsonException)
-                {
-                    throw new ArgumentException($"JIRA validation failed: {errorContent}");
-                }
-            }
-
-            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
-            {
-                _logger.LogError(
-                    "JIRA issue {IssueKey} not found in workspace {WorkspaceId}",
-                    issueKey,
-                    workspaceId);
-                throw new InvalidOperationException(
-                    $"JIRA issue '{issueKey}' not found or you do not have access to it.");
-            }
-
-            if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
-            {
-                _logger.LogError(
-                    "Access forbidden to JIRA issue {IssueKey} in workspace {WorkspaceId}",
-                    issueKey,
-                    workspaceId);
-                throw new InvalidOperationException(
-                    $"You do not have permission to access JIRA issue '{issueKey}'.");
-            }
-
-            if ((int)response.StatusCode >= 500)
-            {
-                _logger.LogError(
-                    "JIRA server error {StatusCode} getting issue {IssueKey} in workspace {WorkspaceId}",
-                    response.StatusCode,
-                    issueKey,
-                    workspaceId);
-                throw new HttpRequestException(
-                    "JIRA server error occurred. Please try again later.");
-            }
-
-            response.EnsureSuccessStatusCode();
-
-            // Step 7: Deserialize response
-            var content = await response.Content.ReadAsStringAsync();
-            JiraTicket? jiraTicket;
-            try
-            {
-                jiraTicket = JsonSerializer.Deserialize<JiraTicket>(
-                    content,
-                    new JsonSerializerOptions 
-                    { 
-                        PropertyNameCaseInsensitive = true 
-                    });
-            }
-            catch (JsonException ex)
-            {
-                _logger.LogError(ex,
-                    "Failed to deserialize JIRA issue response for {IssueKey} in workspace {WorkspaceId}",
-                    issueKey,
-                    workspaceId);
-                throw new InvalidOperationException(
-                    "Failed to parse JIRA API response.");
-            }
+            var jiraTicket = await apiClient.GetIssueAsync(issueKey, fields);
 
             if (jiraTicket == null)
             {
-                throw new InvalidOperationException("Failed to parse JIRA issue response");
+                return new
+                {
+                    success = false,
+                    error = $"JIRA issue '{issueKey}' not found or you do not have access to it.",
+                    errorCode = "JIRA_NOT_FOUND"
+                };
             }
 
-            // Step 8: Extract fields safely and build response
+            // Step 4: Extract fields safely and build response
             var issueUrl = $"{integration.Url.TrimEnd('/')}/browse/{issueKey}";
-            var description = ExtractPlainTextFromAdf(jiraTicket.Fields?.Description);
+            
+            // Convert description from JiraTicket format to markdown
+            JsonElement? descriptionElement = null;
+            if (jiraTicket.Fields?.Description != null)
+            {
+                if (jiraTicket.Fields.Description is JsonElement je)
+                {
+                    descriptionElement = je;
+                }
+                else
+                {
+                    // Serialize the object to JsonElement for conversion
+                    var json = JsonSerializer.Serialize(jiraTicket.Fields.Description);
+                    descriptionElement = JsonSerializer.Deserialize<JsonElement>(json);
+                }
+            }
+            
+            var description = await _contentConverter.ConvertDescriptionToMarkdownAsync(
+                descriptionElement ?? default,
+                integration.JiraType.GetValueOrDefault());
             var assignee = ExtractAssigneeDisplayName(jiraTicket.Fields);
             var priority = jiraTicket.Fields?.Priority?.Name;
             var issueType = ExtractIssueTypeName(jiraTicket.Fields);
@@ -997,15 +808,19 @@ public class JiraToolService : IJiraToolService
             // Step 1: Load and validate integration
             var integration = await GetAndValidateIntegrationAsync(workspaceGuid);
 
-            // Step 2: Get project ID from parameter, filter query, or throw
-            var resolvedProjectId = await GetProjectIdAsync(integration, projectId);
+            // Step 2: Create API client
+            var apiClient = _apiClientFactory.CreateClient(integration);
 
-            // Step 3: Resolve issue type IDs
-            var epicTypeId = await GetIssueTypeIdAsync(integration, "Epic");
-            var storyTypeId = await GetIssueTypeIdAsync(integration, storyTypeName);
+            // Step 3: Get project ID from parameter, filter query, or throw
+            var resolvedProjectId = await GetProjectIdAsync(apiClient, integration, projectId);
 
-            // Step 4: Create the epic issue
+            // Step 4: Resolve issue type IDs
+            var epicTypeId = await GetIssueTypeIdAsync(apiClient, "Epic");
+            var storyTypeId = await GetIssueTypeIdAsync(apiClient, storyTypeName);
+
+            // Step 5: Create the epic issue
             var epicKey = await CreateSingleIssueAsync(
+                apiClient,
                 integration,
                 resolvedProjectId,
                 epicTitle,
@@ -1020,13 +835,14 @@ public class JiraToolService : IJiraToolService
                 workspaceId,
                 stories.Count);
 
-            // Step 5: Create stories under the epic
+            // Step 6: Create stories under the epic
             var createdStoryKeys = new List<string>();
             foreach (var story in stories)
             {
                 try
                 {
                     var storyKey = await CreateSingleIssueAsync(
+                        apiClient,
                         integration,
                         resolvedProjectId,
                         story.Title,
@@ -1053,7 +869,7 @@ public class JiraToolService : IJiraToolService
                 }
             }
 
-            // Step 6: Build success response
+            // Step 7: Build success response
             var message = createdStoryKeys.Count == stories.Count
                 ? $"Successfully created epic {epicKey} with {createdStoryKeys.Count} stories"
                 : $"Created epic {epicKey} with {createdStoryKeys.Count} out of {stories.Count} stories (some failed)";
@@ -1189,48 +1005,6 @@ public class JiraToolService : IJiraToolService
         }
     }
 
-    private HttpClient GetHttpClient(Integration integration)
-    {
-        try
-        {
-            var client = _httpClientFactory.CreateClient();
-
-            if (string.IsNullOrEmpty(integration.Url))
-            {
-                throw new ArgumentException("Integration URL is required for Jira API calls.", nameof(integration.Url));
-            }
-            
-            if (string.IsNullOrEmpty(integration.EncryptedApiKey))
-            {
-                throw new ArgumentException("Integration encrypted API key is required for Jira API calls.", nameof(integration.EncryptedApiKey));
-            }
-            
-            client.BaseAddress = new Uri(integration.Url);
-            
-            // Decrypt API key (format: "email:apiToken")
-            var apiKey = _credentialEncryptionService.Decrypt(integration.EncryptedApiKey);
-            
-            // Set Basic Auth header
-            var authValue = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{integration.Username}:{apiKey}"));
-            client.DefaultRequestHeaders.Authorization = 
-                new AuthenticationHeaderValue("Basic", authValue);
-            
-            return client;
-        }
-        catch (UriFormatException ex)
-        {
-            _logger.LogError(ex, "Invalid URL format for Jira integration '{IntegrationName}': '{Url}'", 
-                integration.Name, integration.Url);
-            throw new ArgumentException("Invalid integration URL format.", nameof(integration.Url), ex);
-        }
-        catch (Exception ex) when (ex is ArgumentException || ex is CryptographicException)
-        {
-            _logger.LogError(ex, "Failed to configure HttpClient for Jira integration '{IntegrationName}'", 
-                integration.Name);
-            throw;
-        }
-    }
-
     private async Task<Integration> GetAndValidateIntegrationAsync(
         Guid workspaceId, 
         CancellationToken cancellationToken = default)
@@ -1260,6 +1034,7 @@ public class JiraToolService : IJiraToolService
     }
 
     private async Task<string> GetProjectIdAsync(
+        IJiraApiClient apiClient,
         Integration integration,
         string? projectId,
         CancellationToken cancellationToken = default)
@@ -1282,7 +1057,7 @@ public class JiraToolService : IJiraToolService
                 var projectKey = match.Groups[1].Value;
                 _logger.LogDebug("Extracted project key from filter query: {ProjectKey}", projectKey);
                 // Resolve project key to project ID via JIRA API
-                var resolvedId = await GetProjectIdByKeyAsync(integration, projectKey, cancellationToken);
+                var resolvedId = await apiClient.GetProjectIdByKeyAsync(projectKey, cancellationToken);
                 if (!string.IsNullOrEmpty(resolvedId))
                 {
                     return resolvedId;
@@ -1295,76 +1070,18 @@ public class JiraToolService : IJiraToolService
         throw new InvalidOperationException("Project ID must be specified via parameter or filter query.");
     }
 
-    // Helper to resolve project key to project ID
-    private async Task<string?> GetProjectIdByKeyAsync(Integration integration, string projectKey, CancellationToken cancellationToken = default)
-    {
-        using var client = GetHttpClient(integration);
-        var requestUrl = $"/rest/api/3/project/{projectKey}";
-        var response = await client.GetAsync(requestUrl, cancellationToken);
-        if (response.IsSuccessStatusCode)
-        {
-            var json = await response.Content.ReadAsStringAsync();
-            using var doc = JsonDocument.Parse(json);
-            if (doc.RootElement.TryGetProperty("id", out var idProp))
-            {
-                return idProp.GetString();
-            }
-        }
-        _logger.LogError("Failed to resolve project key {ProjectKey} to project ID for integration {IntegrationId}", projectKey, integration.Id);
-        return null;
-    }
-
     private async Task<string> GetIssueTypeIdAsync(
-        Integration integration, 
+        IJiraApiClient apiClient,
         string issueTypeName, 
         CancellationToken cancellationToken = default)
     {
         try
         {
-            using var client = GetHttpClient(integration);
-            
             _logger.LogDebug(
-                "Fetching issue type ID for '{IssueTypeName}' from JIRA integration {IntegrationId}", 
-                issueTypeName, 
-                integration.Id);
+                "Fetching issue type ID for '{IssueTypeName}'", 
+                issueTypeName);
             
-            var response = await client.GetAsync("/rest/api/3/issuetype", cancellationToken);
-
-            // Handle specific HTTP status codes
-            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-            {
-                _logger.LogError(
-                    "Failed to authenticate with JIRA for integration {IntegrationId}",
-                    integration.Id);
-                throw new InvalidOperationException(
-                    "Failed to authenticate with JIRA. Please verify the API key.");
-            }
-
-            if ((int)response.StatusCode >= 500)
-            {
-                _logger.LogError(
-                    "JIRA server error {StatusCode} fetching issue types for integration {IntegrationId}",
-                    response.StatusCode,
-                    integration.Id);
-                throw new HttpRequestException(
-                    "JIRA server error occurred. Please try again later.");
-            }
-
-            response.EnsureSuccessStatusCode();
-
-            List<IssueType>? issueTypes;
-            try
-            {
-                issueTypes = await response.Content.ReadFromJsonAsync<List<IssueType>>();
-            }
-            catch (JsonException ex)
-            {
-                _logger.LogError(ex,
-                    "Failed to deserialize JIRA issue types response for integration {IntegrationId}",
-                    integration.Id);
-                throw new InvalidOperationException(
-                    "Failed to parse JIRA API response when fetching issue types.");
-            }
+            var issueTypes = await apiClient.GetIssueTypesAsync(cancellationToken);
             
             var issueType = issueTypes?.FirstOrDefault(it => 
                 string.Equals(it.Name, issueTypeName, StringComparison.OrdinalIgnoreCase));
@@ -1372,32 +1089,30 @@ public class JiraToolService : IJiraToolService
             if (issueType == null)
             {
                 _logger.LogError(
-                    "Issue type '{IssueTypeName}' not found in JIRA integration {IntegrationId}", 
-                    issueTypeName, 
-                    integration.Id);
+                    "Issue type '{IssueTypeName}' not found", 
+                    issueTypeName);
                 throw new ArgumentException(
-                    $"Issue type '{issueTypeName}' not found in JIRA integration {integration.Id}. " +
+                    $"Issue type '{issueTypeName}' not found. " +
                     $"Available types: {string.Join(", ", issueTypes?.Select(it => it.Name) ?? new List<string>())}");
             }
             
             _logger.LogDebug(
-                "Resolved issue type '{IssueTypeName}' to ID {IssueTypeId} for integration {IntegrationId}", 
+                "Resolved issue type '{IssueTypeName}' to ID {IssueTypeId}", 
                 issueTypeName, 
-                issueType.Id, 
-                integration.Id);
+                issueType.Id);
             
             return issueType.Id;
         }
         catch (HttpRequestException ex)
         {
             _logger.LogError(ex, 
-                "Failed to fetch issue types from JIRA integration {IntegrationId}", 
-                integration.Id);
+                "Failed to fetch issue types");
             throw;
         }
     }
 
     private async Task<string> CreateSingleIssueAsync(
+        IJiraApiClient apiClient,
         Integration integration,
         string projectId,
         string summary,
@@ -1408,10 +1123,11 @@ public class JiraToolService : IJiraToolService
     {
         try
         {
-            using var client = GetHttpClient(integration);
-            
-            // Build ADF-formatted description
-            var adfDescription = await _adfConversionService.ConvertMarkdownToAdfAsync(description, cancellationToken);
+            // Build description in the appropriate format
+            var descriptionBody = await _contentConverter.ConvertMarkdownToDescriptionAsync(
+                description,
+                integration.JiraType.GetValueOrDefault(),
+                cancellationToken);
 
             // Build create issue request
             var request = new CreateIssueRequest
@@ -1419,7 +1135,7 @@ public class JiraToolService : IJiraToolService
                 Fields = new CreateIssueFields
                 {
                     Summary = summary,
-                    Description = adfDescription,
+                    Description = descriptionBody,
                     Issuetype = new IssueTypeField { Id = issueTypeId },
                     Project = new ProjectField { Id = projectId }
                 }
@@ -1432,153 +1148,30 @@ public class JiraToolService : IJiraToolService
             }
             
             _logger.LogDebug(
-                "Creating JIRA issue in project {ProjectId} with type {IssueTypeId} for integration {IntegrationId}", 
+                "Creating JIRA issue in project {ProjectId} with type {IssueTypeId}", 
                 projectId, 
-                issueTypeId, 
-                integration.Id);
+                issueTypeId);
             
-            var response = await client.PostAsJsonAsync(
-                "/rest/api/3/issue", 
-                request, 
-                cancellationToken);
-            
-            // Handle specific HTTP status codes before EnsureSuccessStatusCode
-            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-            {
-                _logger.LogError(
-                    "Failed to authenticate with JIRA for integration {IntegrationId}",
-                    integration.Id);
-                throw new InvalidOperationException(
-                    "Failed to authenticate with JIRA. Please verify the API key.");
-            }
-
-            if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
-            {
-                _logger.LogError(
-                    "Access forbidden when creating issue in integration {IntegrationId}",
-                    integration.Id);
-                throw new InvalidOperationException(
-                    "You do not have permission to create issues in JIRA.");
-            }
-
-            if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
-            {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                _logger.LogError(
-                    "JIRA API validation error for integration {IntegrationId}: {ErrorContent}",
-                    integration.Id,
-                    errorContent);
-
-                try
-                {
-                    var jiraError = JsonSerializer.Deserialize<JiraErrorResponse>(errorContent);
-                    var errorMessage = jiraError?.GetFormattedMessage() ?? errorContent;
-                    throw new ArgumentException($"JIRA validation failed: {errorMessage}");
-                }
-                catch (JsonException)
-                {
-                    throw new ArgumentException($"JIRA validation failed: {errorContent}");
-                }
-            }
-
-            if ((int)response.StatusCode >= 500)
-            {
-                _logger.LogError(
-                    "JIRA server error {StatusCode} for integration {IntegrationId}",
-                    response.StatusCode,
-                    integration.Id);
-                throw new HttpRequestException(
-                    "JIRA server error occurred. Please try again later.");
-            }
-
-            response.EnsureSuccessStatusCode();
-            
-            CreateIssueResponse? result;
-            try
-            {
-                result = await response.Content.ReadFromJsonAsync<CreateIssueResponse>();
-            }
-            catch (JsonException ex)
-            {
-                _logger.LogError(ex,
-                    "Failed to deserialize JIRA issue creation response for integration {IntegrationId}",
-                    integration.Id);
-                throw new InvalidOperationException(
-                    "Failed to parse JIRA API response after creating issue.");
-            }
+            var result = await apiClient.CreateIssueAsync(request, cancellationToken);
             
             if (result == null || string.IsNullOrEmpty(result.Key))
             {
                 _logger.LogError(
-                    "Failed to parse create issue response for integration {IntegrationId}", 
-                    integration.Id);
+                    "Failed to parse create issue response");
                 throw new InvalidOperationException("Failed to parse JIRA create issue response");
             }
             
             _logger.LogInformation(
-                "Successfully created JIRA issue {IssueKey} in integration {IntegrationId}", 
-                result.Key, 
-                integration.Id);
+                "Successfully created JIRA issue {IssueKey}", 
+                result.Key);
             
             return result.Key;
         }
         catch (HttpRequestException ex)
         {
             _logger.LogError(ex, 
-                "Failed to create issue in JIRA integration {IntegrationId}", 
-                integration.Id);
+                "Failed to create issue");
             throw;
-        }
-    }
-
-    /// <summary>
-    /// Extracts plain text from Atlassian Document Format (ADF) content.
-    /// Handles the complex nested JSON structure of ADF and returns concatenated text.
-    /// </summary>
-    private string ExtractPlainTextFromAdf(dynamic adfContent)
-    {
-        if (adfContent == null) return "";
-        
-        try
-        {
-            // Serialize dynamic object to JSON string, then deserialize to JsonElement for traversal
-            var jsonString = JsonSerializer.Serialize(adfContent);
-            var doc = JsonSerializer.Deserialize<JsonElement>(jsonString);
-            
-            // ADF structure: { "content": [ { "type": "paragraph", "content": [ { "type": "text", "text": "..." } ] } ] }
-            if (doc.TryGetProperty("content", out JsonElement content))
-            {
-                var textParts = new List<string>();
-                
-                // Iterate through top-level content nodes (paragraphs, headings, etc.)
-                foreach (var node in content.EnumerateArray())
-                {
-                    // Each node can have nested content with text
-                    if (node.TryGetProperty("content", out JsonElement nodeContent))
-                    {
-                        foreach (var textNode in nodeContent.EnumerateArray())
-                        {
-                            if (textNode.TryGetProperty("text", out JsonElement text))
-                            {
-                                var textValue = text.GetString();
-                                if (!string.IsNullOrWhiteSpace(textValue))
-                                {
-                                    textParts.Add(textValue);
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                return string.Join(" ", textParts);
-            }
-            
-            return "";
-        }
-        catch
-        {
-            // Fallback: return string representation if ADF parsing fails
-            return adfContent.ToString() ?? "";
         }
     }
 
