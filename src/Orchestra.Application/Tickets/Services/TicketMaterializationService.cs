@@ -48,6 +48,8 @@ public class TicketMaterializationService : ITicketMaterializationService
             workspaceId,
             integrationId,
             externalTicketId,
+            externalTicket.Title,
+            externalTicket.Description,
             statusId: toDoStatusId,
             priorityId: mappedPriority.Id,
             assignedAgentId: assignedAgentId,

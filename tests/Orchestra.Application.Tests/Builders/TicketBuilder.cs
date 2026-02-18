@@ -145,6 +145,8 @@ public class TicketBuilder
             _workspaceId,
             _integrationId.Value,
             _externalTicketId,
+            _title,
+            _description,
             _statusId,
             _priorityId,
             _assignedAgentId,

@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Settings, X, Loader2, Bot, Brain, Sparkles, Pencil, Trash2, AlertTriangle, Briefcase, Wrench, Search, CheckCircle2, GripVertical, User } from 'lucide-react';
+import { Plus, Settings, X, Loader2, Bot, Brain, Sparkles, Pencil, Trash2, AlertTriangle, Briefcase, Wrench, Search, CheckCircle2, GripVertical, User, Eye, FileText } from 'lucide-react';
+import { marked } from 'marked';
 import { Agent, Tool } from '../types';
 import { getAgents, createAgent, updateAgent, deleteAgent } from '../services/agentService';
 import { getTools } from '../services/toolService';
@@ -8,6 +9,37 @@ import { getTools } from '../services/toolService';
 interface AgentsListProps {
   workspaceId: string;
 }
+
+// Markdown Preview Component
+const MarkdownPreview: React.FC<{ content: string; className?: string }> = ({ content, className = '' }) => {
+  if (!content) {
+    return (
+      <div className={`flex items-center justify-center h-[300px] text-textMuted italic ${className}`}>
+        <div className="text-center">
+          <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
+          <p>Preview will appear here</p>
+        </div>
+      </div>
+    );
+  }
+  
+  try {
+    const html = marked.parse(content, { breaks: true });
+    return (
+      <div 
+        className={`prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-headings:mb-2 prose-headings:mt-4 first:prose-headings:mt-0 prose-headings:font-bold prose-a:text-primary hover:prose-a:text-primaryHover ${className}`}
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+    );
+  } catch (error) {
+    console.error('Markdown parse error:', error);
+    return (
+      <div className={`text-red-400 text-sm p-3 bg-red-500/10 rounded border border-red-500/20 ${className}`}>
+        Error parsing markdown
+      </div>
+    );
+  }
+};
 
 const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -27,6 +59,7 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [toolSearch, setToolSearch] = useState('');
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
 
   // Delete State
   const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
@@ -499,16 +532,26 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
                     </div>
 
                     <div className="space-y-4">
-                        <h4 className="text-[10px] font-bold text-textMuted uppercase tracking-widest flex items-center gap-2">
-                            <Bot className="w-3.5 h-3.5" /> Custom Instructions
-                        </h4>
+                        <div className="flex items-center justify-between">
+                            <h4 className="text-[10px] font-bold text-textMuted uppercase tracking-widest flex items-center gap-2">
+                                <Bot className="w-3.5 h-3.5" /> Custom Instructions
+                            </h4>
+                            <button
+                              type="button"
+                              onClick={() => setIsPreviewModalOpen(true)}
+                              className="text-xs px-2 py-1 rounded flex items-center gap-1.5 transition-colors bg-surfaceHighlight text-textMuted hover:text-text hover:bg-surface"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              Show Preview
+                            </button>
+                        </div>
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-semibold text-textMuted uppercase">Core Behavior & System Prompts</label>
                             <textarea 
-                            value={formState.customInstructions}
-                            onChange={(e) => setFormState({...formState, customInstructions: e.target.value})}
-                            placeholder="Define how the agent should think, reason, and interact with tools..."
-                            className="w-full bg-surface border border-border rounded-md px-4 py-3 text-sm text-text focus:outline-none focus:border-primary h-full min-h-[300px] resize-none font-mono text-[12px] shadow-sm leading-relaxed"
+                              value={formState.customInstructions}
+                              onChange={(e) => setFormState({...formState, customInstructions: e.target.value})}
+                              placeholder="Define how the agent should think, reason, and interact with tools... (Markdown supported)"
+                              className="w-full bg-surface border border-border rounded-md px-4 py-3 text-sm text-text focus:outline-none focus:border-primary h-full min-h-[300px] resize-none font-mono text-[12px] shadow-sm leading-relaxed"
                             />
                         </div>
                     </div>
@@ -543,6 +586,51 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
         </div>
       )}
 
+
+      {/* Markdown Preview Modal */}
+      {isPreviewModalOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-surface border border-border w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden animate-scale-in flex flex-col h-[90vh]">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-border flex justify-between items-center bg-surfaceHighlight/30 shrink-0">
+              <div className="flex items-center gap-3">
+                <Eye className="w-5 h-5 text-primary" />
+                <h3 className="text-lg font-bold text-text">Custom Instructions Preview</h3>
+              </div>
+              <button 
+                onClick={() => setIsPreviewModalOpen(false)}
+                className="p-1 hover:bg-surfaceHighlight rounded-full text-textMuted hover:text-text transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            {/* Modal Content - Two Column */}
+            <div className="flex-1 overflow-hidden flex">
+              {/* Editor */}
+              <div className="flex-1 flex flex-col border-r border-border p-6 overflow-hidden">
+                <p className="text-xs font-bold text-textMuted uppercase tracking-widest mb-3">Editor</p>
+                <textarea 
+                  value={formState.customInstructions}
+                  onChange={(e) => setFormState({...formState, customInstructions: e.target.value})}
+                  placeholder="Define how the agent should think, reason, and interact with tools... (Markdown supported)"
+                  className="flex-1 bg-background border border-border rounded-md px-4 py-3 text-sm text-text focus:outline-none focus:border-primary resize-none font-mono text-[12px] shadow-sm leading-relaxed custom-scrollbar"
+                />
+              </div>
+              
+              {/* Preview */}
+              <div className="flex-1 flex flex-col p-6 bg-surfaceHighlight/30 overflow-hidden">
+                <p className="text-xs font-bold text-textMuted uppercase tracking-widest mb-3 flex items-center gap-1">
+                  <Eye className="w-3 h-3" /> Live Preview
+                </p>
+                <div className="flex-1 bg-surface border border-border rounded-md px-4 py-3 overflow-y-auto shadow-sm custom-scrollbar">
+                  <MarkdownPreview content={formState.customInstructions} className="text-text" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tool Configuration Modal */}
       {isActionModalOpen && configuringToolId && (

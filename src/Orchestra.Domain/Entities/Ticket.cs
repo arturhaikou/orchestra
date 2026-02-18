@@ -66,13 +66,15 @@ public class Ticket
 
     /// <summary>
     /// Creates a materialized external ticket record when assignments are first made to external tickets.
-    /// Title and Description are set to empty strings as placeholders; they will be fetched dynamically from the provider.
+    /// Title and Description are populated from the external ticket data.
     /// StatusId and PriorityId track internal agent execution state while external values remain in the provider.
     /// </summary>
     public static Ticket MaterializeFromExternal(
         Guid workspaceId,
         Guid integrationId,
         string externalTicketId,
+        string title,
+        string description,
         Guid? statusId = null,
         Guid? priorityId = null,
         Guid? assignedAgentId = null,
@@ -86,6 +88,9 @@ public class Ticket
         
         if (string.IsNullOrWhiteSpace(externalTicketId))
             throw new ArgumentException("External ticket ID is required.", nameof(externalTicketId));
+        
+        if (string.IsNullOrWhiteSpace(title))
+            throw new ArgumentException("Title is required.", nameof(title));
 
         return new Ticket
         {
@@ -94,9 +99,8 @@ public class Ticket
             IntegrationId = integrationId,
             ExternalTicketId = externalTicketId,
             IsInternal = false,
-            // Title, Description will come from provider dynamically
-            Title = string.Empty, // Placeholder, will be overridden from provider
-            Description = string.Empty,
+            Title = title,
+            Description = description ?? string.Empty,
             // StatusId and PriorityId track internal state for agent execution
             PriorityId = priorityId,
             StatusId = statusId,

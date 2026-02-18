@@ -61,10 +61,10 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
   const providers = [
     { value: 'jira', label: 'Jira' },
     { value: 'confluence', label: 'Confluence' },
+    { value: 'github', label: 'GitHub' },
     // Unsupported providers - pending backend implementation
     // { value: 'azure-devops', label: 'Azure DevOps' },
     // { value: 'linear', label: 'Linear' },
-    // { value: 'github', label: 'GitHub' },
     // { value: 'gitlab', label: 'GitLab' },
     // { value: 'notion', label: 'Notion' },
     // { value: 'custom', label: 'Custom' },
@@ -84,6 +84,12 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
           placeholder: 'e.g. type = "page" AND space = "ENG"',
           hint: 'Limit which pages are synced by providing a specific Confluence Query Language string.'
         };
+      case 'github':
+        return {
+          label: 'SEARCH FILTER',
+          placeholder: 'e.g. is:open label:bug state:open',
+          hint: 'Limit which issues are synced by providing a GitHub search filter.'
+        };
       // Unsupported providers - pending backend implementation
       // case 'azure-devops':
       //   return {
@@ -91,12 +97,11 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
       //     placeholder: 'SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = "Nexus"',
       //     hint: 'Limit work items using Work Item Query Language.'
       //   };
-      // case 'github':
       // case 'gitlab':
       //   return {
       //     label: 'SEARCH FILTER',
-      //     placeholder: 'e.g. is:open label:bug',
-      //     hint: 'Limit items using standard provider search syntax.'
+      //     placeholder: 'e.g. state:opened labels:bug',
+      //     hint: 'Limit items using standard GitLab search syntax.'
       //   };
       // case 'notion':
       //   return {
@@ -119,7 +124,7 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
       setFormState({
         name: integration.name,
         type: integration.type,
-        provider: integration.provider || 'custom',
+        provider: (integration.provider || 'custom').toLowerCase(),
         url: integration.url || '',
         username: integration.username || '',
         apiKey: '••••••••••••', // Masked for existing
@@ -242,8 +247,8 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
     switch (providerName) {
       case 'jira': return <Layers className="w-5 h-5 text-indigo-500" />;
       case 'confluence': return <Database className="w-5 h-5 text-blue-400" />;
+      case 'github': return <GitBranch className="w-5 h-5 text-orange-500" />;
       // Unsupported providers - pending backend implementation
-      // case 'github': return <GitBranch className="w-5 h-5 text-text" />;
       // case 'linear': return <Zap className="w-5 h-5 text-purple-500" />;
       default: return <Globe className="w-5 h-5 text-zinc-600" />;
     }

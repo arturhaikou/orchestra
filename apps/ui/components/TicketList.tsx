@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Bot, Sparkles, RefreshCw, X, Send, Loader2, MessageSquare, Plus, Save, Database, Globe, Workflow as WorkflowIcon, Flag, Activity, ChevronDown, Clock, ChevronRight, Layers, Smile, Meh, Frown, ExternalLink, Zap, Trash2, AlertTriangle, User } from 'lucide-react';
+import { Bot, Sparkles, RefreshCw, X, Send, Loader2, MessageSquare, Plus, Save, Database, Globe, Workflow as WorkflowIcon, Flag, Activity, ChevronDown, Clock, ChevronRight, Layers, Smile, Meh, Frown, ExternalLink, Zap, Trash2, AlertTriangle, User, Github } from 'lucide-react';
 import { marked } from 'marked';
 import { Ticket, TicketPriority, TicketStatus, Comment, Workflow, Agent } from '../types';
 import { addComment, createTicket, updateTicket, getTickets, convertToExternal, deleteTicket, getTicketStatuses, getTicketPriorities, generateSummary } from '../services/ticketService';
@@ -14,6 +14,42 @@ interface TicketListProps {
   workspaceId: string;
   onNavigateToTickets?: () => void;
 }
+
+interface ProviderInfo {
+  icon: React.ReactNode;
+  name: string;
+  color: string;
+}
+
+const getProviderInfo = (source: string): ProviderInfo => {
+  const sourceUpper = source?.toUpperCase() || '';
+  
+  if (sourceUpper.includes('JIRA')) {
+    return {
+      icon: <Layers className="w-4 h-4" />,
+      name: 'Jira',
+      color: 'text-blue-500'
+    };
+  } else if (sourceUpper.includes('GITHUB')) {
+    return {
+      icon: <Github className="w-4 h-4" />,
+      name: 'GitHub',
+      color: 'text-gray-400'
+    };
+  } else if (sourceUpper.includes('INTERNAL')) {
+    return {
+      icon: <Database className="w-4 h-4" />,
+      name: 'Internal',
+      color: 'text-primary'
+    };
+  }
+  
+  return {
+    icon: <Globe className="w-4 h-4" />,
+    name: 'External',
+    color: 'text-textMuted'
+  };
+};
 
 const Markdown: React.FC<{ content: string; className?: string }> = ({ content, className = '' }) => {
   if (!content) return null;
@@ -496,12 +532,10 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
                         >
                           <td className="p-4 font-mono text-[11px] text-textMuted">
                             <div className="flex items-center gap-2">
-                               {ticket.internal ? (
-                                 <span title="Internal"><Database className="w-3 h-3 text-primary" /></span>
-                               ) : (
-                                 <span title="External"><Globe className="w-3 h-3 text-textMuted" /></span>
-                               )}
-                               {ticket.id}
+                               <span title={ticket.internal ? 'Internal' : 'External'} className={getProviderInfo(ticket.source).color}>
+                                 {getProviderInfo(ticket.source).icon}
+                               </span>
+                               <span className="text-textMuted text-[10px]">{ticket.id}</span>
                             </div>
                           </td>
                           <td className="p-4 text-text font-medium max-w-xs">
@@ -621,18 +655,9 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
                       
                       <div className="flex flex-col gap-1">
                         <div className="flex items-start gap-3">
-                           {ticket.internal ? (
-                             <Database className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                           ) : (
-                             <div className="flex items-center gap-1.5">
-                               <Globe className="w-4 h-4 text-textMuted shrink-0 mt-0.5" />
-                               {(ticket.assignedAgentId || ticket.assignedWorkflowId) && (
-                                 <span className="text-[9px] font-bold uppercase tracking-wider text-primary/70 bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20" title="Tracked internally with agent/workflow">
-                                   Tracked
-                                 </span>
-                               )}
-                             </div>
-                           )}
+                           <div className={`${getProviderInfo(ticket.source).color} mt-0.5 shrink-0`} title={`Tracked in ${getProviderInfo(ticket.source).name}`}>
+                             {getProviderInfo(ticket.source).icon}
+                           </div>
                            <h3 className="text-sm font-semibold text-text leading-snug line-clamp-2">{ticket.title}</h3>
                         </div>
                         {workflowName && (
@@ -715,7 +740,13 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                    {selectedTicket.source === 'JIRA' && <Layers className="w-5 h-5 text-blue-500 shrink-0" />}
+                    {getProviderInfo(selectedTicket.source).color && 
+                      <span className={`${getProviderInfo(selectedTicket.source).color} shrink-0`} title={getProviderInfo(selectedTicket.source).name}>
+                        <div className="w-5 h-5 flex items-center justify-center">
+                          {getProviderInfo(selectedTicket.source).icon}
+                        </div>
+                      </span>
+                    }
                     {!selectedTicket.internal && (selectedTicket.assignedAgentId || selectedTicket.assignedWorkflowId) && (
                       <span className="text-[9px] font-bold uppercase tracking-wider text-primary/70 bg-primary/10 px-2 py-1 rounded border border-primary/20 shrink-0" title="Tracked internally - uses internal status/priority for agent execution">
                         Tracked Internally
