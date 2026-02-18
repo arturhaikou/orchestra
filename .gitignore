@@ -42,7 +42,7 @@ ScaffoldingReadMe.txt
 *.PublishSettings
 
 # Local configuration files
-appsettings.Development.json
+// ...existing code...
 secrets.json
 
 # Logs
