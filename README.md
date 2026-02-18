@@ -8,9 +8,21 @@
 
 ---
 
+
 ## 🚀 Why Orchestra?
 
 Development shouldn't be about passive tracking; it should be about active orchestration. We built **Orchestra** to be your **A.S.A.P.**—an **A**I **S**DLC **A**utomation **P**latform that bridges the gap between issue creation and code deployment.
+
+---
+
+## The Problem: AI Fragmentation in the SDLC
+
+In the fast-evolving world of AI, every team is trying to integrate intelligence into their processes. The Software Development Life Cycle (SDLC) is no exception.
+
+However, configuring AI capabilities across different systems—such as **Jira, Confluence, GitHub, Azure DevOps, etc.**—forces teams to duplicate work in different ways for different platforms. Furthermore, AI features are often inconsistent between these systems; the "AI" in your issue tracker might behave completely differently than the "AI" in your documentation tool.
+
+### The Solution
+Orchestra solves this by providing a **unified control plane**. It allows you to set up AI functionality for all your different systems in a single place. By centralizing the configuration of agents, tools, and access, you ensure consistent AI behavior across your entire development stack without managing a dozen different settings pages.
 
 ### 🎼 The Composition (How it works)
 
