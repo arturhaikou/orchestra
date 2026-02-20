@@ -250,7 +250,9 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
             assignedWorkflowId: editForm.assignedWorkflowId || undefined
         };
 
-        if (selectedTicket.internal) {
+        // Allow status/priority updates for internal tickets and materialized external tickets
+        const isMaterializedExternal = !selectedTicket.internal && (selectedTicket.assignedAgentId || selectedTicket.assignedWorkflowId);
+        if (selectedTicket.internal || isMaterializedExternal) {
            const statusObj = statuses.find(s => s.name === editForm.status);
            if (statusObj) updates.statusId = statusObj.id;
 
@@ -903,8 +905,14 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
                             </div>
                         </div>
 
-                        {selectedTicket.internal && (
+                        {(selectedTicket.internal || (!selectedTicket.internal && (selectedTicket.assignedAgentId || selectedTicket.assignedWorkflowId))) && (
                           <>
+                            {!selectedTicket.internal && (
+                              <div className="text-[9px] text-textMuted bg-primary/5 border border-primary/20 rounded-lg p-3 mb-3 flex items-start gap-2">
+                                <span className="text-primary font-bold mt-0.5">ℹ️</span>
+                                <span>These internal status/priority values are used for agent workflow execution. The external system maintains its own status independently.</span>
+                              </div>
+                            )}
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-bold text-textMuted uppercase">Status</label>
                                 <select 

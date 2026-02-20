@@ -7,7 +7,7 @@ namespace Orchestra.Infrastructure.Tools.Services;
 
 public class InternalToolService : IInternalToolService
 {
-    private static readonly Guid ToDoStatusId = Guid.Parse("66666666-6666-6666-6666-666666666666");
+    private static readonly Guid NewStatusId = Guid.Parse("55555555-5555-5555-5555-555555555555");
     private static readonly Guid MediumPriorityId = Guid.Parse("22222222-2222-2222-2222-222222222222");
 
     private readonly ITicketService _ticketService;
@@ -89,7 +89,7 @@ public class InternalToolService : IInternalToolService
                 WorkspaceId: workspaceGuid,
                 Title: title,
                 Description: description,
-                StatusId: ToDoStatusId,
+                StatusId: NewStatusId,
                 PriorityId: MediumPriorityId,
                 Internal: true);
 

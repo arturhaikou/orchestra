@@ -188,6 +188,72 @@ export const updateTicket = async (ticketId: string, updates: Partial<Ticket>): 
   }
 };
 
+/**
+ * Updates the status of a ticket (for both internal and materialized external tickets).
+ * For materialized external tickets, this updates the internal status independently from the external provider's status.
+ * @param ticketId - The ticket ID (GUID for internal, composite format for external)
+ * @param statusId - The ID of the new status
+ * @returns A Promise that resolves to the updated ticket
+ */
+export const updateTicketStatus = async (ticketId: string, statusId: string): Promise<Ticket> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/${ticketId}`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ statusId }),
+    });
+
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("text/html")) throw new Error("Not JSON");
+
+    if (!response.ok) {
+      try {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || errorData.message || response.statusText);
+      } catch {
+        throw new Error(`Backend error: ${response.statusText}`);
+      }
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Updates the priority of a ticket (for both internal and materialized external tickets).
+ * For materialized external tickets, this updates the internal priority independently from the external provider's priority.
+ * @param ticketId - The ticket ID (GUID for internal, composite format for external)
+ * @param priorityId - The ID of the new priority
+ * @returns A Promise that resolves to the updated ticket
+ */
+export const updateTicketPriority = async (ticketId: string, priorityId: string): Promise<Ticket> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/${ticketId}`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ priorityId }),
+    });
+
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("text/html")) throw new Error("Not JSON");
+
+    if (!response.ok) {
+      try {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || errorData.message || response.statusText);
+      } catch {
+        throw new Error(`Backend error: ${response.statusText}`);
+      }
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+};
+
 export const deleteTicket = async (ticketId: string): Promise<void> => {
   try {
     const response = await fetch(`${API_BASE_URL}/${ticketId}`, {

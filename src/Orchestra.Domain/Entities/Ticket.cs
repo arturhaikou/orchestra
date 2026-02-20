@@ -88,9 +88,6 @@ public class Ticket
         
         if (string.IsNullOrWhiteSpace(externalTicketId))
             throw new ArgumentException("External ticket ID is required.", nameof(externalTicketId));
-        
-        if (string.IsNullOrWhiteSpace(title))
-            throw new ArgumentException("Title is required.", nameof(title));
 
         return new Ticket
         {

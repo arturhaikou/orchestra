@@ -245,16 +245,24 @@ public async Task<IActionResult> GetTicketById(
 
 /// <summary>
 /// Updates a ticket's assignments and metadata (PATCH /v1/tickets/{id}).
-/// External tickets can only update assignments (agent/workflow).
-/// Internal tickets can update status, priority, and assignments.
-/// Materializes external tickets on first assignment.
+/// For materialized external tickets: can update status, priority, and assignments.
+/// For non-materialized external tickets: can only update assignments (which triggers materialization).
+/// For internal tickets: can update status, priority, assignments, and description.
 /// </summary>
+/// <remarks>
+/// **Materialized External Tickets:** Once an external ticket is materialized (assigned to an agent or workflow),
+/// you can independently manage its internal status and priority. The external provider's status/priority remains 
+/// separate and unchanged—this internal tracking allows agents to manage workflow state independently.
+/// 
+/// **Non-Materialized External Tickets:** Cannot update status/priority until materialized. Providing assignments
+/// will trigger materialization with optional initial status/priority values.
+/// </remarks>
 /// <param name="id">Internal ticket GUID or composite format {integrationId}:{externalTicketId}</param>
 /// <param name="request">Update request with nullable fields for partial updates</param>
 /// <param name="cancellationToken">Cancellation token</param>
 /// <returns>Updated ticket details</returns>
 /// <response code="200">Ticket updated successfully</response>
-/// <response code="400">Invalid request or attempted to update status/priority on external ticket</response>
+/// <response code="400">Invalid request (e.g., attempting to update status/priority on non-materialized external ticket)</response>
 /// <response code="401">Unauthorized - missing or invalid JWT token</response>
 /// <response code="403">Forbidden - user lacks access to ticket's workspace</response>
 /// <response code="404">Ticket not found</response>

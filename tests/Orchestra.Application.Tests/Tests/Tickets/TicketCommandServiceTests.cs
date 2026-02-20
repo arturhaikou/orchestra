@@ -373,4 +373,122 @@ public class TicketCommandServiceTests : ServiceTestFixture<TicketCommandService
         Assert.Equal(request.AssignedAgentId, result.AssignedAgentId);
         Assert.Equal(request.AssignedWorkflowId, result.AssignedWorkflowId);
     }
+
+    // --- Begin: UpdateExternalTicketAsync Materialized Ticket Tests ---
+    [Fact]
+    public async Task UpdateExternalTicketAsync_Throws_WhenAttemptingStatusPriorityUpdateBeforeMaterialization()
+    {
+        // Arrange: Unmaterialized external ticket with status update attempt
+        var integrationId = Guid.NewGuid();
+        var externalTicketId = "JIRA-123";
+        var compositeId = $"{integrationId}:{externalTicketId}";
+        var userId = Guid.NewGuid();
+        var workspaceId = Guid.NewGuid();
+        var statusId = Guid.NewGuid();
+        var request = new UpdateTicketRequest(statusId, null, null, null, null);
+
+        var integration = new IntegrationBuilder().WithId(integrationId).WithWorkspaceId(workspaceId).Build();
+        
+        // Mock the ID parsing service to recognize this as an external ticket
+        var parseResult = new TicketIdParseResult(TicketIdType.External, null, integrationId, externalTicketId);
+        _ticketIdParsingService.Parse(compositeId).Returns(parseResult);
+        
+        _workspaceAuthorizationService.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
+        _integrationDataAccess.GetByIdAsync(integrationId, Arg.Any<CancellationToken>()).Returns(integration);
+        _ticketDataAccess.GetTicketByExternalIdAsync(integrationId, externalTicketId, Arg.Any<CancellationToken>()).Returns((Ticket?)null);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidTicketOperationException>(() =>
+            _sut.UpdateTicketAsync(compositeId, userId, request, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task UpdateExternalTicketAsync_Success_UpdatesStatusAndPriorityForMaterializedTicket()
+    {
+        // Arrange: Materialized external ticket with status and priority update
+        var integrationId = Guid.NewGuid();
+        var externalTicketId = "JIRA-123";
+        var compositeId = $"{integrationId}:{externalTicketId}";
+        var userId = Guid.NewGuid();
+        var workspaceId = Guid.NewGuid();
+        var statusId = Guid.NewGuid();
+        var priorityId = Guid.NewGuid();
+
+        var materializedTicket = new TicketBuilder()
+            .AsExternal(integrationId, externalTicketId)
+            .WithWorkspaceId(workspaceId)
+            .WithStatusId(Guid.NewGuid()) // Existing internal status
+            .WithPriorityId(Guid.NewGuid()) // Existing internal priority
+            .Build();
+
+        var request = new UpdateTicketRequest(statusId, priorityId, null, null, null);
+        var status = new TicketStatus { Id = statusId, Name = "In Progress", Color = "#fff" };
+        var priority = new TicketPriority { Id = priorityId, Name = "High", Color = "#f00", Value = 2 };
+
+        var integration = new IntegrationBuilder().WithId(integrationId).WithWorkspaceId(workspaceId).Build();
+        var updatedDto = new TicketDto(
+            compositeId, workspaceId, "Title", "Desc", 
+            new TicketStatusDto(statusId, "In Progress", "#fff"),
+            new TicketPriorityDto(priorityId, "High", "#f00", 2),
+            false, integrationId, externalTicketId, "http://external.url", "JIRA", 
+            null, null, new List<CommentDto>(), null, null);
+
+        // Mock the ID parsing service
+        var parseResult = new TicketIdParseResult(TicketIdType.External, null, integrationId, externalTicketId);
+        _ticketIdParsingService.Parse(compositeId).Returns(parseResult);
+
+        _workspaceAuthorizationService.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
+        _integrationDataAccess.GetByIdAsync(integrationId, Arg.Any<CancellationToken>()).Returns(integration);
+        _ticketDataAccess.GetTicketByExternalIdAsync(integrationId, externalTicketId, Arg.Any<CancellationToken>()).Returns(materializedTicket);
+        _ticketDataAccess.GetStatusByIdAsync(statusId, Arg.Any<CancellationToken>()).Returns(status);
+        _ticketDataAccess.GetPriorityByIdAsync(priorityId, Arg.Any<CancellationToken>()).Returns(priority);
+        _ticketAssignmentValidationService.ValidateAndGetAgentWorkspaceAsync(null, Arg.Any<CancellationToken>()).Returns((Guid?)null);
+        _ticketAssignmentValidationService.ValidateAndGetWorkflowWorkspaceAsync(null, Arg.Any<CancellationToken>()).Returns((Guid?)null);
+        _ticketDataAccess.UpdateTicketAsync(Arg.Any<Ticket>(), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
+        _queryService.GetTicketByIdAsync(compositeId, userId, Arg.Any<CancellationToken>()).Returns(updatedDto);
+
+        // Act
+        var result = await _sut.UpdateTicketAsync(compositeId, userId, request, CancellationToken.None);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(statusId, result.Status?.Id);
+        Assert.Equal(priorityId, result.Priority?.Id);
+        Assert.Equal("In Progress", result.Status?.Name);
+        Assert.Equal("High", result.Priority?.Name);
+        await _ticketDataAccess.Received(1).UpdateTicketAsync(Arg.Any<Ticket>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task UpdateExternalTicketAsync_Throws_WhenStatusNotFound()
+    {
+        // Arrange: Materialized external ticket with invalid status ID
+        var integrationId = Guid.NewGuid();
+        var externalTicketId = "JIRA-123";
+        var compositeId = $"{integrationId}:{externalTicketId}";
+        var userId = Guid.NewGuid();
+        var workspaceId = Guid.NewGuid();
+        var invalidStatusId = Guid.NewGuid();
+
+        var materializedTicket = new TicketBuilder()
+            .AsExternal(integrationId, externalTicketId)
+            .WithWorkspaceId(workspaceId)
+            .Build();
+
+        var request = new UpdateTicketRequest(invalidStatusId, null, null, null, null);
+        var integration = new IntegrationBuilder().WithId(integrationId).WithWorkspaceId(workspaceId).Build();
+
+        // Mock the ID parsing service
+        var parseResult = new TicketIdParseResult(TicketIdType.External, null, integrationId, externalTicketId);
+        _ticketIdParsingService.Parse(compositeId).Returns(parseResult);
+
+        _workspaceAuthorizationService.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
+        _integrationDataAccess.GetByIdAsync(integrationId, Arg.Any<CancellationToken>()).Returns(integration);
+        _ticketDataAccess.GetTicketByExternalIdAsync(integrationId, externalTicketId, Arg.Any<CancellationToken>()).Returns(materializedTicket);
+        _ticketDataAccess.GetStatusByIdAsync(invalidStatusId, Arg.Any<CancellationToken>()).Returns((TicketStatus?)null);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidTicketOperationException>(() =>
+            _sut.UpdateTicketAsync(compositeId, userId, request, CancellationToken.None));
+    }
 }

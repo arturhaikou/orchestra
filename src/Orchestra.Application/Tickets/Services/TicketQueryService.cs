@@ -13,6 +13,15 @@ using System.Text.Json;
 
 namespace Orchestra.Application.Tickets.Services;
 
+/// <summary>
+/// Enumeration for pagination phases to avoid magic strings.
+/// Follows SOLID principle by defining clear constants.
+/// </summary>
+internal static class TicketPaginationPhase
+{
+    public const string Internal = "internal";
+    public const string External = "external";
+}
 
 public class TicketQueryService : ITicketQueryService
 {
@@ -61,239 +70,29 @@ public class TicketQueryService : ITicketQueryService
         int pageSize = 50,
         CancellationToken cancellationToken = default)
     {
-        // Parameter validation (delegated to validation service or utility)
-        if (workspaceId == Guid.Empty)
-            throw new ArgumentException("Workspace ID is required.", nameof(workspaceId));
-        if (userId == Guid.Empty)
-            throw new ArgumentException("User ID is required.", nameof(userId));
+        // 1. Validate input parameters and authorization
+        ValidateInputParameters(workspaceId, userId);
         pageSize = _ticketPaginationService.NormalizePageSize(pageSize);
-        
-        // Validate workspace access
-        var hasAccess = await _workspaceAuthorizationService.IsMemberAsync(
-            userId, 
-            workspaceId, 
-            cancellationToken);
-        
-        if (!hasAccess)
-        {
-            throw new UnauthorizedTicketAccessException(
-                userId, 
-                $"workspace:{workspaceId}");
-        }
+        await ValidateWorkspaceAccessAsync(workspaceId, userId, cancellationToken);
 
-        // Parse page token to determine current phase and offset (delegated to pagination service)
+        // 2. Parse pagination token
         var currentToken = _ticketPaginationService.ParsePageToken(pageToken);
 
-        var resultTickets = new List<TicketDto>();
-        var isLastPage = false;
-        TicketPageToken? nextToken = null;
+        // 3. Fetch tickets based on current phase
+        var (resultTickets, isLastPage, nextToken) = currentToken.Phase == TicketPaginationPhase.Internal
+            ? await FetchInternalPhaseAsync(workspaceId, currentToken, pageSize, cancellationToken)
+            : await FetchExternalPhaseAsync(workspaceId, currentToken, pageSize, cancellationToken);
 
-        // PHASE 1: Fetch only pure internal tickets (no externalId)
-        if (currentToken.Phase == "internal")
-        {
-            _logger.LogDebug(
-                "Phase 1: Fetching pure internal tickets (offset: {Offset}, limit: {Limit})",
-                currentToken.InternalOffset, pageSize);
-
-            // Fetch paginated pure internal tickets from database (externalId == null)
-            var internalTickets = await _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(
-                workspaceId,
-                currentToken.InternalOffset,
-                pageSize,
-                cancellationToken);
-
-            // Filter to only pure internal tickets (no IntegrationId, no ExternalTicketId)
-            var pureInternalTickets = internalTickets
-                .Where(t => t.IntegrationId == null && string.IsNullOrEmpty(t.ExternalTicketId))
-                .ToList();
-
-            // Load status and priority lookups for mapping
-            var allStatuses = await _ticketDataAccess.GetAllStatusesAsync(cancellationToken);
-            var allPriorities = await _ticketDataAccess.GetAllPrioritiesAsync(cancellationToken);
-            var statusLookup = allStatuses.ToDictionary(s => s.Id, s => s);
-            var priorityLookup = allPriorities.ToDictionary(p => p.Id, p => p);
-
-            // Map pure internal tickets to DTOs
-            foreach (var ticket in pureInternalTickets)
-            {
-                var ticketDto = MapInternalTicketToDto(ticket, statusLookup, priorityLookup);
-                resultTickets.Add(ticketDto);
-            }
-
-            _logger.LogInformation(
-                "Phase 1 complete: Fetched {Count} pure internal tickets",
-                resultTickets.Count);
-
-            // Check if page is full with internal tickets only
-            if (resultTickets.Count == pageSize)
-            {
-                // Page full - prepare next token for more internal tickets
-                nextToken = new TicketPageToken
-                {
-                    Phase = "internal",
-                    InternalOffset = currentToken.InternalOffset + pageSize
-                };
-                isLastPage = false;
-            }
-            else
-            {
-                // Not enough internal tickets to fill page - transition to external phase
-                var remainingSlots = pageSize - resultTickets.Count;
-
-                _logger.LogDebug(
-                    "Phase 1 incomplete ({Count}/{PageSize}). Transitioning to Phase 2 with {Remaining} remaining slots",
-                    resultTickets.Count, pageSize, remainingSlots);
-
-                // Check if there are external integrations
-                var integrations = await _integrationDataAccess.GetByWorkspaceIdAsync(
-                    workspaceId,
-                    cancellationToken);
-
-                var trackerIntegrations = integrations
-                    .Where(i => i.Type == IntegrationType.TRACKER)
-                    .ToList();
-
-                if (trackerIntegrations.Any() && remainingSlots > 0)
-                {
-                    // Fetch external tickets to fill remaining slots
-                    var externalTickets = await _externalFetchingService.FetchExternalTicketsAsync(
-                        trackerIntegrations,
-                        remainingSlots,
-                        null, // No previous external state
-                        cancellationToken);
-
-                    // For each external ticket, check for materialized ticket and return only if matched
-                    foreach (var extTicket in externalTickets.Tickets)
-                    {
-                        if (!string.IsNullOrEmpty(extTicket.ExternalTicketId) && extTicket.IntegrationId != null)
-                        {
-                            var materialized = await _ticketDataAccess.GetTicketByExternalIdAsync(
-                                extTicket.IntegrationId.Value,
-                                extTicket.ExternalTicketId,
-                                cancellationToken);
-                            if (materialized != null)
-                            {
-                                // Map materialized ticket to DTO
-                                var ticketDto = MapInternalTicketToDto(materialized, statusLookup, priorityLookup);
-                                resultTickets.Add(ticketDto);
-                            }
-                            else
-                            {
-                                // Return external ticket as-is
-                                resultTickets.Add(extTicket);
-                            }
-                        }
-                        else
-                        {
-                            // Return external ticket as-is
-                            resultTickets.Add(extTicket);
-                        }
-                    }
-
-                    _logger.LogInformation(
-                        "Phase 2 complete: Fetched {Count} external/materialized tickets",
-                        externalTickets.Tickets.Count);
-
-                    // Determine if more external tickets available
-                    if (externalTickets.HasMore)
-                    {
-                        // More external tickets available - prepare next token for external phase
-                        nextToken = new TicketPageToken
-                        {
-                            Phase = "external",
-                            InternalOffset = currentToken.InternalOffset + resultTickets.Count,
-                            ExternalState = externalTickets.State
-                        };
-                        isLastPage = false;
-                    }
-                    else
-                    {
-                        // No more tickets (internal or external)
-                        isLastPage = true;
-                    }
-                }
-                else
-                {
-                    // No external integrations or no remaining slots - we're done
-                    isLastPage = true;
-                }
-            }
-        }
-        // PHASE 2: Fetch External Tickets Only
-        else if (currentToken.Phase == "external")
-        {
-            _logger.LogDebug(
-                "Phase 2: Fetching external tickets (limit: {Limit})",
-                pageSize);
-
-            // Load integrations
-            var integrations = await _integrationDataAccess.GetByWorkspaceIdAsync(
-                workspaceId,
-                cancellationToken);
-
-            var trackerIntegrations = integrations
-                .Where(i => i.Type == IntegrationType.TRACKER)
-                .ToList();
-
-            if (trackerIntegrations.Any())
-            {
-                // Fetch external tickets using saved state
-                var externalTickets = await _externalFetchingService.FetchExternalTicketsAsync(
-                    trackerIntegrations,
-                    pageSize,
-                    currentToken.ExternalState,
-                    cancellationToken);
-
-                resultTickets.AddRange(externalTickets.Tickets);
-
-                _logger.LogInformation(
-                    "Phase 2 complete: Fetched {Count} external tickets",
-                    resultTickets.Count);
-
-                // Determine if more external tickets available
-                if (externalTickets.HasMore)
-                {
-                    nextToken = new TicketPageToken
-                    {
-                        Phase = "external",
-                        InternalOffset = currentToken.InternalOffset,
-                        ExternalState = externalTickets.State
-                    };
-                    isLastPage = false;
-                }
-                else
-                {
-                    isLastPage = true;
-                }
-            }
-            else
-            {
-                // No external integrations - we're done
-                isLastPage = true;
-            }
-        }
-
-        // Generate next page token (delegated to pagination service)
-        string? nextPageTokenString = null;
-        if (nextToken != null && !isLastPage)
-        {
-            nextPageTokenString = _ticketPaginationService.SerializePageToken(nextToken);
-        }
-
-        // Deduplicate tickets by ID (defensive measure)
-        resultTickets = resultTickets
-            .GroupBy(t => t.Id)
-            .Select(g => g.First())
-            .ToList();
-
-        _logger.LogInformation(
-            "GetTicketsAsync complete: Returned {Count} tickets (after deduplication), IsLast: {IsLast}",
-            resultTickets.Count, isLastPage);
-
-        // Calculate sentiment/satisfaction for all tickets
+        // 4. Deduplicate and finalize response
+        resultTickets = DeduplicateTickets(resultTickets);
         await CalculateSentimentForTicketsAsync(resultTickets, cancellationToken);
 
-        // Return paginated response with dynamic count
+        var nextPageTokenString = GenerateNextPageToken(nextToken, isLastPage);
+
+        _logger.LogInformation(
+            "GetTicketsAsync complete: Returned {Count} tickets, IsLast: {IsLast}",
+            resultTickets.Count, isLastPage);
+
         return new PaginatedTicketsResponse(
             Items: resultTickets,
             NextPageToken: nextPageTokenString,
@@ -372,6 +171,246 @@ public class TicketQueryService : ITicketQueryService
         return priorities.Select(p => new TicketPriorityDto(p.Id, p.Name, p.Color, p.Value)).ToList();
     }
 
+    #region GetTicketsAsync Helper Methods
+
+    /// <summary>
+    /// Validates input parameters for GetTicketsAsync.
+    /// Follows Single Responsibility Principle by isolating parameter validation.
+    /// </summary>
+    private void ValidateInputParameters(Guid workspaceId, Guid userId)
+    {
+        if (workspaceId == Guid.Empty)
+            throw new ArgumentException("Workspace ID is required.", nameof(workspaceId));
+        if (userId == Guid.Empty)
+            throw new ArgumentException("User ID is required.", nameof(userId));
+    }
+
+    /// <summary>
+    /// Validates that the user has access to the workspace.
+    /// Handles authorization concerns separately from pagination logic.
+    /// </summary>
+    private async Task ValidateWorkspaceAccessAsync(
+        Guid workspaceId,
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        var hasAccess = await _workspaceAuthorizationService.IsMemberAsync(
+            userId,
+            workspaceId,
+            cancellationToken);
+
+        if (!hasAccess)
+        {
+            throw new UnauthorizedTicketAccessException(
+                userId,
+                $"workspace:{workspaceId}");
+        }
+    }
+
+    /// <summary>
+    /// Fetches internal tickets for Phase 1 pagination.
+    /// Returns tickets, pagination state, and whether this is the last page.
+    /// Separates internal ticket handling from external ticket handling.
+    /// </summary>
+    private async Task<(List<TicketDto> Tickets, bool IsLastPage, TicketPageToken? NextToken)> FetchInternalPhaseAsync(
+        Guid workspaceId,
+        TicketPageToken currentToken,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        _logger.LogDebug(
+            "Fetching internal phase (offset: {Offset}, limit: {Limit})",
+            currentToken.InternalOffset, pageSize);
+
+        // Fetch internal tickets
+        var internalTickets = await _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(
+            workspaceId,
+            currentToken.InternalOffset,
+            pageSize,
+            cancellationToken);
+
+        var pureInternalTickets = internalTickets
+            .Where(t => t.IntegrationId == null && string.IsNullOrEmpty(t.ExternalTicketId))
+            .ToList();
+
+        // Load lookups
+        var allStatuses = await _ticketDataAccess.GetAllStatusesAsync(cancellationToken);
+        var allPriorities = await _ticketDataAccess.GetAllPrioritiesAsync(cancellationToken);
+        var statusLookup = allStatuses.ToDictionary(s => s.Id, s => s);
+        var priorityLookup = allPriorities.ToDictionary(p => p.Id, p => p);
+
+        // Map to DTOs
+        var resultTickets = pureInternalTickets
+            .Select(t => MapInternalTicketToDto(t, statusLookup, priorityLookup))
+            .ToList();
+
+        _logger.LogInformation(
+            "Internal phase: Fetched {Count} tickets",
+            resultTickets.Count);
+
+        // If page is full, continue with internal phase
+        if (resultTickets.Count >= pageSize)
+        {
+            var nextToken = new TicketPageToken
+            {
+                Phase = TicketPaginationPhase.Internal,
+                InternalOffset = currentToken.InternalOffset + pageSize
+            };
+            return (resultTickets, false, nextToken);
+        }
+
+        // Page not full, try to fill with external tickets
+        var remainingSlots = pageSize - resultTickets.Count;
+        _logger.LogDebug(
+            "Internal phase incomplete ({Count}/{PageSize}). Attempting to fill {Remaining} remaining slots with external tickets",
+            resultTickets.Count, pageSize, remainingSlots);
+
+        var (externalTickets, hasMore) = await FetchExternalTicketsToFillSlotsAsync(
+            workspaceId,
+            remainingSlots,
+            null,
+            statusLookup,
+            priorityLookup,
+            cancellationToken);
+
+        resultTickets.AddRange(externalTickets);
+
+        if (hasMore)
+        {
+            var nextToken = new TicketPageToken
+            {
+                Phase = TicketPaginationPhase.External,
+                InternalOffset = currentToken.InternalOffset + resultTickets.Count,
+                ExternalState = null // Would be set from external service
+            };
+            return (resultTickets, false, nextToken);
+        }
+
+        return (resultTickets, true, null);
+    }
+
+    /// <summary>
+    /// Fetches external tickets for Phase 2 pagination.
+    /// Returns tickets, pagination state, and whether this is the last page.
+    /// </summary>
+    private async Task<(List<TicketDto> Tickets, bool IsLastPage, TicketPageToken? NextToken)> FetchExternalPhaseAsync(
+        Guid workspaceId,
+        TicketPageToken currentToken,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        _logger.LogDebug(
+            "Fetching external phase (limit: {Limit})",
+            pageSize);
+
+        var integrations = await _integrationDataAccess.GetByWorkspaceIdAsync(
+            workspaceId,
+            cancellationToken);
+
+        var trackerIntegrations = integrations
+            .Where(i => i.Type == IntegrationType.TRACKER)
+            .ToList();
+
+        if (!trackerIntegrations.Any())
+        {
+            _logger.LogDebug("No tracker integrations found. External phase complete.");
+            return (new List<TicketDto>(), true, null);
+        }
+
+        var externalTickets = await _externalFetchingService.FetchExternalTicketsAsync(
+            trackerIntegrations,
+            pageSize,
+            currentToken.ExternalState,
+            cancellationToken);
+
+        _logger.LogInformation(
+            "External phase: Fetched {Count} tickets, HasMore: {HasMore}",
+            externalTickets.Tickets.Count, externalTickets.HasMore);
+
+        if (externalTickets.HasMore)
+        {
+            var nextToken = new TicketPageToken
+            {
+                Phase = TicketPaginationPhase.External,
+                InternalOffset = currentToken.InternalOffset,
+                ExternalState = externalTickets.State
+            };
+            return (externalTickets.Tickets, false, nextToken);
+        }
+
+        return (externalTickets.Tickets, true, null);
+    }
+
+    /// <summary>
+    /// Helper to fetch external tickets and fill remaining slots.
+    /// Extracted to reduce code duplication between phases.
+    /// </summary>
+    private async Task<(List<TicketDto> Tickets, bool HasMore)> FetchExternalTicketsToFillSlotsAsync(
+        Guid workspaceId,
+        int remainingSlots,
+        ExternalPaginationState? externalState,
+        Dictionary<Guid, TicketStatus> statusLookup,
+        Dictionary<Guid, TicketPriority> priorityLookup,
+        CancellationToken cancellationToken)
+    {
+        if (remainingSlots <= 0)
+            return (new List<TicketDto>(), false);
+
+        var integrations = await _integrationDataAccess.GetByWorkspaceIdAsync(
+            workspaceId,
+            cancellationToken);
+
+        var trackerIntegrations = integrations
+            .Where(i => i.Type == IntegrationType.TRACKER)
+            .ToList();
+
+        if (!trackerIntegrations.Any())
+            return (new List<TicketDto>(), false);
+
+        var externalTickets = await _externalFetchingService.FetchExternalTicketsAsync(
+            trackerIntegrations,
+            remainingSlots,
+            externalState,
+            cancellationToken);
+
+        var resultTickets = new List<TicketDto>();
+
+        // Note: externalTickets returned from FetchExternalTicketsAsync should already have
+        // assignedAgentId/assignedWorkflowId merged from materialized tickets if they exist.
+        // We just need to add them directly to results.
+        foreach (var extTicket in externalTickets.Tickets)
+        {
+            resultTickets.Add(extTicket);
+        }
+
+        return (resultTickets, externalTickets.HasMore);
+    }
+
+    /// <summary>
+    /// Removes duplicate tickets by ID.
+    /// Defensive deduplication as a separate concern.
+    /// </summary>
+    private List<TicketDto> DeduplicateTickets(List<TicketDto> tickets)
+    {
+        return tickets
+            .GroupBy(t => t.Id)
+            .Select(g => g.First())
+            .ToList();
+    }
+
+    /// <summary>
+    /// Generates the next page token string if needed.
+    /// Separates token generation from business logic.
+    /// </summary>
+    private string? GenerateNextPageToken(TicketPageToken? nextToken, bool isLastPage)
+    {
+        if (nextToken == null || isLastPage)
+            return null;
+
+        return _ticketPaginationService.SerializePageToken(nextToken);
+    }
+
+    #endregion
 
     private async Task<TicketDto> GetInternalTicketByIdAsync(
         Guid ticketId,

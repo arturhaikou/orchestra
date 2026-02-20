@@ -400,13 +400,6 @@ public class TicketCommandService : ITicketCommandService
     {
         _logger.LogDebug("Updating external ticket {CompositeId}", compositeId);
 
-        if (request.StatusId.HasValue || request.PriorityId.HasValue)
-        {
-            throw new InvalidTicketOperationException(
-                "Cannot update status or priority of external tickets. " +
-                "These fields are managed by the external provider.");
-        }
-
         var parts = compositeId.Split(':', 2);
         if (parts.Length != 2)
         {
@@ -451,6 +444,14 @@ public class TicketCommandService : ITicketCommandService
 
         if (materializedTicket == null)
         {
+            // Cannot update status/priority on unmaterialized external tickets
+            if (request.StatusId.HasValue || request.PriorityId.HasValue)
+            {
+                throw new InvalidTicketOperationException(
+                    "Cannot update status or priority on unmaterialized external tickets. " +
+                    "External tickets must be materialized (assigned to an agent or workflow) before status/priority can be managed.");
+            }
+
             if (request.AssignedAgentId.HasValue || request.AssignedWorkflowId.HasValue)
             {
                 _logger.LogInformation(
@@ -502,21 +503,54 @@ public class TicketCommandService : ITicketCommandService
                 "Updating assignments for materialized external ticket {ExternalTicketId}",
                 externalTicketId);
 
-            var agentWorkspaceId = await _ticketAssignmentValidationService.ValidateAndGetAgentWorkspaceAsync(
-                request.AssignedAgentId, 
-                cancellationToken);
+            try
+            {
+                // Validate and update status if provided
+                if (request.StatusId.HasValue)
+                {
+                    var status = await _ticketDataAccess.GetStatusByIdAsync(request.StatusId.Value, cancellationToken);
+                    if (status == null)
+                    {
+                        throw new InvalidOperationException($"Status with ID '{request.StatusId.Value}' not found.");
+                    }
+                    materializedTicket.UpdateStatus(request.StatusId.Value);
+                }
 
-            var workflowWorkspaceId = await _ticketAssignmentValidationService.ValidateAndGetWorkflowWorkspaceAsync(
-                request.AssignedWorkflowId, 
-                cancellationToken);
+                // Validate and update priority if provided
+                if (request.PriorityId.HasValue)
+                {
+                    var priority = await _ticketDataAccess.GetPriorityByIdAsync(request.PriorityId.Value, cancellationToken);
+                    if (priority == null)
+                    {
+                        throw new InvalidOperationException($"Priority with ID '{request.PriorityId.Value}' not found.");
+                    }
+                    materializedTicket.UpdatePriority(request.PriorityId.Value);
+                }
 
-            materializedTicket.UpdateAssignments(
-                request.AssignedAgentId,
-                agentWorkspaceId,
-                request.AssignedWorkflowId,
-                workflowWorkspaceId);
+                var agentWorkspaceId = await _ticketAssignmentValidationService.ValidateAndGetAgentWorkspaceAsync(
+                    request.AssignedAgentId, 
+                    cancellationToken);
 
-            await _ticketDataAccess.UpdateTicketAsync(materializedTicket, cancellationToken);
+                var workflowWorkspaceId = await _ticketAssignmentValidationService.ValidateAndGetWorkflowWorkspaceAsync(
+                    request.AssignedWorkflowId, 
+                    cancellationToken);
+
+                materializedTicket.UpdateAssignments(
+                    request.AssignedAgentId,
+                    agentWorkspaceId,
+                    request.AssignedWorkflowId,
+                    workflowWorkspaceId);
+
+                await _ticketDataAccess.UpdateTicketAsync(materializedTicket, cancellationToken);
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogError(ex,
+                    "Domain validation failed while updating materialized external ticket {ExternalTicketId}",
+                    externalTicketId);
+                throw new InvalidTicketOperationException(ex.Message, ex);
+            }
+
         }
 
         _logger.LogInformation(

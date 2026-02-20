@@ -41,16 +41,16 @@ public class TicketMaterializationService : ITicketMaterializationService
         }
 
         // Status GUIDs from seeding
-        var toDoStatusId = Guid.Parse("66666666-6666-6666-6666-666666666666");
+        var newStatusId = Guid.Parse("55555555-5555-5555-5555-555555555555");
 
         // Create materialized ticket
         var materializedTicket = Ticket.MaterializeFromExternal(
             workspaceId,
             integrationId,
             externalTicketId,
-            externalTicket.Title,
-            externalTicket.Description,
-            statusId: toDoStatusId,
+            string.Empty,
+            string.Empty,
+            statusId: newStatusId,
             priorityId: mappedPriority.Id,
             assignedAgentId: assignedAgentId,
             assignedWorkflowId: assignedWorkflowId);
