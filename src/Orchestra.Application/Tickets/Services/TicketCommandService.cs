@@ -5,7 +5,6 @@ using Orchestra.Application.Tickets.Common;
 using Orchestra.Application.Tickets.DTOs;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
-using Orchestra.Domain.Interfaces;
 using Microsoft.Extensions.Logging;
 using System.Linq;
 
@@ -18,7 +17,6 @@ public class TicketCommandService : ITicketCommandService
     private readonly IWorkspaceAuthorizationService _workspaceAuthorizationService;
     private readonly IIntegrationDataAccess _integrationDataAccess;
     private readonly ITicketProviderFactory _ticketProviderFactory;
-    private readonly ICredentialEncryptionService _credentialEncryptionService;
     private readonly ITicketIdParsingService _ticketIdParsingService;
     private readonly ITicketAssignmentValidationService _ticketAssignmentValidationService;
     private readonly IUserDataAccess _userDataAccess;
@@ -32,7 +30,6 @@ public class TicketCommandService : ITicketCommandService
         IWorkspaceAuthorizationService workspaceAuthorizationService,
         IIntegrationDataAccess integrationDataAccess,
         ITicketProviderFactory ticketProviderFactory,
-        ICredentialEncryptionService credentialEncryptionService,
         ITicketIdParsingService ticketIdParsingService,
         ITicketAssignmentValidationService ticketAssignmentValidationService,
         IUserDataAccess userDataAccess,
@@ -45,7 +42,6 @@ public class TicketCommandService : ITicketCommandService
         _workspaceAuthorizationService = workspaceAuthorizationService;
         _integrationDataAccess = integrationDataAccess;
         _ticketProviderFactory = ticketProviderFactory;
-        _credentialEncryptionService = credentialEncryptionService;
         _ticketIdParsingService = ticketIdParsingService;
         _ticketAssignmentValidationService = ticketAssignmentValidationService;
         _userDataAccess = userDataAccess;
@@ -168,7 +164,7 @@ public class TicketCommandService : ITicketCommandService
         
         if (parseResult.Type == TicketIdType.External)
         {
-            return await UpdateExternalTicketAsync(ticketId, userId, request, cancellationToken);
+            return await UpdateExternalTicketAsync(parseResult, userId, request, cancellationToken);
         }
         else
         {
@@ -262,7 +258,7 @@ public class TicketCommandService : ITicketCommandService
             ticketId, result.IssueKey);
 
         // Return updated ticket with composite ID
-        var compositeId = $"{integrationId}:{result.IssueKey}";
+        var compositeId = _ticketIdParsingService.BuildCompositeId(integrationId, result.IssueKey);
         return await _queryService.GetTicketByIdAsync(compositeId, userId, cancellationToken);
     }
 
@@ -393,58 +389,35 @@ public class TicketCommandService : ITicketCommandService
     }
 
     private async Task<TicketDto> UpdateExternalTicketAsync(
-        string compositeId,
+        TicketIdParseResult parseResult,
         Guid userId,
         UpdateTicketRequest request,
         CancellationToken cancellationToken)
     {
+        var integrationId = parseResult.IntegrationId!.Value;
+        var externalTicketId = parseResult.ExternalTicketId!;
+        var compositeId = _ticketIdParsingService.BuildCompositeId(integrationId, externalTicketId);
+
         _logger.LogDebug("Updating external ticket {CompositeId}", compositeId);
 
-        var parts = compositeId.Split(':', 2);
-        if (parts.Length != 2)
-        {
-            throw new ArgumentException(
-                $"Invalid composite ID format: '{compositeId}'. Expected format: '{{integrationId}}:{{externalTicketId}}'",
-                nameof(compositeId));
-        }
-
-        var integrationIdString = parts[0];
-        var externalTicketId = parts[1];
-
-        if (!Guid.TryParse(integrationIdString, out var integrationId))
-        {
-            throw new ArgumentException(
-                $"Invalid integration ID in composite ID: '{integrationIdString}'",
-                nameof(compositeId));
-        }
-
-        var integration = await _integrationDataAccess.GetByIdAsync(
-            integrationId,
-            cancellationToken);
-        
+        var integration = await _integrationDataAccess.GetByIdAsync(integrationId, cancellationToken);
         if (integration == null)
         {
             throw new TicketNotFoundException(compositeId);
         }
 
         var hasAccess = await _workspaceAuthorizationService.IsMemberAsync(
-            userId,
-            integration.WorkspaceId,
-            cancellationToken);
-        
+            userId, integration.WorkspaceId, cancellationToken);
         if (!hasAccess)
         {
             throw new UnauthorizedTicketAccessException(userId, compositeId);
         }
 
         var materializedTicket = await _ticketDataAccess.GetTicketByExternalIdAsync(
-            integrationId,
-            externalTicketId,
-            cancellationToken);
+            integrationId, externalTicketId, cancellationToken);
 
         if (materializedTicket == null)
         {
-            // Cannot update status/priority on unmaterialized external tickets
             if (request.StatusId.HasValue || request.PriorityId.HasValue)
             {
                 throw new InvalidTicketOperationException(
@@ -458,33 +431,10 @@ public class TicketCommandService : ITicketCommandService
                     "Materializing external ticket {ExternalTicketId} for integration {IntegrationId}",
                     externalTicketId, integrationId);
 
-                var provider = _ticketProviderFactory.CreateProvider(integration.Provider);
-                if (provider == null)
-                {
-                    throw new InvalidOperationException(
-                        $"No provider implementation found for '{integration.Provider}'");
-                }
-
-                var externalTicket = await provider.GetTicketByIdAsync(
-                    integration,
-                    externalTicketId,
+                await MaterializeExternalTicketAsync(
+                    integration, integrationId, externalTicketId,
+                    request.AssignedAgentId, request.AssignedWorkflowId,
                     cancellationToken);
-
-                if (externalTicket == null)
-                {
-                    throw new TicketNotFoundException(compositeId);
-                }
-
-                materializedTicket = await _materializationService.MaterializeFromExternalAsync(
-                    integrationId,
-                    externalTicketId,
-                    integration.WorkspaceId,
-                    externalTicket,
-                    request.AssignedAgentId,
-                    request.AssignedWorkflowId,
-                    cancellationToken);
-
-                await _ticketDataAccess.AddTicketAsync(materializedTicket, cancellationToken);
 
                 _logger.LogInformation(
                     "Successfully materialized external ticket {ExternalTicketId}",
@@ -505,43 +455,7 @@ public class TicketCommandService : ITicketCommandService
 
             try
             {
-                // Validate and update status if provided
-                if (request.StatusId.HasValue)
-                {
-                    var status = await _ticketDataAccess.GetStatusByIdAsync(request.StatusId.Value, cancellationToken);
-                    if (status == null)
-                    {
-                        throw new InvalidOperationException($"Status with ID '{request.StatusId.Value}' not found.");
-                    }
-                    materializedTicket.UpdateStatus(request.StatusId.Value);
-                }
-
-                // Validate and update priority if provided
-                if (request.PriorityId.HasValue)
-                {
-                    var priority = await _ticketDataAccess.GetPriorityByIdAsync(request.PriorityId.Value, cancellationToken);
-                    if (priority == null)
-                    {
-                        throw new InvalidOperationException($"Priority with ID '{request.PriorityId.Value}' not found.");
-                    }
-                    materializedTicket.UpdatePriority(request.PriorityId.Value);
-                }
-
-                var agentWorkspaceId = await _ticketAssignmentValidationService.ValidateAndGetAgentWorkspaceAsync(
-                    request.AssignedAgentId, 
-                    cancellationToken);
-
-                var workflowWorkspaceId = await _ticketAssignmentValidationService.ValidateAndGetWorkflowWorkspaceAsync(
-                    request.AssignedWorkflowId, 
-                    cancellationToken);
-
-                materializedTicket.UpdateAssignments(
-                    request.AssignedAgentId,
-                    agentWorkspaceId,
-                    request.AssignedWorkflowId,
-                    workflowWorkspaceId);
-
-                await _ticketDataAccess.UpdateTicketAsync(materializedTicket, cancellationToken);
+                await UpdateMaterializedExternalTicketAsync(materializedTicket, request, cancellationToken);
             }
             catch (InvalidOperationException ex)
             {
@@ -550,13 +464,77 @@ public class TicketCommandService : ITicketCommandService
                     externalTicketId);
                 throw new InvalidTicketOperationException(ex.Message, ex);
             }
-
         }
 
-        _logger.LogInformation(
-            "Successfully updated external ticket {CompositeId}",
-            compositeId);
+        _logger.LogInformation("Successfully updated external ticket {CompositeId}", compositeId);
 
         return await _queryService.GetTicketByIdAsync(compositeId, userId, cancellationToken);
+    }
+
+    private async Task MaterializeExternalTicketAsync(
+        Integration integration,
+        Guid integrationId,
+        string externalTicketId,
+        Guid? assignedAgentId,
+        Guid? assignedWorkflowId,
+        CancellationToken cancellationToken)
+    {
+        var provider = _ticketProviderFactory.CreateProvider(integration.Provider);
+        if (provider == null)
+        {
+            throw new InvalidOperationException(
+                $"No provider implementation found for '{integration.Provider}'");
+        }
+
+        var externalTicket = await provider.GetTicketByIdAsync(integration, externalTicketId, cancellationToken);
+        if (externalTicket == null)
+        {
+            throw new TicketNotFoundException(_ticketIdParsingService.BuildCompositeId(integrationId, externalTicketId));
+        }
+
+        var materializedTicket = await _materializationService.MaterializeFromExternalAsync(
+            integrationId, externalTicketId, integration.WorkspaceId,
+            externalTicket, assignedAgentId, assignedWorkflowId,
+            cancellationToken);
+
+        await _ticketDataAccess.AddTicketAsync(materializedTicket, cancellationToken);
+    }
+
+    private async Task UpdateMaterializedExternalTicketAsync(
+        Ticket ticket,
+        UpdateTicketRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request.StatusId.HasValue)
+        {
+            var status = await _ticketDataAccess.GetStatusByIdAsync(request.StatusId.Value, cancellationToken);
+            if (status == null)
+            {
+                throw new InvalidOperationException($"Status with ID '{request.StatusId.Value}' not found.");
+            }
+            ticket.UpdateStatus(request.StatusId.Value);
+        }
+
+        if (request.PriorityId.HasValue)
+        {
+            var priority = await _ticketDataAccess.GetPriorityByIdAsync(request.PriorityId.Value, cancellationToken);
+            if (priority == null)
+            {
+                throw new InvalidOperationException($"Priority with ID '{request.PriorityId.Value}' not found.");
+            }
+            ticket.UpdatePriority(request.PriorityId.Value);
+        }
+
+        var agentWorkspaceId = await _ticketAssignmentValidationService.ValidateAndGetAgentWorkspaceAsync(
+            request.AssignedAgentId, cancellationToken);
+
+        var workflowWorkspaceId = await _ticketAssignmentValidationService.ValidateAndGetWorkflowWorkspaceAsync(
+            request.AssignedWorkflowId, cancellationToken);
+
+        ticket.UpdateAssignments(
+            request.AssignedAgentId, agentWorkspaceId,
+            request.AssignedWorkflowId, workflowWorkspaceId);
+
+        await _ticketDataAccess.UpdateTicketAsync(ticket, cancellationToken);
     }
 }

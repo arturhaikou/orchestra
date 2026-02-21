@@ -29,4 +29,12 @@ public interface ITicketIdParsingService
     /// <param name="ticketId">The ticket ID to check.</param>
     /// <returns>True if valid GUID format, false otherwise.</returns>
     bool IsGuidFormat(string ticketId);
+
+    /// <summary>
+    /// Builds a composite ticket ID from an integration ID and an external ticket ID.
+    /// </summary>
+    /// <param name="integrationId">The integration GUID.</param>
+    /// <param name="externalTicketId">The external ticket identifier.</param>
+    /// <returns>Composite ID in the format '{integrationId}:{externalTicketId}'.</returns>
+    string BuildCompositeId(Guid integrationId, string externalTicketId);
 }

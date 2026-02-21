@@ -42,4 +42,12 @@ public class TicketIdParsingService : ITicketIdParsingService
     {
         return TicketIdValidator.IsGuidFormat(ticketId);
     }
+
+    /// <summary>
+    /// Builds a composite ticket ID from an integration ID and an external ticket ID.
+    /// </summary>
+    public string BuildCompositeId(Guid integrationId, string externalTicketId)
+    {
+        return $"{integrationId}:{externalTicketId}";
+    }
 }

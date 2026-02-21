@@ -75,6 +75,20 @@ public static class Extensions
         // HttpClient factory for provider HTTP calls (Jira, Azure DevOps, etc.)
         builder.Services.AddHttpClient();
 
+        // Named HttpClient for Jira On-Premise:
+        // - AllowAutoRedirect=false so that the SSO/auth-plugin 302 redirect is NOT silently
+        //   followed. Without this the server returns a 200 HTML login page which then causes
+        //   a JsonException instead of a meaningful auth error.
+        // - Accept: application/json so Jira returns JSON error bodies instead of HTML error pages.
+        builder.Services.AddHttpClient("JiraOnPremise", client =>
+        {
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+        })
+        .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+        {
+            AllowAutoRedirect = false
+        });
+
         // ADF Conversion Service
         // Converts Atlassian Document Format (ADF) to Markdown
         // Uses Aspire service discovery and Standard Resilience Handler (retry/circuit breaker)

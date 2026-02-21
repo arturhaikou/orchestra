@@ -28,7 +28,6 @@ public class TicketCommandServiceTests : ServiceTestFixture<TicketCommandService
     private readonly IWorkspaceAuthorizationService _workspaceAuthorizationService = Substitute.For<IWorkspaceAuthorizationService>();
     private readonly IIntegrationDataAccess _integrationDataAccess = Substitute.For<IIntegrationDataAccess>();
     private readonly ITicketProviderFactory _ticketProviderFactory = Substitute.For<ITicketProviderFactory>();
-    private readonly ICredentialEncryptionService _credentialEncryptionService = Substitute.For<ICredentialEncryptionService>();
     private readonly ITicketIdParsingService _ticketIdParsingService = Substitute.For<ITicketIdParsingService>();
     private readonly ITicketAssignmentValidationService _ticketAssignmentValidationService = Substitute.For<ITicketAssignmentValidationService>();
     private readonly IUserDataAccess _userDataAccess = Substitute.For<IUserDataAccess>();
@@ -46,7 +45,6 @@ public class TicketCommandServiceTests : ServiceTestFixture<TicketCommandService
             _workspaceAuthorizationService,
             _integrationDataAccess,
             _ticketProviderFactory,
-            _credentialEncryptionService,
             _ticketIdParsingService,
             _ticketAssignmentValidationService,
             _userDataAccess,
@@ -436,6 +434,7 @@ public class TicketCommandServiceTests : ServiceTestFixture<TicketCommandService
         // Mock the ID parsing service
         var parseResult = new TicketIdParseResult(TicketIdType.External, null, integrationId, externalTicketId);
         _ticketIdParsingService.Parse(compositeId).Returns(parseResult);
+        _ticketIdParsingService.BuildCompositeId(integrationId, externalTicketId).Returns(compositeId);
 
         _workspaceAuthorizationService.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
         _integrationDataAccess.GetByIdAsync(integrationId, Arg.Any<CancellationToken>()).Returns(integration);

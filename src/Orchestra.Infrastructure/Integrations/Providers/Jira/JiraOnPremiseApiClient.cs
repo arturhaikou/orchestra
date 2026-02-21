@@ -43,7 +43,7 @@ public class JiraOnPremiseApiClient : IJiraApiClient
             var requestUrl = $"rest/api/2/search?{query}";
             var response = await _httpClient.GetAsync(requestUrl, cancellationToken);
 
-            response.EnsureSuccessStatusCode();
+            EnsureSuccessOrThrowAuthError(response);
 
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
             
@@ -87,7 +87,7 @@ public class JiraOnPremiseApiClient : IJiraApiClient
                 return null;
             }
 
-            response.EnsureSuccessStatusCode();
+            EnsureSuccessOrThrowAuthError(response);
 
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
             var jiraTicket = JsonSerializer.Deserialize<JiraTicket>(
@@ -150,7 +150,7 @@ public class JiraOnPremiseApiClient : IJiraApiClient
                 jsonContent,
                 cancellationToken);
 
-            response.EnsureSuccessStatusCode();
+            EnsureSuccessOrThrowAuthError(response);
         }
         catch (Exception ex)
         {
@@ -169,7 +169,7 @@ public class JiraOnPremiseApiClient : IJiraApiClient
                 $"/rest/api/2/issue/{issueKey}",
                 cancellationToken);
 
-            response.EnsureSuccessStatusCode();
+            EnsureSuccessOrThrowAuthError(response);
         }
         catch (Exception ex)
         {
@@ -195,7 +195,7 @@ public class JiraOnPremiseApiClient : IJiraApiClient
                 jsonContent,
                 cancellationToken);
 
-            response.EnsureSuccessStatusCode();
+            EnsureSuccessOrThrowAuthError(response);
         }
         catch (Exception ex)
         {
@@ -212,7 +212,7 @@ public class JiraOnPremiseApiClient : IJiraApiClient
             // v2 API uses /issue/createmeta for issue types, but this requires projectKeys
             // Fallback to global issue types endpoint if available
             var response = await _httpClient.GetAsync("/rest/api/2/issuetype", cancellationToken);
-            response.EnsureSuccessStatusCode();
+            EnsureSuccessOrThrowAuthError(response);
 
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
             var issueTypes = JsonSerializer.Deserialize<List<IssueType>>(
@@ -234,7 +234,7 @@ public class JiraOnPremiseApiClient : IJiraApiClient
         try
         {
             var response = await _httpClient.GetAsync("/rest/api/2/project", cancellationToken);
-            response.EnsureSuccessStatusCode();
+            EnsureSuccessOrThrowAuthError(response);
 
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
             
@@ -268,7 +268,7 @@ public class JiraOnPremiseApiClient : IJiraApiClient
                 return null;
             }
 
-            response.EnsureSuccessStatusCode();
+            EnsureSuccessOrThrowAuthError(response);
 
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
             using var doc = JsonDocument.Parse(content);
@@ -290,17 +290,8 @@ public class JiraOnPremiseApiClient : IJiraApiClient
 
     private void HandleCreateIssueErrors(HttpResponseMessage response)
     {
-        if (response.StatusCode == HttpStatusCode.Unauthorized)
-        {
-            _logger.LogError("Failed to authenticate with Jira On-Premise API");
-            throw new InvalidOperationException("Failed to authenticate with Jira. Please verify the API key.");
-        }
-
-        if (response.StatusCode == HttpStatusCode.Forbidden)
-        {
-            _logger.LogError("Access forbidden when creating issue in Jira On-Premise");
-            throw new InvalidOperationException("You do not have permission to create issues in Jira.");
-        }
+        // Check for auth/redirect issues first
+        EnsureSuccessOrThrowAuthError(response, forbiddenMessage: "You do not have permission to create issues in Jira.");
 
         if (response.StatusCode == HttpStatusCode.BadRequest)
         {
@@ -315,5 +306,48 @@ public class JiraOnPremiseApiClient : IJiraApiClient
         }
 
         response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>
+    /// Checks the response for auth-related failures before attempting to read the body.
+    /// Handles:
+    /// - 3xx redirects: Jira On-Premise SSO plugins redirect unauthenticated requests to an HTML
+    ///   login page. With AllowAutoRedirect=false these show up as 3xx here and produce a clear error
+    ///   instead of a JsonException when the caller tries to deserialize the HTML body.
+    /// - 401/403: Missing, expired, or insufficient-scope Personal Access Token.
+    /// </summary>
+    private void EnsureSuccessOrThrowAuthError(
+        HttpResponseMessage response,
+        string? forbiddenMessage = null)
+    {
+        var statusCode = (int)response.StatusCode;
+
+        if (statusCode is >= 300 and < 400)
+        {
+            var location = response.Headers.Location?.ToString() ?? "(unknown)";
+            _logger.LogError(
+                "Jira On-Premise returned a redirect ({StatusCode}) to '{Location}'. " +
+                "This usually means the Personal Access Token is missing, expired, or the Jira instance " +
+                "requires authentication before accepting API requests.",
+                statusCode, location);
+            throw new InvalidOperationException(
+                "Jira On-Premise redirected the request to a login page. " +
+                "Please verify that a valid Personal Access Token is configured for this integration.");
+        }
+
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            _logger.LogError("Jira On-Premise returned 401 Unauthorized. The Personal Access Token may be missing or expired.");
+            throw new InvalidOperationException(
+                "Failed to authenticate with Jira On-Premise (401). " +
+                "Please verify that your Personal Access Token is valid and has not expired.");
+        }
+
+        if (response.StatusCode == HttpStatusCode.Forbidden)
+        {
+            var message = forbiddenMessage ?? "You do not have permission to perform this action in Jira On-Premise.";
+            _logger.LogError("Jira On-Premise returned 403 Forbidden.");
+            throw new InvalidOperationException(message);
+        }
     }
 }

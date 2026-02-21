@@ -2,6 +2,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
@@ -75,7 +76,12 @@ public class JiraApiClientFactory
     {
         try
         {
-            var client = _httpClientFactory.CreateClient();
+            // On-Premise uses a named client with AllowAutoRedirect=false so that the Jira
+            // SSO/auth plugin's 302 redirect is not silently followed (which would result in
+            // a 200 HTML login page that cannot be deserialized as JSON).
+            var jiraType = integration.JiraType ?? JiraType.Cloud;
+            var clientName = jiraType == JiraType.OnPremise ? "JiraOnPremise" : string.Empty;
+            var client = _httpClientFactory.CreateClient(clientName);
 
             // Set base address
             try
@@ -92,8 +98,6 @@ public class JiraApiClientFactory
 
             // Configure authentication
             var apiKey = _credentialEncryptionService.Decrypt(integration.EncryptedApiKey);
-
-            var jiraType = integration.JiraType ?? JiraType.Cloud;
 
             if (jiraType == JiraType.Cloud)
             {
