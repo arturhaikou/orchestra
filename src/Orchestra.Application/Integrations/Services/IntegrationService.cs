@@ -312,6 +312,9 @@ public class IntegrationService : IIntegrationService
             case ProviderType.GITHUB:
                 await ValidateGithubConnectionAsync(request);
                 break;
+            case ProviderType.GITLAB:
+                await ValidateGitLabConnectionAsync(request);
+                break;
             default:
                 throw new ArgumentException($"Connection validation not supported for provider: {request.Provider}", nameof(request.Provider));
         }
@@ -360,6 +363,45 @@ public class IntegrationService : IIntegrationService
         catch (UriFormatException)
         {
             throw new ArgumentException("Invalid GitHub URL format.");
+        }
+    }
+
+    private async Task ValidateGitLabConnectionAsync(ValidateIntegrationConnectionRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(request.Url))
+                throw new ArgumentException("GitLab project URL is required.");
+
+            var uri = new Uri(request.Url);
+            var projectPath = uri.AbsolutePath.Trim('/');
+
+            if (string.IsNullOrEmpty(projectPath) || !projectPath.Contains('/'))
+                throw new ArgumentException("Invalid GitLab URL format. Expected: https://gitlab.com/{namespace}/{project}");
+
+            // API base derived from URL — supports both gitlab.com and self-hosted instances
+            var apiBaseUrl = $"{uri.Scheme}://{uri.Host}";
+            var encodedPath = Uri.EscapeDataString(projectPath);
+
+            using var client = new HttpClient();
+            client.BaseAddress = new Uri(apiBaseUrl);
+            client.DefaultRequestHeaders.Add("PRIVATE-TOKEN", request.ApiKey);
+
+            var response = await client.GetAsync($"/api/v4/projects/{encodedPath}");
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized || response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                throw new InvalidOperationException("Failed to authenticate with GitLab. Please verify your token and project access.");
+
+            if (!response.IsSuccessStatusCode)
+                throw new InvalidOperationException($"Failed to connect to GitLab: {response.StatusCode}");
+        }
+        catch (HttpRequestException ex) when (ex.InnerException is System.Net.Sockets.SocketException)
+        {
+            throw new InvalidOperationException("Failed to connect to GitLab. Please verify the URL is correct and reachable.");
+        }
+        catch (UriFormatException)
+        {
+            throw new ArgumentException("Invalid GitLab URL format.");
         }
     }
 

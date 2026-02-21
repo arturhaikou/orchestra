@@ -216,6 +216,18 @@ public class IntegrationBuilder
     }
 
     /// <summary>
+    /// Creates a GitLab integration (supports both gitlab.com and self-hosted).
+    /// </summary>
+    public static Integration GitLabIntegration()
+    {
+        return new IntegrationBuilder()
+            .WithProvider(ProviderType.GITLAB)
+            .WithType(IntegrationType.CODE_SOURCE)
+            .WithUrl("https://gitlab.com/myorg/myrepo")
+            .Build();
+    }
+
+    /// <summary>
     /// Creates a Confluence integration.
     /// </summary>
     public static Integration ConfluenceIntegration()

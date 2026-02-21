@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Bot, Sparkles, RefreshCw, X, Send, Loader2, MessageSquare, Plus, Save, Database, Globe, Workflow as WorkflowIcon, Flag, Activity, ChevronDown, Clock, ChevronRight, Layers, Smile, Meh, Frown, ExternalLink, Zap, Trash2, AlertTriangle, User, Github } from 'lucide-react';
+import { Bot, Sparkles, RefreshCw, X, Send, Loader2, MessageSquare, Plus, Save, Database, Globe, Workflow as WorkflowIcon, Flag, Activity, ChevronDown, Clock, ChevronRight, Layers, Smile, Meh, Frown, ExternalLink, Zap, Trash2, AlertTriangle, User, Github, Gitlab } from 'lucide-react';
 import { marked } from 'marked';
 import { Ticket, TicketPriority, TicketStatus, Comment, Workflow, Agent } from '../types';
 import { addComment, createTicket, updateTicket, getTickets, convertToExternal, deleteTicket, getTicketStatuses, getTicketPriorities, generateSummary } from '../services/ticketService';
@@ -35,6 +35,12 @@ const getProviderInfo = (source: string): ProviderInfo => {
       icon: <Github className="w-4 h-4" />,
       name: 'GitHub',
       color: 'text-gray-400'
+    };
+  } else if (sourceUpper.includes('GITLAB')) {
+    return {
+      icon: <Gitlab className="w-4 h-4" />,
+      name: 'GitLab',
+      color: 'text-orange-500'
     };
   } else if (sourceUpper.includes('INTERNAL')) {
     return {

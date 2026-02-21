@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Layers, GitBranch, Database, Globe, X, Save, Check, Loader2, Trash2, AlertTriangle, RefreshCw, Key, Filter, Zap, User, Link as LinkIcon, Search, ChevronDown, Wifi } from 'lucide-react';
+import { Plus, Layers, GitBranch, Gitlab, Database, Globe, X, Save, Check, Loader2, Trash2, AlertTriangle, RefreshCw, Key, Filter, Zap, User, Link as LinkIcon, Search, ChevronDown, Wifi } from 'lucide-react';
 import { Integration, IntegrationType } from '../types';
 import { getIntegrations, createIntegration, updateIntegration, deleteIntegration, testIntegrationConnection } from '../services/integrationService';
 import FilterWarningModal from './FilterWarningModal';
@@ -62,10 +62,10 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
     { value: 'jira', label: 'Jira' },
     { value: 'confluence', label: 'Confluence' },
     { value: 'github', label: 'GitHub' },
+    { value: 'gitlab', label: 'GitLab' },
     // Unsupported providers - pending backend implementation
     // { value: 'azure-devops', label: 'Azure DevOps' },
     // { value: 'linear', label: 'Linear' },
-    // { value: 'gitlab', label: 'GitLab' },
     // { value: 'notion', label: 'Notion' },
     // { value: 'custom', label: 'Custom' },
   ];
@@ -89,6 +89,12 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
           label: 'SEARCH FILTER',
           placeholder: 'e.g. is:open label:bug state:open',
           hint: 'Limit which issues are synced by providing a GitHub search filter.'
+        };
+      case 'gitlab':
+        return {
+          label: 'SEARCH FILTER',
+          placeholder: 'e.g. state:opened labels:bug',
+          hint: 'Limit which issues are synced using GitLab search syntax.'
         };
       // Unsupported providers - pending backend implementation
       // case 'azure-devops':
@@ -248,6 +254,7 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
       case 'jira': return <Layers className="w-5 h-5 text-indigo-500" />;
       case 'confluence': return <Database className="w-5 h-5 text-blue-400" />;
       case 'github': return <GitBranch className="w-5 h-5 text-orange-500" />;
+      case 'gitlab': return <Gitlab className="w-5 h-5 text-orange-500" />;
       // Unsupported providers - pending backend implementation
       // case 'linear': return <Zap className="w-5 h-5 text-purple-500" />;
       default: return <Globe className="w-5 h-5 text-zinc-600" />;

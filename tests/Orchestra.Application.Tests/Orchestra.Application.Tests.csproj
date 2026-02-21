@@ -10,6 +10,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Orchestra.Application\Orchestra.Application.csproj" />
     <ProjectReference Include="..\..\src\Orchestra.Domain\Orchestra.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Orchestra.Infrastructure\Orchestra.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orchestra.Infrastructure.Integrations.Providers.Jira;
 using Orchestra.Infrastructure.Integrations.Providers.GitHub;
+using Orchestra.Infrastructure.Integrations.Providers.GitLab;
 using Orchestra.Domain.Enums;
 
 namespace Orchestra.Infrastructure.Integrations.Providers;
@@ -37,6 +38,7 @@ public class TicketProviderFactory : ITicketProviderFactory
         {
             ProviderType.JIRA => _serviceProvider.GetRequiredService<JiraTicketProvider>(),
             ProviderType.GITHUB => _serviceProvider.GetRequiredService<GitHubTicketProvider>(),
+            ProviderType.GITLAB => _serviceProvider.GetRequiredService<GitLabTicketProvider>(),
             // Future providers can be added here:
             // ProviderType.AZURE_DEVOPS => _serviceProvider.GetRequiredService<AzureDevOpsTicketProvider>(),
             // ProviderType.LINEAR => _serviceProvider.GetRequiredService<LinearTicketProvider>(),
@@ -50,7 +52,7 @@ public class TicketProviderFactory : ITicketProviderFactory
     /// <returns>Collection of supported ProviderType enum values.</returns>
     public IEnumerable<ProviderType> GetSupportedProviders()
     {
-        return new[] { ProviderType.JIRA, ProviderType.GITHUB };
+        return new[] { ProviderType.JIRA, ProviderType.GITHUB, ProviderType.GITLAB };
     }
 
     private ITicketProvider? LogAndReturnNull(ProviderType providerType)
