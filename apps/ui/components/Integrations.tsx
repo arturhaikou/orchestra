@@ -48,8 +48,6 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
     apiKey: '',
     filterQuery: '',
     vectorize: false,
-    jiraType: 'Cloud',
-    confluenceType: 'Cloud'
   });
 
   const categories = [
@@ -136,8 +134,6 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
         apiKey: '••••••••••••', // Masked for existing
         filterQuery: integration.filterQuery || '',
         vectorize: integration.vectorize || false,
-        jiraType: (integration as any).jiraType || 'Cloud',
-        confluenceType: (integration as any).confluenceType || 'Cloud'
       });
     } else {
       setEditingId(null);
@@ -150,8 +146,6 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
         apiKey: '',
         filterQuery: '',
         vectorize: false,
-        jiraType: 'Cloud',
-        confluenceType: 'Cloud'
       });
     }
     setIsModalOpen(true);
@@ -226,16 +220,6 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
         username: formState.username,
         apiKey: formState.apiKey
       };
-      
-      // Include jiraType for Jira integrations
-      if (formState.provider === 'jira') {
-        testRequest.jiraType = formState.jiraType;
-      }
-      
-      // Include confluenceType for Confluence integrations
-      if (formState.provider === 'confluence') {
-        testRequest.confluenceType = formState.confluenceType;
-      }
       
       await testIntegrationConnection(testRequest);
       setConnectionTestSuccess(true);
@@ -437,50 +421,6 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
                   required
                   />
               </div>
-
-              {formState.provider === 'jira' && (
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-textMuted uppercase tracking-wider">Jira Instance Type</label>
-                  <div className="relative">
-                    <select 
-                      value={formState.jiraType} 
-                      onChange={(e) => setFormState({...formState, jiraType: e.target.value})}
-                      className="w-full bg-background border border-border rounded-lg pl-3 pr-10 py-2.5 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary appearance-none transition-all shadow-sm"
-                    >
-                      <option value="Cloud">Jira Cloud</option>
-                      <option value="OnPremise">Jira On-Premise</option>
-                    </select>
-                    <Globe className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-textMuted pointer-events-none" />
-                  </div>
-                  <p className="text-[10px] text-textMuted ml-1">
-                    {formState.jiraType === 'Cloud' 
-                      ? 'For cloud.atlassian.net instances' 
-                      : 'For self-hosted or data center instances'}
-                  </p>
-                </div>
-              )}
-
-              {formState.provider === 'confluence' && (
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-textMuted uppercase tracking-wider">Confluence Instance Type</label>
-                  <div className="relative">
-                    <select 
-                      value={formState.confluenceType} 
-                      onChange={(e) => setFormState({...formState, confluenceType: e.target.value})}
-                      className="w-full bg-background border border-border rounded-lg pl-3 pr-10 py-2.5 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary appearance-none transition-all shadow-sm"
-                    >
-                      <option value="Cloud">Confluence Cloud</option>
-                      <option value="OnPremise">Confluence On-Premise</option>
-                    </select>
-                    <Globe className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-textMuted pointer-events-none" />
-                  </div>
-                  <p className="text-[10px] text-textMuted ml-1">
-                    {formState.confluenceType === 'Cloud' 
-                      ? 'Connects to Atlassian Cloud instance (https://[domain].atlassian.net)' 
-                      : 'Connects to self-hosted or Data Center instance'}
-                  </p>
-                </div>
-              )}
 
               <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-textMuted uppercase tracking-wider">Username / Email</label>

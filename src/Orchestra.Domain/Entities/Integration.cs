@@ -15,8 +15,7 @@ public class Integration
         string? url,
         string apiKey, // Decrypted API key
         string? filterQuery,
-        IntegrationType integrationType,
-        JiraType? jiraType = null)
+        IntegrationType integrationType)
     {
         Id = id;
         WorkspaceId = workspaceId;
@@ -26,7 +25,6 @@ public class Integration
         // Note: ApiKey is not stored, only used transiently
         FilterQuery = filterQuery;
         Type = integrationType;
-        JiraType = jiraType;
         CreatedAt = DateTime.UtcNow;
         IsActive = true;
     }
@@ -37,8 +35,6 @@ public class Integration
     public IntegrationType Type { get; private set; }
     public string? Icon { get; private set; }
     public ProviderType Provider { get; private set; }
-    public JiraType? JiraType { get; private set; }
-    public ConfluenceType? ConfluenceType { get; private set; }
     public string? Url { get; private set; }
     public string? Username { get; private set; }
     public string? EncryptedApiKey { get; private set; }
@@ -65,9 +61,7 @@ public class Integration
         string? username = null,
         string? encryptedApiKey = null,
         string? filterQuery = null,
-        bool vectorize = false,
-        JiraType? jiraType = null,
-        ConfluenceType? confluenceType = null)
+        bool vectorize = false)
     {
         // Validate workspace ID
         if (workspaceId == Guid.Empty)
@@ -95,8 +89,6 @@ public class Integration
             EncryptedApiKey = encryptedApiKey,
             FilterQuery = filterQuery,
             Vectorize = vectorize,
-            JiraType = jiraType ?? Orchestra.Domain.Enums.JiraType.Cloud, // Default to Cloud
-            ConfluenceType = confluenceType ?? Orchestra.Domain.Enums.ConfluenceType.Cloud, // Default to Cloud
             Connected = true, // Default to connected
             CreatedAt = DateTime.UtcNow,
             IsActive = true
@@ -112,8 +104,6 @@ public class Integration
     /// <param name="url">The URL for the integration (optional, must be absolute if specified).</param>
     /// <param name="username">The username for authentication (optional).</param>
     /// <param name="encryptedApiKey">The encrypted API key (optional, only updated if provided).</param>
-    /// <param name="jiraType">The Jira instance type (optional, only updated if specified).</param>
-    /// <param name="confluenceType">The Confluence instance type (optional, only updated if specified).</param>
     /// <param name="connected">The connection status (optional, only updated if provided).</param>
     public void Update(
         string name,
@@ -123,8 +113,6 @@ public class Integration
         string? encryptedApiKey = null,
         string? filterQuery = null,
         bool vectorize = false,
-        JiraType? jiraType = null,
-        ConfluenceType? confluenceType = null,
         bool? connected = null)
     {
         // Validate and trim name
@@ -147,14 +135,6 @@ public class Integration
         Username = username;
         FilterQuery = filterQuery;
         Vectorize = vectorize;
-        if (jiraType.HasValue)
-        {
-            JiraType = jiraType;
-        }
-        if (confluenceType.HasValue)
-        {
-            ConfluenceType = confluenceType;
-        }
         UpdatedAt = DateTime.UtcNow;
         
         // Only update API key if a new value is provided

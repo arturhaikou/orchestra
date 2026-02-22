@@ -7,6 +7,7 @@ using Orchestra.Application.Common.Interfaces;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
 using Orchestra.Domain.Interfaces;
+using Orchestra.Domain.Utilities;
 
 namespace Orchestra.Infrastructure.Integrations.Providers.Jira;
 
@@ -51,8 +52,8 @@ public class JiraApiClientFactory
 
         var httpClient = CreateAndConfigureHttpClient(integration);
         
-        // Default to Cloud if JiraType is not set (for backward compatibility)
-        var jiraType = integration.JiraType ?? JiraType.Cloud;
+        // Detect type from URL: Cloud = *.atlassian.net, otherwise OnPremise
+        var jiraType = IntegrationTypeDetector.DetectJiraType(integration.Url);
 
         return jiraType switch
         {
@@ -76,10 +77,8 @@ public class JiraApiClientFactory
     {
         try
         {
-            // On-Premise uses a named client with AllowAutoRedirect=false so that the Jira
-            // SSO/auth plugin's 302 redirect is not silently followed (which would result in
-            // a 200 HTML login page that cannot be deserialized as JSON).
-            var jiraType = integration.JiraType ?? JiraType.Cloud;
+            // Detect type from URL: Cloud = *.atlassian.net, otherwise OnPremise
+            var jiraType = IntegrationTypeDetector.DetectJiraType(integration.Url);
             var clientName = jiraType == JiraType.OnPremise ? "JiraOnPremise" : string.Empty;
             var client = _httpClientFactory.CreateClient(clientName);
 

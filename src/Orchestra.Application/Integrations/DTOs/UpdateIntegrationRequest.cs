@@ -12,7 +12,5 @@ public record UpdateIntegrationRequest(
     string? ApiKey,  // If contains "••••••••••••", preserve existing encrypted key
     string? FilterQuery,
     bool Vectorize,
-    string? JiraType = null,  // "Cloud" or "OnPremise"
-    string? ConfluenceType = null,  // "Cloud" or "OnPremise"
     bool? Connected = null  // Optional connection status (only updated if provided)
 );

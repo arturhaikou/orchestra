@@ -126,6 +126,8 @@ export interface Integration {
   filterQuery?: string;
   username?: string;
   vectorize?: boolean;
+  jiraType?: string;       // Computed from URL: "Cloud" or "OnPremise"
+  confluenceType?: string; // Computed from URL: "Cloud" or "OnPremise"
 }
 
 export interface User {

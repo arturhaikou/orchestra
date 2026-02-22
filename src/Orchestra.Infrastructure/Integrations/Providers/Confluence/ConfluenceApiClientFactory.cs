@@ -5,6 +5,7 @@ using Orchestra.Application.Common.Interfaces;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
 using Orchestra.Domain.Interfaces;
+using Orchestra.Domain.Utilities;
 
 namespace Orchestra.Infrastructure.Integrations.Providers.Confluence;
 
@@ -49,8 +50,8 @@ public class ConfluenceApiClientFactory
 
         var httpClient = CreateAndConfigureHttpClient(integration);
         
-        // Default to Cloud if ConfluenceType is not set (for backward compatibility)
-        var confluenceType = integration.ConfluenceType ?? ConfluenceType.Cloud;
+        // Detect type from URL: Cloud = *.atlassian.net, otherwise OnPremise
+        var confluenceType = IntegrationTypeDetector.DetectConfluenceType(integration.Url);
 
         return confluenceType switch
         {
@@ -89,9 +90,9 @@ public class ConfluenceApiClientFactory
                     ex);
             }
 
-            // Configure authentication
+            // Configure authentication based on URL-detected type
             var apiKey = _credentialEncryptionService.Decrypt(integration.EncryptedApiKey);
-            var confluenceType = integration.ConfluenceType ?? ConfluenceType.Cloud;
+            var confluenceType = IntegrationTypeDetector.DetectConfluenceType(integration.Url);
 
             if (confluenceType == ConfluenceType.Cloud)
             {

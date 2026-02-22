@@ -100,8 +100,6 @@ export interface ConnectionTestRequest {
   url: string;
   username?: string;
   apiKey: string;
-  jiraType?: string;  // "Cloud" or "OnPremise" for Jira integrations
-  confluenceType?: string;  // "Cloud" or "OnPremise" for Confluence integrations
 }
 
 export const testIntegrationConnection = async (data: ConnectionTestRequest): Promise<void> => {

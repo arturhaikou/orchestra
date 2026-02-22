@@ -73,11 +73,6 @@ public static class TestConstants
     public static readonly AgentStatus DefaultAgentStatus = AgentStatus.Idle;
 
     /// <summary>
-    /// Default Jira type for tests.
-    /// </summary>
-    public static readonly JiraType DefaultJiraType = JiraType.Cloud;
-
-    /// <summary>
     /// Default provider type for tests.
     /// </summary>
     public static readonly ProviderType DefaultProviderType = ProviderType.JIRA;

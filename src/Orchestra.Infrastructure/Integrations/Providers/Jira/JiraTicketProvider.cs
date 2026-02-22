@@ -5,6 +5,7 @@ using Orchestra.Application.Integrations.Services;
 using Orchestra.Application.Tickets.DTOs;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Interfaces;
+using Orchestra.Domain.Utilities;
 using Orchestra.Infrastructure.Integrations.Providers.Jira.Models;
 using System.Text.Json;
 using System.Net;
@@ -135,7 +136,7 @@ public class JiraTicketProvider : ITicketProvider
         // Convert markdown to appropriate format (ADF for Cloud, HTML for On-Premise)
         var commentBody = await _contentConverter.ConvertMarkdownToCommentBodyAsync(
             content, 
-            integration.JiraType.GetValueOrDefault(), 
+            IntegrationTypeDetector.DetectJiraType(integration.Url), 
             cancellationToken);
         
         try
@@ -182,7 +183,7 @@ public class JiraTicketProvider : ITicketProvider
             // Step 3: Convert markdown description to appropriate format
             var descriptionBody = await _contentConverter.ConvertMarkdownToDescriptionAsync(
                 description,
-                integration.JiraType.GetValueOrDefault(),
+                IntegrationTypeDetector.DetectJiraType(integration.Url),
                 cancellationToken);
             
             // Step 4: Build create issue request
@@ -324,7 +325,7 @@ public class JiraTicketProvider : ITicketProvider
 
         var comments = await ConvertCommentsAsync(
             jiraTicket.Fields?.Comment?.Comments,
-            integration.JiraType.GetValueOrDefault(),
+            IntegrationTypeDetector.DetectJiraType(integration.Url),
             cancellationToken);
 
         // Build external URL directly from integration base URL and ticket key
@@ -339,7 +340,7 @@ public class JiraTicketProvider : ITicketProvider
             Title: jiraTicket.Fields?.Summary ?? "Untitled",
             Description: await ExtractDescriptionTextAsync(
                 jiraTicket.Fields?.Description,
-                integration.JiraType.GetValueOrDefault(),
+                IntegrationTypeDetector.DetectJiraType(integration.Url),
                 cancellationToken),
             StatusName: statusName,
             StatusColor: GetStatusColor(statusCategoryId, statusName),

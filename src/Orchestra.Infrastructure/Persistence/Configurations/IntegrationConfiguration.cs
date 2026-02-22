@@ -66,12 +66,6 @@ public class IntegrationConfiguration : IEntityTypeConfiguration<Integration>
             .IsRequired()
             .HasDefaultValue(true);
         
-        builder.Property(i => i.JiraType)
-            .HasConversion<int?>();
-        
-        builder.Property(i => i.ConfluenceType)
-            .HasConversion<int?>();
-        
         // Indexes
         builder.HasIndex(i => i.WorkspaceId)
             .HasDatabaseName("IX_Integrations_WorkspaceId");

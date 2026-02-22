@@ -19,8 +19,6 @@ public class IntegrationBuilder
     private string? _filterQuery;
     private bool _vectorize = false;
     private bool _connected = true;
-    private JiraType? _jiraType = JiraType.Cloud;
-    private ConfluenceType? _confluenceType = ConfluenceType.Cloud;
 
     /// <summary>
     /// Sets the integration ID.
@@ -122,24 +120,6 @@ public class IntegrationBuilder
     }
 
     /// <summary>
-    /// Sets the Jira type (Cloud or Self-Hosted).
-    /// </summary>
-    public IntegrationBuilder WithJiraType(JiraType? jiraType)
-    {
-        _jiraType = jiraType;
-        return this;
-    }
-
-    /// <summary>
-    /// Sets the Confluence type (Cloud or On-Premise).
-    /// </summary>
-    public IntegrationBuilder WithConfluenceType(ConfluenceType? confluenceType)
-    {
-        _confluenceType = confluenceType;
-        return this;
-    }
-
-    /// <summary>
     /// Builds the Integration entity.
     /// </summary>
     public Integration Build()
@@ -153,9 +133,7 @@ public class IntegrationBuilder
             _username,
             _encryptedApiKey,
             _filterQuery,
-            _vectorize,
-            _jiraType,
-            _confluenceType
+            _vectorize
         );
 
         if (!_connected)
@@ -168,8 +146,6 @@ public class IntegrationBuilder
                 _encryptedApiKey,
                 _filterQuery,
                 _vectorize,
-                _jiraType,
-                _confluenceType,
                 _connected);
         }
 
@@ -185,7 +161,6 @@ public class IntegrationBuilder
             .WithProvider(ProviderType.JIRA)
             .WithType(IntegrationType.TRACKER)
             .WithUrl("https://mycompany.atlassian.net")
-            .WithJiraType(JiraType.Cloud)
             .AsConnected(true)
             .Build();
     }
@@ -199,7 +174,6 @@ public class IntegrationBuilder
             .WithProvider(ProviderType.JIRA)
             .WithType(IntegrationType.TRACKER)
             .WithUrl("https://jira.mycompany.local")
-            .WithJiraType(JiraType.OnPremise)
             .Build();
     }
 

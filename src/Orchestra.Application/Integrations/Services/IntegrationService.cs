@@ -4,6 +4,7 @@ using Orchestra.Application.Integrations.DTOs;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
 using Orchestra.Domain.Interfaces;
+using Orchestra.Domain.Utilities;
 using System.Net.Http.Headers;
 using System.Text;
 
@@ -87,31 +88,7 @@ public class IntegrationService : IIntegrationService
             ? null 
             : _credentialEncryptionService.Encrypt(request.ApiKey);
 
-        // 5. Parse JiraType if provided and provider is JIRA
-        Domain.Enums.JiraType? jiraType = null;
-        if (providerType == ProviderType.JIRA && !string.IsNullOrEmpty(request.JiraType))
-        {
-            if (!Enum.TryParse<Domain.Enums.JiraType>(request.JiraType, ignoreCase: true, out var parsedJiraType))
-            {
-                var validJiraTypes = string.Join(", ", Enum.GetNames<Domain.Enums.JiraType>());
-                throw new ArgumentException($"Invalid Jira type: {request.JiraType}. Valid types are: {validJiraTypes}", nameof(request.JiraType));
-            }
-            jiraType = parsedJiraType;
-        }
-
-        // 5b. Parse ConfluenceType if provided and provider is CONFLUENCE
-        Domain.Enums.ConfluenceType? confluenceType = null;
-        if (providerType == ProviderType.CONFLUENCE && !string.IsNullOrEmpty(request.ConfluenceType))
-        {
-            if (!Enum.TryParse<Domain.Enums.ConfluenceType>(request.ConfluenceType, ignoreCase: true, out var parsedConfluenceType))
-            {
-                var validConfluenceTypes = string.Join(", ", Enum.GetNames<Domain.Enums.ConfluenceType>());
-                throw new ArgumentException($"Invalid Confluence type: {request.ConfluenceType}. Valid types are: {validConfluenceTypes}", nameof(request.ConfluenceType));
-            }
-            confluenceType = parsedConfluenceType;
-        }
-
-        // 6. Create integration entity using domain factory
+        // 5. Create integration entity using domain factory
         var integration = Integration.Create(
             workspaceId: request.WorkspaceId,
             name: request.Name,
@@ -121,12 +98,10 @@ public class IntegrationService : IIntegrationService
             username: request.Username,
             encryptedApiKey: encryptedApiKey,
             filterQuery: request.FilterQuery,
-            vectorize: request.Vectorize,
-            jiraType: jiraType,
-            confluenceType: confluenceType
+            vectorize: request.Vectorize
         );
 
-        // 6b. Set connected status if provided in request
+        // 5b. Set connected status if provided in request
         if (request.Connected.HasValue)
         {
             integration.Update(
@@ -137,7 +112,6 @@ public class IntegrationService : IIntegrationService
                 encryptedApiKey: null, // Don't re-encrypt
                 filterQuery: integration.FilterQuery,
                 vectorize: integration.Vectorize,
-                jiraType: integration.JiraType,
                 connected: request.Connected.Value
             );
         }
@@ -203,30 +177,6 @@ public class IntegrationService : IIntegrationService
             encryptedApiKey = _credentialEncryptionService.Encrypt(request.ApiKey);
         }
 
-        // 5b. Parse JiraType if provided and provider is JIRA
-        Domain.Enums.JiraType? jiraType = null;
-        if ((providerType ?? integration.Provider) == ProviderType.JIRA && !string.IsNullOrEmpty(request.JiraType))
-        {
-            if (!Enum.TryParse<Domain.Enums.JiraType>(request.JiraType, ignoreCase: true, out var parsedJiraType))
-            {
-                var validJiraTypes = string.Join(", ", Enum.GetNames<Domain.Enums.JiraType>());
-                throw new ArgumentException($"Invalid Jira type: {request.JiraType}. Valid types are: {validJiraTypes}", nameof(request.JiraType));
-            }
-            jiraType = parsedJiraType;
-        }
-
-        // 5c. Parse ConfluenceType if provided and provider is CONFLUENCE
-        Domain.Enums.ConfluenceType? confluenceType = null;
-        if ((providerType ?? integration.Provider) == ProviderType.CONFLUENCE && !string.IsNullOrEmpty(request.ConfluenceType))
-        {
-            if (!Enum.TryParse<Domain.Enums.ConfluenceType>(request.ConfluenceType, ignoreCase: true, out var parsedConfluenceType))
-            {
-                var validConfluenceTypes = string.Join(", ", Enum.GetNames<Domain.Enums.ConfluenceType>());
-                throw new ArgumentException($"Invalid Confluence type: {request.ConfluenceType}. Valid types are: {validConfluenceTypes}", nameof(request.ConfluenceType));
-            }
-            confluenceType = parsedConfluenceType;
-        }
-
         // 6. Update the integration using domain method
         integration.Update(
             name: request.Name,
@@ -236,8 +186,6 @@ public class IntegrationService : IIntegrationService
             encryptedApiKey: encryptedApiKey,
             filterQuery: request.FilterQuery,
             vectorize: request.Vectorize,
-            jiraType: jiraType,
-            confluenceType: confluenceType,
             connected: request.Connected
         );
 
@@ -411,15 +359,11 @@ public class IntegrationService : IIntegrationService
         {
             using var client = CreateHttpClient(request);
             
-            // Determine which Jira API to use based on type
-            // Cloud uses v3 API, On-Premise can use v2 which is more compatible
-            string endpoint = "/rest/api/2/serverInfo";
-            
-            if (!string.IsNullOrEmpty(request.JiraType) && 
-                request.JiraType.Equals("Cloud", StringComparison.OrdinalIgnoreCase))
-            {
-                endpoint = "/rest/api/3/serverInfo";
-            }
+            // Detect Jira type from URL: Cloud uses API v3, On-Premise uses API v2
+            var jiraType = IntegrationTypeDetector.DetectJiraType(request.Url);
+            var endpoint = jiraType == JiraType.Cloud
+                ? "/rest/api/3/serverInfo"
+                : "/rest/api/2/serverInfo";
             
             var response = await client.GetAsync(endpoint);
             
@@ -449,15 +393,11 @@ public class IntegrationService : IIntegrationService
         {
             using var client = CreateHttpClient(request);
             
-            // Determine which Confluence API to use based on type
-            string endpoint = "/wiki/rest/api/space?limit=1";
-            
-            if (!string.IsNullOrEmpty(request.ConfluenceType) && 
-                request.ConfluenceType.Equals("OnPremise", StringComparison.OrdinalIgnoreCase))
-            {
-                // On-Premise can use the same endpoint but may have different auth handling
-                endpoint = "/wiki/rest/api/space?limit=1";
-            }
+            // Detect Confluence type from URL: Cloud has /wiki/ prefix, On-Premise does not
+            var confluenceType = IntegrationTypeDetector.DetectConfluenceType(request.Url);
+            var endpoint = confluenceType == ConfluenceType.Cloud
+                ? "/wiki/rest/api/space?limit=1"
+                : "/rest/api/space?limit=1";
             
             var response = await client.GetAsync(endpoint);
             
@@ -523,8 +463,12 @@ public class IntegrationService : IIntegrationService
             LastSync: FormatLastSync(integration.LastSyncAt),
             FilterQuery: integration.FilterQuery,
             Vectorize: integration.Vectorize,
-            JiraType: integration.JiraType?.ToString(),
-            ConfluenceType: integration.ConfluenceType?.ToString()
+            JiraType: integration.Provider == ProviderType.JIRA
+                ? IntegrationTypeDetector.DetectJiraType(integration.Url).ToString()
+                : null,
+            ConfluenceType: integration.Provider == ProviderType.CONFLUENCE
+                ? IntegrationTypeDetector.DetectConfluenceType(integration.Url).ToString()
+                : null
         );
     }
 

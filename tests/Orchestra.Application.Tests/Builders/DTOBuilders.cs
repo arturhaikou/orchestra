@@ -523,8 +523,6 @@ public class CreateIntegrationRequestBuilder
     private string _encryptedApiKey = "encrypted_key_" + Guid.NewGuid();
     private string? _filterQuery;
     private bool _vectorize = false;
-    private string? _jiraType = "Cloud";
-    private string? _confluenceType = "Cloud";
     private bool? _connected;
 
     /// <summary>
@@ -609,21 +607,12 @@ public class CreateIntegrationRequestBuilder
     }
 
     /// <summary>
-    /// Sets the Jira type.
-    /// </summary>
-    public CreateIntegrationRequestBuilder WithJiraType(string? jiraType)
-    {
-        _jiraType = jiraType;
-        return this;
-    }
-
-    /// <summary>
     /// Builds the CreateIntegrationRequest.
     /// </summary>
     public CreateIntegrationRequest Build()
     {
         return new CreateIntegrationRequest(
-            _workspaceId, _name, _type, _provider, _url, _username, _encryptedApiKey, _filterQuery, _vectorize, _jiraType, _confluenceType, _connected);
+            _workspaceId, _name, _type, _provider, _url, _username, _encryptedApiKey, _filterQuery, _vectorize, _connected);
     }
 }
 
@@ -640,8 +629,6 @@ public class UpdateIntegrationRequestBuilder
     private string? _encryptedApiKey;
     private string? _filterQuery;
     private bool _vectorize = false;
-    private string? _jiraType;
-    private string? _confluenceType;
     private bool? _connected;
 
     /// <summary>
@@ -667,6 +654,6 @@ public class UpdateIntegrationRequestBuilder
     /// </summary>
     public UpdateIntegrationRequest Build()
     {
-        return new UpdateIntegrationRequest(_name, _type, _provider, _url, _username, _encryptedApiKey, _filterQuery, _vectorize, _jiraType, _confluenceType, _connected);
+        return new UpdateIntegrationRequest(_name, _type, _provider, _url, _username, _encryptedApiKey, _filterQuery, _vectorize, _connected);
     }
 }

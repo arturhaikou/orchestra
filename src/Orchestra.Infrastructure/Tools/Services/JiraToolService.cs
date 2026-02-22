@@ -8,6 +8,7 @@ using Orchestra.Application.Common.Interfaces;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
 using Orchestra.Domain.Interfaces;
+using Orchestra.Domain.Utilities;
 using Orchestra.Infrastructure.Integrations.Providers.Jira;
 using Orchestra.Infrastructure.Integrations.Providers.Jira.Models;
 using Orchestra.Infrastructure.Tools.Models.Jira;
@@ -263,7 +264,7 @@ public class JiraToolService : IJiraToolService
             {
                 var convertedDescription = await _contentConverter.ConvertMarkdownToDescriptionAsync(
                     description,
-                    integration.JiraType.GetValueOrDefault());
+                    IntegrationTypeDetector.DetectJiraType(integration.Url));
                 
                 // Convert object result to JsonElement if needed
                 if (convertedDescription is JsonElement je)
@@ -637,7 +638,7 @@ public class JiraToolService : IJiraToolService
             
             var description = await _contentConverter.ConvertDescriptionToMarkdownAsync(
                 descriptionElement ?? default,
-                integration.JiraType.GetValueOrDefault());
+                IntegrationTypeDetector.DetectJiraType(integration.Url));
             var assignee = ExtractAssigneeDisplayName(jiraTicket.Fields);
             var priority = jiraTicket.Fields?.Priority?.Name;
             var issueType = ExtractIssueTypeName(jiraTicket.Fields);
@@ -1126,7 +1127,7 @@ public class JiraToolService : IJiraToolService
             // Build description in the appropriate format
             var descriptionBody = await _contentConverter.ConvertMarkdownToDescriptionAsync(
                 description,
-                integration.JiraType.GetValueOrDefault(),
+                IntegrationTypeDetector.DetectJiraType(integration.Url),
                 cancellationToken);
 
             // Build create issue request
