@@ -574,12 +574,23 @@ public class TicketQueryService : ITicketQueryService
             cancellationToken);
     }
 
+    private static string NormalizeExternalTicketId(string externalTicketId, string provider)
+    {
+        if (string.IsNullOrEmpty(externalTicketId)) return externalTicketId;
+        // Remove leading '#' for GitHub and GitLab
+        if ((provider.ToUpperInvariant().Contains("GITHUB") || provider.ToUpperInvariant().Contains("GITLAB")) && externalTicketId.StartsWith("#"))
+            return externalTicketId.Substring(1);
+        return externalTicketId;
+    }
+
     private async Task<TicketDto> FetchAndMergeExternalTicketAsync(
         Integration integration,
         string externalTicketId,
         string compositeId,
         CancellationToken cancellationToken)
     {
+        // Normalize external ticket id for provider
+        var normalizedExternalTicketId = NormalizeExternalTicketId(externalTicketId, integration.Provider.ToString());
         // 1. Validate and decrypt integration credentials
         if (string.IsNullOrEmpty(integration.EncryptedApiKey))
         {
@@ -598,21 +609,21 @@ public class TicketQueryService : ITicketQueryService
         // 3. Fetch ticket from provider
         _logger.LogDebug(
             "Fetching ticket {ExternalTicketId} from provider {Provider}",
-            externalTicketId, integration.Provider);
+            normalizedExternalTicketId, integration.Provider);
 
         ExternalTicketDto? externalTicket;
         try
         {
             externalTicket = await provider.GetTicketByIdAsync(
                 integration,
-                externalTicketId,
+                normalizedExternalTicketId,
                 cancellationToken);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, 
                 "Failed to fetch ticket {ExternalTicketId} from provider {Provider}",
-                externalTicketId, integration.Provider);
+                normalizedExternalTicketId, integration.Provider);
             throw new TicketNotFoundException(compositeId);
         }
 
@@ -624,7 +635,7 @@ public class TicketQueryService : ITicketQueryService
         // 4. Check for materialized DB record
         var materializedTicket = await _ticketDataAccess.GetTicketByExternalIdAsync(
             integration.Id,
-            externalTicketId,
+            normalizedExternalTicketId,
             cancellationToken);
 
         _logger.LogDebug(

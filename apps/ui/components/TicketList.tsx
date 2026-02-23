@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Bot, Sparkles, RefreshCw, X, Send, Loader2, MessageSquare, Plus, Save, Database, Globe, Workflow as WorkflowIcon, Flag, Activity, ChevronDown, Clock, ChevronRight, Layers, Smile, Meh, Frown, ExternalLink, Zap, Trash2, AlertTriangle, User, Github, Gitlab } from 'lucide-react';
 import { marked } from 'marked';
@@ -9,6 +8,7 @@ import { getUser } from '../services/authService';
 import { getAgents } from '../services/agentService';
 import { IntegrationSelector } from './IntegrationSelector';
 import { IssueTypeSelector } from './IssueTypeSelector';
+import Toast from './Toast';
 
 interface TicketListProps {
   workspaceId: string;
@@ -129,6 +129,8 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
   
   // Read state for unread counts
   const [lastReadCounts, setLastReadCounts] = useState<Record<string, number>>({});
+
+  const [toastError, setToastError] = useState<string | null>(null);
 
   useEffect(() => {
       selectedTicketRef.current = selectedTicket;
@@ -280,23 +282,20 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
 
   const handleSaveDescription = async () => {
     if (!selectedTicket || !selectedTicket.internal) return;
-    
     // Validation
     const trimmedDescription = descriptionValue.trim();
     if (!trimmedDescription) {
-      alert('Description cannot be empty.');
+      setToastError('Description cannot be empty.');
       return;
     }
     if (trimmedDescription.length > 5000) {
-      alert('Description cannot exceed 5,000 characters.');
+      setToastError('Description cannot exceed 5,000 characters.');
       return;
     }
-
     setIsSavingDescription(true);
     try {
       const updates = { description: trimmedDescription };
       await updateTicket(selectedTicket.id, updates);
-      
       // Update local state
       const updatedTicket = { ...selectedTicket, description: trimmedDescription };
       setTickets(prev => prev.map(t => t.id === selectedTicket.id ? updatedTicket : t));
@@ -304,7 +303,7 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
       setIsEditingDescription(false);
     } catch (error) {
       console.error('Failed to update description', error);
-      alert('Failed to save description. Please try again.');
+      setToastError('Failed to save description. Please try again.');
     } finally {
       setIsSavingDescription(false);
     }
@@ -339,7 +338,6 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
 
   const handleConvertToExternal = async () => {
     if (!selectedTicket || !selectedTicket.internal || !conversionConfig) return;
-    
     setIsConverting(true);
     try {
       const updated = await convertToExternal(
@@ -347,14 +345,13 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
         conversionConfig.integrationId,
         conversionConfig.issueTypeName
       );
-      
       setTickets(prev => prev.map(t => t.id === selectedTicket.id ? updated : t));
       setSelectedTicket(null);
       setConversionConfig(null);
       setShowConversionForm(false);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Conversion failed", error);
-      alert(error?.message || "Failed to convert ticket to external system");
+      setToastError(error?.message || "Failed to convert ticket to external system");
     } finally {
       setIsConverting(false);
     }
@@ -476,6 +473,9 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
 
   return (
     <div className="h-full flex flex-col gap-4 md:gap-6 relative">
+      {toastError && (
+        <Toast message={toastError} type="error" onClose={() => setToastError(null)} />
+      )}
       {/* Header Actions */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <h2 className="text-xl md:text-2xl font-bold text-text">Tickets</h2>
