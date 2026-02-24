@@ -438,4 +438,134 @@ public class TicketQueryServiceTests
         Assert.All(result3.Items.Skip(1), t => Assert.StartsWith("External", t.Title));
         Assert.True(result3.IsLast);
     }
+
+    // -----------------------------------------------------------------------
+    // Bug regression: isLast incorrectly false / Load More shows nothing
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Bug 1 regression: pageSize=10, 1 provider with only 6 tickets.
+    /// The external service signals all providers exhausted (hasMore=false).
+    /// Expected: IsLast=true and no NextPageToken on the first (and only) page.
+    /// </summary>
+    [Fact]
+    public async Task GetTicketsAsync_Bug1_SingleProviderAllExhausted_IsLastTrue()
+    {
+        var workspaceId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var integrationId = Guid.NewGuid();
+
+        _ticketPaginationService.ParsePageToken(Arg.Any<string>())
+            .Returns(new TicketPageToken { Phase = "internal", InternalOffset = 0 });
+        _ticketPaginationService.NormalizePageSize(Arg.Any<int>()).Returns(x => (int)x[0]);
+        _ticketPaginationService.SerializePageToken(Arg.Any<TicketPageToken>()).Returns("next-token");
+        _workspaceAuth.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
+
+        // No pure-internal tickets in the DB.
+        _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, 0, 10, Arg.Any<CancellationToken>())
+            .Returns(new List<Ticket>());
+        _ticketDataAccess.GetAllStatusesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketStatus>());
+        _ticketDataAccess.GetAllPrioritiesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketPriority>());
+
+        var integration = new Orchestra.Application.Tests.Builders.IntegrationBuilder()
+            .WithId(integrationId).WithWorkspaceId(workspaceId).Build();
+        _integrationDataAccess.GetByWorkspaceIdAsync(workspaceId, Arg.Any<CancellationToken>())
+            .Returns(new List<Integration> { integration });
+
+        // External service returns 6 tickets but marks the provider as exhausted (hasMore=false).
+        var sixDtos = Enumerable.Range(1, 6).Select(i => new Orchestra.Application.Tests.Builders.TicketDtoBuilder()
+            .WithId($"{integrationId}:EXT-{i}")
+            .WithWorkspaceId(workspaceId)
+            .WithTitle($"Ext {i}")
+            .AsExternal(integrationId, $"EXT-{i}")
+            .Build()).ToList();
+
+        var exhaustedState = new ExternalPaginationState
+        {
+            ExhaustedProviderIds = new List<string> { integrationId.ToString() }
+        };
+        _externalFetchingService.FetchExternalTicketsAsync(
+                Arg.Any<List<Integration>>(), 10, Arg.Any<ExternalPaginationState>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<(List<TicketDto>, bool, ExternalPaginationState)>((sixDtos, false, exhaustedState)));
+
+        var service = CreateService();
+        var result = await service.GetTicketsAsync(workspaceId, userId, null, 10);
+
+        Assert.Equal(6, result.Items.Count);
+        Assert.True(result.IsLast,
+            "IsLast must be true when the provider returned fewer tickets than pageSize and is exhausted.");
+        Assert.Null(result.NextPageToken);
+    }
+
+    /// <summary>
+    /// Bug 2 regression: pageSize=10, external service fills the page (hasMore=true) and
+    /// returns a non-null ExternalPaginationState.
+    /// Expected: the state is embedded in the next-page token so the second request continues
+    /// from where it left off instead of restarting from scratch.
+    /// </summary>
+    [Fact]
+    public async Task GetTicketsAsync_Bug2_ExternalStatePreservedInNextPageToken()
+    {
+        var workspaceId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var integrationId = Guid.NewGuid();
+
+        _ticketPaginationService.ParsePageToken(Arg.Any<string>())
+            .Returns(new TicketPageToken { Phase = "internal", InternalOffset = 0 });
+        _ticketPaginationService.NormalizePageSize(Arg.Any<int>()).Returns(x => (int)x[0]);
+
+        // Capture the token passed to SerializePageToken so we can inspect its ExternalState.
+        TicketPageToken? capturedToken = null;
+        _ticketPaginationService.SerializePageToken(Arg.Any<TicketPageToken>())
+            .Returns(ci =>
+            {
+                capturedToken = ci.ArgAt<TicketPageToken>(0);
+                return "next-token";
+            });
+
+        _workspaceAuth.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
+        _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, 0, 10, Arg.Any<CancellationToken>())
+            .Returns(new List<Ticket>());
+        _ticketDataAccess.GetAllStatusesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketStatus>());
+        _ticketDataAccess.GetAllPrioritiesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketPriority>());
+
+        var integration = new Orchestra.Application.Tests.Builders.IntegrationBuilder()
+            .WithId(integrationId).WithWorkspaceId(workspaceId).Build();
+        _integrationDataAccess.GetByWorkspaceIdAsync(workspaceId, Arg.Any<CancellationToken>())
+            .Returns(new List<Integration> { integration });
+
+        // External service fills the page exactly (10/10) and signals more remain.
+        var tenDtos = Enumerable.Range(1, 10).Select(i => new Orchestra.Application.Tests.Builders.TicketDtoBuilder()
+            .WithId($"{integrationId}:EXT-{i}")
+            .WithWorkspaceId(workspaceId)
+            .AsExternal(integrationId, $"EXT-{i}")
+            .Build()).ToList();
+
+        var partialState = new ExternalPaginationState
+        {
+            TotalExternalFetched = 10,
+            ProviderTokens = new Dictionary<string, string?>
+            {
+                { integrationId.ToString(), "cursor-after-10" }
+            }
+        };
+        _externalFetchingService.FetchExternalTicketsAsync(
+                Arg.Any<List<Integration>>(), 10, Arg.Any<ExternalPaginationState>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<(List<TicketDto>, bool, ExternalPaginationState)>((tenDtos, true, partialState)));
+
+        var service = CreateService();
+        var result = await service.GetTicketsAsync(workspaceId, userId, null, 10);
+
+        Assert.Equal(10, result.Items.Count);
+        Assert.False(result.IsLast);
+        Assert.NotNull(result.NextPageToken);
+
+        // Core assertion: the ExternalState must not be null in the serialised token.
+        // A null ExternalState would cause the next request to restart from offset 0
+        // (the root cause of Bug 2's "Load More does nothing" symptom).
+        Assert.NotNull(capturedToken);
+        Assert.NotNull(capturedToken!.ExternalState);
+        Assert.Equal("cursor-after-10",
+            capturedToken.ExternalState!.ProviderTokens[integrationId.ToString()]);
+    }
 }

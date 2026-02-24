@@ -265,7 +265,7 @@ public class TicketQueryService : ITicketQueryService
             "Internal phase incomplete ({Count}/{PageSize}). Attempting to fill {Remaining} remaining slots with external tickets",
             resultTickets.Count, pageSize, remainingSlots);
 
-        var (externalTickets, hasMore) = await FetchExternalTicketsToFillSlotsAsync(
+        var (externalTickets, hasMore, externalState) = await FetchExternalTicketsToFillSlotsAsync(
             workspaceId,
             remainingSlots,
             null,
@@ -280,8 +280,10 @@ public class TicketQueryService : ITicketQueryService
             var nextToken = new TicketPageToken
             {
                 Phase = TicketPaginationPhase.External,
-                InternalOffset = currentToken.InternalOffset + resultTickets.Count,
-                ExternalState = null // Would be set from external service
+                // Advance by the number of pure internal DB rows consumed, not by the total
+                // result count (which also includes external tickets already fetched this page).
+                InternalOffset = currentToken.InternalOffset + pureInternalTickets.Count,
+                ExternalState = externalState
             };
             return (resultTickets, false, nextToken);
         }
@@ -343,9 +345,11 @@ public class TicketQueryService : ITicketQueryService
 
     /// <summary>
     /// Helper to fetch external tickets and fill remaining slots.
-    /// Extracted to reduce code duplication between phases.
+    /// Returns the updated <see cref="ExternalPaginationState"/> so the caller can embed it
+    /// in the next-page token — without this the client would restart external pagination
+    /// from scratch on every subsequent request.
     /// </summary>
-    private async Task<(List<TicketDto> Tickets, bool HasMore)> FetchExternalTicketsToFillSlotsAsync(
+    private async Task<(List<TicketDto> Tickets, bool HasMore, ExternalPaginationState? State)> FetchExternalTicketsToFillSlotsAsync(
         Guid workspaceId,
         int remainingSlots,
         ExternalPaginationState? externalState,
@@ -354,7 +358,7 @@ public class TicketQueryService : ITicketQueryService
         CancellationToken cancellationToken)
     {
         if (remainingSlots <= 0)
-            return (new List<TicketDto>(), false);
+            return (new List<TicketDto>(), false, null);
 
         var integrations = await _integrationDataAccess.GetByWorkspaceIdAsync(
             workspaceId,
@@ -365,7 +369,7 @@ public class TicketQueryService : ITicketQueryService
             .ToList();
 
         if (!trackerIntegrations.Any())
-            return (new List<TicketDto>(), false);
+            return (new List<TicketDto>(), false, null);
 
         var externalTickets = await _externalFetchingService.FetchExternalTicketsAsync(
             trackerIntegrations,
@@ -383,7 +387,8 @@ public class TicketQueryService : ITicketQueryService
             resultTickets.Add(extTicket);
         }
 
-        return (resultTickets, externalTickets.HasMore);
+        // Propagate the updated state so the caller can persist it in the next-page token.
+        return (resultTickets, externalTickets.HasMore, externalTickets.State);
     }
 
     /// <summary>

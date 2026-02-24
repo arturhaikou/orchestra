@@ -79,4 +79,12 @@ public class ExternalPaginationState
     /// </summary>
     [JsonPropertyName("totalExternalFetched")]
     public int TotalExternalFetched { get; set; } = 0;
+    
+    /// <summary>
+    /// List of integration IDs (as strings) that have been exhausted (returned 0 tickets).
+    /// These providers are skipped in subsequent redistribution rounds.
+    /// Persisted in the page token to avoid re-querying exhausted providers.
+    /// </summary>
+    [JsonPropertyName("exhaustedProviderIds")]
+    public List<string> ExhaustedProviderIds { get; set; } = new();
 }
