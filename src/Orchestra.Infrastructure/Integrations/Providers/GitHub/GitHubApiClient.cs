@@ -28,7 +28,7 @@ public class GitHubApiClient : IGitHubApiClient
         _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiToken}");
     }
 
-    public async Task<List<GitHubIssue>> GetRepositoryIssuesAsync(int page = 1, int perPage = 30, CancellationToken cancellationToken = default)
+    public async Task<(List<GitHubIssue> Issues, bool HasNextPage)> GetRepositoryIssuesAsync(int page = 1, int perPage = 30, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -42,8 +42,18 @@ public class GitHubApiClient : IGitHubApiClient
                 PropertyNameCaseInsensitive = true
             }) ?? new();
 
+            // Use the Link header to determine if a next page exists.
+            // GitHub omits the Link header (or omits rel="next") on the final page,
+            // making this reliable even when the result count equals perPage exactly.
+            var hasNextPage = false;
+            if (response.Headers.TryGetValues("Link", out var linkValues))
+            {
+                var linkHeader = string.Join(",", linkValues);
+                hasNextPage = linkHeader.Contains("rel=\"next\"");
+            }
+
             _logger.LogInformation($"Retrieved {issues.Count} issues from GitHub repository {_owner}/{_repo}");
-            return issues;
+            return (issues, hasNextPage);
         }
         catch (HttpRequestException ex)
         {

@@ -126,7 +126,7 @@ public static class Extensions
         builder.Services.AddScoped<IJiraTextContentConverter, JiraTextContentConverter>();
 
         // GitHub API client abstraction
-        builder.Services.AddScoped<GitHubApiClientFactory>();
+        builder.Services.AddScoped<IGitHubApiClientFactory, GitHubApiClientFactory>();
 
         // GitLab API client abstraction
         builder.Services.AddScoped<IGitLabApiClientFactory, GitLabApiClientFactory>();

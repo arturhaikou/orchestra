@@ -29,7 +29,7 @@ public class GitLabTicketProvider : ITicketProvider
 
             // GitLab uses page-based pagination (1-indexed)
             var page = string.IsNullOrEmpty(pageToken) ? 1 : int.Parse(pageToken);
-            var issues = await client.GetProjectIssuesAsync(page, maxResults, cancellationToken);
+            var (issues, hasNextPage) = await client.GetProjectIssuesAsync(page, maxResults, cancellationToken);
 
             var tickets = new List<ExternalTicketDto>();
 
@@ -58,7 +58,9 @@ public class GitLabTicketProvider : ITicketProvider
                 ));
             }
 
-            var isLast = issues.Count < maxResults;
+            // isLast is derived from the X-Next-Page header, which is authoritative
+            // even when the page is exactly full.
+            var isLast = !hasNextPage;
             var nextPageToken = isLast ? null : (page + 1).ToString();
 
             _logger.LogInformation("Fetched {Count} tickets from GitLab", tickets.Count);

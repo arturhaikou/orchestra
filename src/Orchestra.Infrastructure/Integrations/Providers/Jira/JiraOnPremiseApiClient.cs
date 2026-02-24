@@ -60,6 +60,15 @@ public class JiraOnPremiseApiClient : IJiraApiClient
                 throw;
             }
 
+            if (searchResponse != null)
+            {
+                // Jira On-Premise (Data Center / Server) v2 API does not include an isLast field.
+                // We derive it from the total count returned by the API:
+                //   isLast = startAt + fetched >= total
+                var fetched = searchResponse.Tickets?.Count ?? 0;
+                searchResponse.IsLast = searchResponse.Total == 0 || (searchResponse.StartAt + fetched) >= searchResponse.Total;
+            }
+
             return searchResponse ?? new JiraSearchResponse { Tickets = new List<JiraTicket>(), IsLast = true };
         }
         catch (Exception ex)

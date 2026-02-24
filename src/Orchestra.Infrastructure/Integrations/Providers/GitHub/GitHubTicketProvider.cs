@@ -7,10 +7,10 @@ namespace Orchestra.Infrastructure.Integrations.Providers.GitHub;
 
 public class GitHubTicketProvider : ITicketProvider
 {
-    private readonly GitHubApiClientFactory _apiClientFactory;
+    private readonly IGitHubApiClientFactory _apiClientFactory;
     private readonly ILogger<GitHubTicketProvider> _logger;
 
-    public GitHubTicketProvider(GitHubApiClientFactory apiClientFactory, ILogger<GitHubTicketProvider> logger)
+    public GitHubTicketProvider(IGitHubApiClientFactory apiClientFactory, ILogger<GitHubTicketProvider> logger)
     {
         _apiClientFactory = apiClientFactory;
         _logger = logger;
@@ -29,7 +29,7 @@ public class GitHubTicketProvider : ITicketProvider
             
             // GitHub uses page-based pagination (1-indexed)
             var page = string.IsNullOrEmpty(pageToken) ? 1 : int.Parse(pageToken);
-            var issues = await client.GetRepositoryIssuesAsync(page, maxResults, cancellationToken);
+            var (issues, hasNextPage) = await client.GetRepositoryIssuesAsync(page, maxResults, cancellationToken);
 
             var tickets = new List<ExternalTicketDto>();
 
@@ -60,7 +60,9 @@ public class GitHubTicketProvider : ITicketProvider
                 tickets.Add(ticket);
             }
 
-            var isLast = issues.Count < maxResults;
+            // isLast is derived from the Link header (presence of rel="next"), which is
+            // authoritative even when the page is exactly full.
+            var isLast = !hasNextPage;
             var nextPageToken = isLast ? null : (page + 1).ToString();
 
             _logger.LogInformation($"Fetched {tickets.Count} tickets from GitHub");

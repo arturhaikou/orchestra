@@ -4,7 +4,7 @@ using Orchestra.Domain.Interfaces;
 
 namespace Orchestra.Infrastructure.Integrations.Providers.GitHub;
 
-public class GitHubApiClientFactory
+public class GitHubApiClientFactory : IGitHubApiClientFactory
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<GitHubApiClient> _logger;

@@ -25,7 +25,7 @@ public class GitLabApiClient : IGitLabApiClient
 
     private string EncodedProjectPath => Uri.EscapeDataString(_projectPath);
 
-    public async Task<List<GitLabIssue>> GetProjectIssuesAsync(int page = 1, int perPage = 30, CancellationToken cancellationToken = default)
+    public async Task<(List<GitLabIssue> Issues, bool HasNextPage)> GetProjectIssuesAsync(int page = 1, int perPage = 30, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -36,8 +36,18 @@ public class GitLabApiClient : IGitLabApiClient
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
             var issues = JsonSerializer.Deserialize<List<GitLabIssue>>(content, _jsonOptions) ?? new();
 
+            // Use the X-Next-Page response header to determine whether more pages exist.
+            // GitLab sets this header to the next page number, or leaves it empty on the last page.
+            // This is reliable even when the result count equals perPage exactly.
+            var hasNextPage = false;
+            if (response.Headers.TryGetValues("X-Next-Page", out var nextPageValues))
+            {
+                var nextPageHeader = string.Join("", nextPageValues);
+                hasNextPage = !string.IsNullOrWhiteSpace(nextPageHeader);
+            }
+
             _logger.LogInformation("Retrieved {Count} issues from GitLab project {Project}", issues.Count, _projectPath);
-            return issues;
+            return (issues, hasNextPage);
         }
         catch (HttpRequestException ex)
         {

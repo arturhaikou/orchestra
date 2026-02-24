@@ -35,7 +35,7 @@ public class GitLabTicketProviderTests : ServiceTestFixture<GitLabTicketProvider
         };
 
         _apiClient.GetProjectIssuesAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns(issues);
+            .Returns((issues, false)); // hasNextPage=false: fewer results than maxResults
         _apiClient.GetIssueNotesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(new List<GitLabNote>());
 
@@ -64,7 +64,7 @@ public class GitLabTicketProviderTests : ServiceTestFixture<GitLabTicketProvider
         }).ToList();
 
         _apiClient.GetProjectIssuesAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns(issues);
+            .Returns((issues, true)); // hasNextPage=true: X-Next-Page header present
         _apiClient.GetIssueNotesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(new List<GitLabNote>());
 
@@ -93,7 +93,7 @@ public class GitLabTicketProviderTests : ServiceTestFixture<GitLabTicketProvider
         };
 
         _apiClient.GetProjectIssuesAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns(issues);
+            .Returns((issues, false)); // hasNextPage=false
         _apiClient.GetIssueNotesAsync(1, Arg.Any<CancellationToken>()).Returns(notes);
 
         // Act
@@ -219,6 +219,37 @@ public class GitLabTicketProviderTests : ServiceTestFixture<GitLabTicketProvider
         Assert.Equal("#5", result.IssueKey);
         Assert.Equal("5", result.IssueId);
         Assert.Equal("https://gitlab.com/myorg/myrepo/-/issues/5", result.IssueUrl);
+    }
+
+    /// <summary>
+    /// Regression test for the exact-boundary bug: when a provider returns exactly
+    /// <c>maxResults</c> items but there are no more pages (X-Next-Page header is absent),
+    /// the old <c>count &lt; maxResults</c> heuristic would incorrectly set isLast=false,
+    /// causing the UI to show a phantom "Load More" button.
+    /// </summary>
+    [Fact]
+    public async Task FetchTicketsAsync_ExactFullPage_NoHasNextPage_ReturnsIsLastTrue()
+    {
+        // Arrange
+        var integration = IntegrationBuilder.GitLabIntegration();
+        // Exactly 50 issues - fills the page, but X-Next-Page header is absent (last page).
+        var issues = Enumerable.Range(1, 50).Select(i => new GitLabIssue
+        {
+            Id = i, Iid = i, Title = $"Issue {i}", State = "opened", Labels = new()
+        }).ToList();
+
+        _apiClient.GetProjectIssuesAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns((issues, false)); // hasNextPage=false even though page is exactly full
+        _apiClient.GetIssueNotesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new List<GitLabNote>());
+
+        // Act
+        var (tickets, isLast, nextPageToken) = await _sut.FetchTicketsAsync(integration, maxResults: 50);
+
+        // Assert
+        Assert.Equal(50, tickets.Count);
+        Assert.True(isLast,  "isLast must be true when X-Next-Page header is absent, even on a full page.");
+        Assert.Null(nextPageToken);
     }
 
     [Fact]
