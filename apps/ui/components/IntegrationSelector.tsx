@@ -55,7 +55,7 @@ export const IntegrationSelector: React.FC<IntegrationSelectorProps> = ({
 
   if (loading) {
     return (
-      <select disabled className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-md text-slate-400">
+      <select disabled className="w-full px-3 py-2 bg-surface border border-border rounded-md text-textMuted">
         <option>Loading integrations...</option>
       </select>
     );
@@ -63,7 +63,7 @@ export const IntegrationSelector: React.FC<IntegrationSelectorProps> = ({
 
   if (error) {
     return (
-      <select disabled className="w-full px-3 py-2 bg-slate-800 border border-red-500 rounded-md text-red-400">
+      <select disabled className="w-full px-3 py-2 bg-surface border border-red-500 rounded-md text-red-400">
         <option>{error}</option>
       </select>
     );
@@ -71,7 +71,7 @@ export const IntegrationSelector: React.FC<IntegrationSelectorProps> = ({
 
   if (integrations.length === 0) {
     return (
-      <select disabled className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-md text-slate-400">
+      <select disabled className="w-full px-3 py-2 bg-surface border border-border rounded-md text-textMuted">
         <option>No tracker integrations available</option>
       </select>
     );
@@ -82,7 +82,7 @@ export const IntegrationSelector: React.FC<IntegrationSelectorProps> = ({
       value={value || ''}
       onChange={handleChange}
       disabled={disabled}
-      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-md text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+      className="w-full px-3 py-2 bg-surface border border-border rounded-md text-text focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
     >
       <option value="">Select tracker integration...</option>
       {integrations.map(integration => (
