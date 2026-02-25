@@ -5,6 +5,7 @@ using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
 using Orchestra.Domain.Interfaces;
 using Orchestra.Domain.Utilities;
+using Orchestra.Domain.Validators;
 using System.Net.Http.Headers;
 using System.Text;
 
@@ -70,6 +71,19 @@ public class IntegrationService : IIntegrationService
         {
             var validProviders = string.Join(", ", Enum.GetNames<ProviderType>());
             throw new ArgumentException($"Invalid provider: {request.Provider}. Valid providers are: {validProviders}", nameof(request.Provider));
+        }
+
+        // 3a. Validate filter query for Jira and Confluence TRACKER integrations
+        if (integrationType == IntegrationType.TRACKER)
+        {
+            if (providerType == ProviderType.JIRA)
+            {
+                FilterQueryValidator.ValidateJiraFilterQuery(request.FilterQuery);
+            }
+            else if (providerType == ProviderType.CONFLUENCE)
+            {
+                FilterQueryValidator.ValidateConfluenceFilterQuery(request.FilterQuery);
+            }
         }
 
         // 3b. Validate duplicate name
@@ -159,6 +173,23 @@ public class IntegrationService : IIntegrationService
             }
             providerType = parsedProvider;
         }
+
+        // 4a. Validate filter query for Jira and Confluence TRACKER integrations
+        if (integrationType == IntegrationType.TRACKER)
+        {
+            // Use provided provider if specified, otherwise use existing integration's provider
+            var effectiveProvider = providerType ?? integration.Provider;
+            
+            if (effectiveProvider == ProviderType.JIRA)
+            {
+                FilterQueryValidator.ValidateJiraFilterQuery(request.FilterQuery);
+            }
+            else if (effectiveProvider == ProviderType.CONFLUENCE)
+            {
+                FilterQueryValidator.ValidateConfluenceFilterQuery(request.FilterQuery);
+            }
+        }
+
         var isDuplicate = await _integrationDataAccess.ExistsByNameInWorkspaceAsync(
             request.Name, 
             integration.WorkspaceId, 

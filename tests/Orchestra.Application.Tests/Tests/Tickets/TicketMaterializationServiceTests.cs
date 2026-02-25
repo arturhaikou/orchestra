@@ -96,8 +96,8 @@ namespace Orchestra.Application.Tests.Tests.Tickets
             Assert.Equal(workspaceId, ticket.WorkspaceId);
             Assert.Equal(integrationId, ticket.IntegrationId);
             Assert.Equal(externalTicketId, ticket.ExternalTicketId);
-            Assert.Equal("Title", ticket.Title);
-            Assert.Equal("Description", ticket.Description);
+            Assert.Equal(string.Empty, ticket.Title);
+            Assert.Equal(string.Empty, ticket.Description);
             Assert.Equal(priority.Id, ticket.PriorityId);
             Assert.Equal(assignedAgentId, ticket.AssignedAgentId);
             Assert.Equal(assignedWorkflowId, ticket.AssignedWorkflowId);

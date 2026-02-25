@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Layers, GitBranch, Gitlab, Database, Globe, X, Save, Check, Loader2, Trash2, AlertTriangle, RefreshCw, Key, Filter, Zap, User, Link as LinkIcon, Search, ChevronDown, Wifi } from 'lucide-react';
 import { Integration, IntegrationType } from '../types';
 import { getIntegrations, createIntegration, updateIntegration, deleteIntegration, testIntegrationConnection } from '../services/integrationService';
+import { validateFilterQuery } from '../utils/filterValidator';
 import FilterWarningModal from './FilterWarningModal';
 
 interface IntegrationsProps {
@@ -22,6 +23,8 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
   const [connectionTestError, setConnectionTestError] = useState<string | null>(null);
   const [connectionTestSuccess, setConnectionTestSuccess] = useState(false);
   const [testFailed, setTestFailed] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const fetchAll = async () => {
     setIsLoading(true);
@@ -148,6 +151,9 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
         vectorize: false,
       });
     }
+    setValidationError(null);
+    setSaveError(null);
+    setConnectionTestError(null);
     setIsModalOpen(true);
   };
 
@@ -185,6 +191,7 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
 
   const performSave = async () => {
     setIsSaving(true);
+    setSaveError(null);
     try {
       // Determine connected status: false if test failed, true by default
       const connected = testFailed ? false : true;
@@ -200,7 +207,10 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
       setConnectionTestError(null);
       setConnectionTestSuccess(false);
       setTestFailed(false);
+      setValidationError(null);
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save integration';
+      setSaveError(errorMessage);
       console.error("Failed to save integration", error);
     } finally {
       setIsSaving(false);
@@ -485,18 +495,27 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
                         <label className="text-[10px] font-bold text-textMuted uppercase tracking-wider">
                             {getFilterConfig(formState.provider).label}
                         </label>
-                        <span className="text-[9px] bg-surfaceHighlight text-textMuted px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter">optional</span>
+                        <span className="text-[9px] bg-surfaceHighlight text-textMuted px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter">required</span>
                     </div>
                     <div className="relative">
                         <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-textMuted" />
                         <input 
                           type="text"
                           value={formState.filterQuery}
-                          onChange={(e) => setFormState({...formState, filterQuery: e.target.value})}
+                          onChange={(e) => {
+                            const newValue = e.target.value;
+                            setFormState({...formState, filterQuery: newValue});
+                            // Run client-side validation
+                            const validation = validateFilterQuery(newValue, formState.provider);
+                            setValidationError(validation.isValid ? null : validation.error || null);
+                          }}
                           className="w-full bg-background border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all shadow-sm font-mono placeholder:text-textMuted/40"
                           placeholder={getFilterConfig(formState.provider).placeholder}
                         />
                     </div>
+                    {(validationError || saveError) && (
+                      <p className="text-[10px] text-red-500 ml-1">⚠ {validationError || saveError}</p>
+                    )}
                     <p className="text-[10px] text-textMuted italic ml-1">{getFilterConfig(formState.provider).hint}</p>
                 </div>
               )}

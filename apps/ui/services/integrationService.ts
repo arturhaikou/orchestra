@@ -50,7 +50,10 @@ export const createIntegration = async (data: CreateIntegrationDTO): Promise<Int
     if (contentType && contentType.includes("text/html")) throw new Error("Not JSON");
 
     if (!response.ok) {
-      throw new Error(`Backend error: ${response.statusText}`);
+      // Try to extract detailed error message from response body
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = (errorData as any)?.error || (errorData as any)?.message || response.statusText;
+      throw new Error(errorMessage);
     }
 
     return await response.json();
@@ -69,7 +72,10 @@ export const updateIntegration = async (id: string, data: IntegrationDTO): Promi
     });
 
     if (!response.ok) {
-      throw new Error(`Backend error: ${response.statusText}`);
+      // Try to extract detailed error message from response body
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = (errorData as any)?.error || (errorData as any)?.message || response.statusText;
+      throw new Error(errorMessage);
     }
 
     return await response.json();
