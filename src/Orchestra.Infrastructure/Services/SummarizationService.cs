@@ -2,16 +2,28 @@ using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Common.Exceptions;
 using Orchestra.Application.Common;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
 
 namespace Orchestra.Infrastructure.Services;
 
-public class SummarizationService(IChatClient _chatClient) : ISummarizationService
+public class SummarizationService(
+    IChatClientResolver _chatClientResolver,
+    ILogger<SummarizationService> _logger) : ISummarizationService
 {
-    public async Task<string> GenerateSummaryAsync(string content, CancellationToken cancellationToken = default)
+    public async Task<string> GenerateSummaryAsync(string content, string? modelId = null, CancellationToken cancellationToken = default)
     {
         try
         {
-            var response = await _chatClient.GetResponseAsync([new ChatMessage(ChatRole.System, SystemMessages.SummarizationSystemMessage), new ChatMessage(ChatRole.User, content)]);
+            // Resolve the appropriate IChatClient based on the workspace-configured model ID
+            var chatClient = await _chatClientResolver.ResolveChatClientAsync(modelId, cancellationToken);
+            
+            var response = await chatClient.GetResponseAsync(
+                [
+                    new ChatMessage(ChatRole.System, SystemMessages.SummarizationSystemMessage),
+                    new ChatMessage(ChatRole.User, content)
+                ],
+                cancellationToken: cancellationToken);
+            
             return response.Text;
         }
         catch (Exception ex) when (ex is not SummarizationException)

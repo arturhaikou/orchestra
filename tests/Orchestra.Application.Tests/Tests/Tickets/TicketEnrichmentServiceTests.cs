@@ -6,7 +6,6 @@ using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Tickets.DTOs;
-using Orchestra.Application.Tests.Builders;
 using Orchestra.Application.Tickets.Services;
 using Xunit;
 
@@ -151,10 +150,10 @@ namespace Orchestra.Application.Tests.Tests.Tickets
         public async Task GenerateSummaryAsync_DelegatesToSummarizationService()
         {
 
-            _summarizationMock.GenerateSummaryAsync("content", Arg.Any<CancellationToken>())
+            _summarizationMock.GenerateSummaryAsync("content", Arg.Any<string?>(), Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult("summary"));
 
-            var result = await _sut.GenerateSummaryAsync("content", CancellationToken.None);
+            var result = await _sut.GenerateSummaryAsync("content", null, CancellationToken.None);
 
             Assert.Equal("summary", result);
         }

@@ -1,7 +1,7 @@
 using Bogus;
 using Orchestra.Domain.Enums;
 
-namespace Orchestra.Application.Tests.Builders;
+namespace Orchestra.Tests.Shared.Builders;
 
 /// <summary>
 /// Fluent builder for creating ToolAction test entities with sensible defaults.

@@ -35,6 +35,7 @@ public class TicketQueryService : ITicketQueryService
     private readonly IExternalTicketFetchingService _externalFetchingService;
     private readonly ISentimentAnalysisService _sentimentAnalysisService;
     private readonly ITicketPaginationService _ticketPaginationService;
+    private readonly IWorkspaceDataAccess _workspaceDataAccess;
     private readonly ILogger<TicketQueryService> _logger;
 
     public TicketQueryService(
@@ -48,6 +49,7 @@ public class TicketQueryService : ITicketQueryService
         IExternalTicketFetchingService externalFetchingService,
         ISentimentAnalysisService sentimentAnalysisService,
         ITicketPaginationService ticketPaginationService,
+        IWorkspaceDataAccess workspaceDataAccess,
         ILogger<TicketQueryService> logger)
     {
         _ticketDataAccess = ticketDataAccess;
@@ -60,6 +62,7 @@ public class TicketQueryService : ITicketQueryService
         _externalFetchingService = externalFetchingService;
         _sentimentAnalysisService = sentimentAnalysisService;
         _ticketPaginationService = ticketPaginationService;
+        _workspaceDataAccess = workspaceDataAccess;
         _logger = logger;
     }
 
@@ -85,7 +88,7 @@ public class TicketQueryService : ITicketQueryService
 
         // 4. Deduplicate and finalize response
         resultTickets = DeduplicateTickets(resultTickets);
-        await CalculateSentimentForTicketsAsync(resultTickets, cancellationToken);
+        await CalculateSentimentForTicketsAsync(resultTickets, workspaceId, cancellationToken);
 
         var nextPageTokenString = GenerateNextPageToken(nextToken, isLastPage);
 
@@ -850,10 +853,30 @@ public class TicketQueryService : ITicketQueryService
 
     private async Task CalculateSentimentForTicketsAsync(
         List<TicketDto> tickets,
+        Guid workspaceId,
         CancellationToken cancellationToken)
     {
         if (tickets == null || tickets.Count == 0)
             return;
+
+        // Check workspace flag once per paginated list request
+        var workspace = await _workspaceDataAccess.GetByIdAsync(workspaceId, cancellationToken);
+        
+        if (workspace != null && !workspace.IsCustomerSatisfactionAnalysisEnabled)
+        {
+            // CSAT is disabled for this workspace - set all tickets to 100 and skip sentiment analysis
+            _logger.LogInformation(
+                "CSAT analysis is disabled for workspace {WorkspaceId}. Setting all tickets to Satisfaction=100",
+                workspaceId);
+
+            for (int i = 0; i < tickets.Count; i++)
+            {
+                var ticket = tickets[i];
+                tickets[i] = ticket with { Satisfaction = 100 };
+            }
+
+            return;
+        }
 
         var ticketsToAnalyze = new List<TicketSentimentRequest>();
         var ticketIndexMap = new Dictionary<string, int>();
@@ -917,14 +940,14 @@ public class TicketQueryService : ITicketQueryService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to analyze sentiment for tickets, defaulting to 100");
+                _logger.LogError(ex, "Failed to analyze sentiment for tickets, defaulting to 75");
                 
                 foreach (var ticketId in ticketIndexMap.Keys)
                 {
                     if (ticketIndexMap.TryGetValue(ticketId, out var index))
                     {
                         var ticket = tickets[index];
-                        tickets[index] = ticket with { Satisfaction = 100 };
+                        tickets[index] = ticket with { Satisfaction = 75 };
                     }
                 }
             }

@@ -1,6 +1,6 @@
 using Bogus;
 
-namespace Orchestra.Application.Tests.Builders;
+namespace Orchestra.Tests.Shared.Builders;
 
 /// <summary>
 /// Fluent builder for creating Workspace test entities with sensible defaults.
@@ -11,6 +11,10 @@ public class WorkspaceBuilder
     private string _name = new Faker().Company.CompanyName();
     private Guid _ownerId = Guid.NewGuid();
     private bool _isActive = true;
+    private bool _isAiSummarizationEnabled = false;
+    private bool _isCustomerSatisfactionAnalysisEnabled = false;
+    private string? _aiSummarizationModelId = null;
+    private string? _customerSatisfactionAnalysisModelId = null;
 
     /// <summary>
     /// Sets the workspace ID.
@@ -40,6 +44,42 @@ public class WorkspaceBuilder
     }
 
     /// <summary>
+    /// Sets whether AI summarization is enabled.
+    /// </summary>
+    public WorkspaceBuilder WithIsAiSummarizationEnabled(bool enabled)
+    {
+        _isAiSummarizationEnabled = enabled;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets whether customer satisfaction analysis is enabled.
+    /// </summary>
+    public WorkspaceBuilder WithIsCustomerSatisfactionAnalysisEnabled(bool enabled)
+    {
+        _isCustomerSatisfactionAnalysisEnabled = enabled;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the AI Summarization model ID.
+    /// </summary>
+    public WorkspaceBuilder WithAiSummarizationModelId(string? modelId)
+    {
+        _aiSummarizationModelId = modelId;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the Customer Satisfaction Analysis model ID.
+    /// </summary>
+    public WorkspaceBuilder WithCustomerSatisfactionAnalysisModelId(string? modelId)
+    {
+        _customerSatisfactionAnalysisModelId = modelId;
+        return this;
+    }
+
+    /// <summary>
     /// Sets whether the workspace is active.
     /// </summary>
     public WorkspaceBuilder AsActive(bool active = true)
@@ -53,7 +93,21 @@ public class WorkspaceBuilder
     /// </summary>
     public Workspace Build()
     {
-        return Workspace.Create(_name, _ownerId);
+        var workspace = Workspace.Create(
+            _name,
+            _ownerId,
+            _aiSummarizationModelId,
+            _customerSatisfactionAnalysisModelId);
+        
+        // Apply AI flags and model IDs if configured
+        workspace.UpdateAiSettings(
+            _isAiSummarizationEnabled,
+            _isCustomerSatisfactionAnalysisEnabled,
+            _aiSummarizationModelId,
+            _customerSatisfactionAnalysisModelId,
+            updateModelIds: true);
+        
+        return workspace;
     }
 
     /// <summary>

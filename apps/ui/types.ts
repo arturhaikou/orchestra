@@ -21,6 +21,10 @@ export interface TicketPriority {
 export interface Workspace {
   id: string;
   name: string;
+  isAiSummarizationEnabled: boolean;
+  isCustomerSatisfactionAnalysisEnabled: boolean;
+  aiSummarizationModelId?: string;
+  customerSatisfactionAnalysisModelId?: string;
 }
 
 export interface Comment {
@@ -45,6 +49,12 @@ export interface Ticket {
   integrationId?: string; // Link to the integration that sourced this ticket
   comments: Comment[];
   summary?: string; // AI Generated
+}
+
+export interface TicketSummarizationResponse {
+  ticket?: Ticket; // Populated when summarization is enabled and successful
+  featureDisabled: boolean; // True when AI summarization is disabled for the workspace
+  message?: string; // Message when feature is disabled
 }
 
 export interface PaginatedResponse<T> {

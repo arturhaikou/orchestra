@@ -361,11 +361,20 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
     setLoadingSummary(true);
     try {
         // Call backend API instead of directly calling external AI service
-        const ticketWithSummary = await generateSummary(ticket.id);
-        setSummary(ticketWithSummary.summary || "No summary generated.");
+        const result = await generateSummary(ticket.id);
         
-        // Update the selected ticket with the new summary
-        setSelectedTicket(prev => prev ? { ...prev, summary: ticketWithSummary.summary } : null);
+        if (result.featureDisabled) {
+            // Feature is disabled for this workspace
+            setSummary(result.message || "Summarization is not enabled for this workspace. Go to workspace settings to enable it.");
+        } else if (result.ticket) {
+            // Feature is enabled and we got a ticket with summary
+            setSummary(result.ticket.summary || "No summary generated.");
+            
+            // Update the selected ticket with the new summary
+            setSelectedTicket(prev => prev ? { ...prev, summary: result.ticket?.summary } : null);
+        } else {
+            setSummary("No summary generated.");
+        }
     } catch (e) {
         console.error("Failed to generate summary:", e);
         setSummary("Error generating summary. Please try again.");

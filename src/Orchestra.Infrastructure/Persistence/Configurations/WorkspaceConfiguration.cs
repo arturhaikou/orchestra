@@ -36,5 +36,21 @@ public class WorkspaceConfiguration : IEntityTypeConfiguration<Workspace>
         builder.HasIndex(w => w.OwnerId);
 
         builder.HasIndex(w => w.IsActive);
+
+        builder.Property(w => w.IsAiSummarizationEnabled)
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(w => w.IsCustomerSatisfactionAnalysisEnabled)
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(w => w.AiSummarizationModelId)
+            .IsRequired(false)
+            .HasMaxLength(255);
+
+        builder.Property(w => w.CustomerSatisfactionAnalysisModelId)
+            .IsRequired(false)
+            .HasMaxLength(255);
     }
 }

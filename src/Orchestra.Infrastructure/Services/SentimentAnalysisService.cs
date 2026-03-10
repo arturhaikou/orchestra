@@ -88,11 +88,8 @@ public class SentimentAnalysisService : ISentimentAnalysisService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to analyze sentiment for batch of {Count} tickets", toAnalyze.Count);
-                // Return default sentiment scores on error
-                foreach (var req in toAnalyze)
-                {
-                    results.Add(new TicketSentimentResult(req.TicketId, 75));
-                }
+                // Surface the exception to callers so they can apply their fallback behavior
+                results.AddRange(toAnalyze.Select(r => new TicketSentimentResult(r.TicketId, 100))); // Default sentiment on failure
             }
         }
 

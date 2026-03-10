@@ -5,7 +5,7 @@ using Orchestra.Application.Tickets.DTOs;
 using Orchestra.Application.Integrations.DTOs;
 using Orchestra.Domain.Enums;
 
-namespace Orchestra.Application.Tests.Builders;
+namespace Orchestra.Tests.Shared.Builders;
 
 // ============================================================================
 // Auth DTOs

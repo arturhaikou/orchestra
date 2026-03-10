@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Orchestra.Application.Tickets.DTOs;
 
-namespace Orchestra.Application.Tests.Builders
+namespace Orchestra.Tests.Shared.Builders
 {
     public class TicketDtoBuilder
     {

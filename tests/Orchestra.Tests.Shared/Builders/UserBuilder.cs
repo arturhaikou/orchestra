@@ -1,6 +1,6 @@
 using Bogus;
 
-namespace Orchestra.Application.Tests.Builders;
+namespace Orchestra.Tests.Shared.Builders;
 
 /// <summary>
 /// Fluent builder for creating User test entities with sensible defaults.

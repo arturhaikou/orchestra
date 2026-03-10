@@ -147,4 +147,119 @@ public class GitLabApiClient : IGitLabApiClient
             throw;
         }
     }
+
+    public async Task<GitLabMergeRequest?> GetMergeRequestAsync(int mrIid, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var url = $"/api/v4/projects/{EncodedProjectPath}/merge_requests/{mrIid}";
+            var response = await _httpClient.GetAsync(url, cancellationToken);
+
+            // Return null if the merge request is not found (404)
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                return null;
+
+            // Throw HttpRequestException for any other non-successful status
+            response.EnsureSuccessStatusCode();
+
+            var content = await response.Content.ReadAsStringAsync(cancellationToken);
+            var mergeRequest = JsonSerializer.Deserialize<GitLabMergeRequest>(content, _jsonOptions);
+
+            _logger.LogInformation("Retrieved merge request {MrIid} from GitLab project {Project}", mrIid, _projectPath);
+            return mergeRequest;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "HTTP error retrieving merge request {MrIid} from project {Project}", mrIid, _projectPath);
+            throw;
+        }
+        catch (OperationCanceledException ex)
+        {
+            _logger.LogWarning(ex, "Operation cancelled while retrieving merge request {MrIid}", mrIid);
+            throw;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "JSON deserialization error for merge request {MrIid}", mrIid);
+            throw;
+        }
+    }
+
+    public async Task<List<GitLabIssue>> SearchIssuesAsync(string query, int limit = 10, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // URL-encode the search query to prevent injection in the path
+            var encodedQuery = Uri.EscapeDataString(query);
+
+            var url = $"/api/v4/projects/{EncodedProjectPath}/issues?search={encodedQuery}&per_page={limit}&state=all";
+            var response = await _httpClient.GetAsync(url, cancellationToken);
+
+            response.EnsureSuccessStatusCode();
+
+            var content = await response.Content.ReadAsStringAsync(cancellationToken);
+            var issues = JsonSerializer.Deserialize<List<GitLabIssue>>(content, _jsonOptions) ?? new();
+
+            _logger.LogInformation("Found {Count} issues matching query '{Query}' in project {Project}", 
+                issues.Count, query, _projectPath);
+            return issues;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "HTTP error searching issues for query '{Query}' in project {Project}", query, _projectPath);
+            throw;
+        }
+        catch (OperationCanceledException ex)
+        {
+            _logger.LogWarning(ex, "Operation cancelled while searching issues for query '{Query}'", query);
+            throw;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "JSON deserialization error for search results on query '{Query}'", query);
+            throw;
+        }
+    }
+
+    public async Task<GitLabIssue> UpdateIssueAsync(int iid, string? title, string? description, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var url = $"/api/v4/projects/{EncodedProjectPath}/issues/{iid}";
+
+            // Build the request body with only fields that are being updated
+            var body = new Dictionary<string, object?>();
+            if (!string.IsNullOrWhiteSpace(title))
+                body["title"] = title;
+            if (description != null)
+                body["description"] = description;
+
+            var json = JsonSerializer.Serialize(body);
+            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.PutAsync(url, content, cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+            var updatedIssue = JsonSerializer.Deserialize<GitLabIssue>(responseContent, _jsonOptions)!;
+
+            _logger.LogInformation("Updated issue {IssueIid} in project {Project}", iid, _projectPath);
+            return updatedIssue;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "HTTP error updating issue {IssueIid} in project {Project}", iid, _projectPath);
+            throw;
+        }
+        catch (OperationCanceledException ex)
+        {
+            _logger.LogWarning(ex, "Operation cancelled while updating issue {IssueIid}", iid);
+            throw;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "JSON deserialization error for updated issue {IssueIid}", iid);
+            throw;
+        }
+    }
 }

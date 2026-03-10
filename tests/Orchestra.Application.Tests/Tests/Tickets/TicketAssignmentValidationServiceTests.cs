@@ -5,7 +5,6 @@ using NSubstitute;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Tickets.Services;
 using Orchestra.Domain.Entities;
-using Orchestra.Application.Tests.Builders;
 using Xunit;
 
 namespace Orchestra.Application.Tests.Tests.Tickets;

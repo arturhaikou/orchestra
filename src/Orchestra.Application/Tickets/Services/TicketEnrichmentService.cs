@@ -187,13 +187,20 @@ public class TicketEnrichmentService : ITicketEnrichmentService
 
     /// <summary>
     /// Generates an AI summary of ticket content.
-    /// Extracted logic from TicketService.GenerateSummaryAsync (no changes).
+    /// The optional modelId parameter is forwarded unchanged to ISummarizationService,
+    /// where it is resolved (availability check and fallback to default if needed).
     /// </summary>
-    public async Task<string> GenerateSummaryAsync(string content, CancellationToken cancellationToken)
+    /// <param name="content">The pre-formatted ticket content to summarize.</param>
+    /// <param name="modelId">
+    /// Optional workspace-configured model identifier. Forwarded to ISummarizationService without validation.
+    /// </param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The generated summary text.</returns>
+    public async Task<string> GenerateSummaryAsync(string content, string? modelId = null, CancellationToken cancellationToken = default)
     {
         try
         {
-            return await _summarizationService.GenerateSummaryAsync(content, cancellationToken);
+            return await _summarizationService.GenerateSummaryAsync(content, modelId, cancellationToken);
         }
         catch (Exception ex)
         {

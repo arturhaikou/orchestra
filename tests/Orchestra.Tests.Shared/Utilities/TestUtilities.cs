@@ -1,6 +1,6 @@
 using Orchestra.Domain.Enums;
 
-namespace Orchestra.Application.Tests.Utilities;
+namespace Orchestra.Tests.Shared.Utilities;
 
 /// <summary>
 /// Common test constants used across test suites.
@@ -91,9 +91,6 @@ public class WorkspaceScopeHelper
     /// <summary>
     /// Validates that a collection of entities all belong to the same workspace.
     /// </summary>
-    /// <param name="entities">The entities to validate.</param>
-    /// <param name="expectedWorkspaceId">The expected workspace ID.</param>
-    /// <returns>True if all entities belong to the expected workspace.</returns>
     public static bool AreAllInWorkspace(IEnumerable<Agent> entities, Guid expectedWorkspaceId)
     {
         return entities.All(e => e.WorkspaceId == expectedWorkspaceId);
@@ -162,7 +159,6 @@ public class MockDataProvider
     public static ITicketDataAccess TicketDataAccessWithData(params Ticket[] tickets)
     {
         var mock = Substitute.For<ITicketDataAccess>();
-        // Note: Specific method needs to be checked from ITicketDataAccess interface
         return mock;
     }
 
@@ -172,7 +168,6 @@ public class MockDataProvider
     public static IUserDataAccess UserDataAccessWithData(params User[] users)
     {
         var mock = Substitute.For<IUserDataAccess>();
-        // Note: Specific method needs to be checked from IUserDataAccess interface
         return mock;
     }
 

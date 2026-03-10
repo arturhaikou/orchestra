@@ -9,6 +9,8 @@ import AgentsList from './components/AgentsList';
 import JobsList from './components/JobsList';
 import WorkflowBuilder from './components/WorkflowBuilder';
 import Login from './components/Login';
+import ToggleSwitch from './components/ToggleSwitch';
+import WorkspaceModals from './components/WorkspaceModals/WorkspaceModals';
 import { Workspace, User } from './types';
 import { getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace } from './services/workspaceService';
 import { getToken, logout, getUser, updateUser, changePassword } from './services/authService';
@@ -63,7 +65,6 @@ const App: React.FC = () => {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [workspaceInAction, setWorkspaceInAction] = useState<Workspace | null>(null);
   
-  const [workspaceNameInput, setWorkspaceNameInput] = useState('');
   const [profileInput, setProfileInput] = useState({ 
     name: '', 
     email: '', 
@@ -132,68 +133,7 @@ const App: React.FC = () => {
     setIsSidebarOpen(false);
   };
 
-  const handleCreateWorkspace = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!workspaceNameInput.trim()) return;
 
-    setIsProcessing(true);
-    try {
-      const newWorkspace = await createWorkspace(workspaceNameInput);
-      setWorkspaces([...workspaces, newWorkspace]);
-      setActiveWorkspaceId(newWorkspace.id);
-      setWorkspaceNameInput('');
-      setIsCreateModalOpen(false);
-    } catch (error) {
-      console.error("Failed to create workspace", error);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleUpdateWorkspace = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!workspaceInAction || !workspaceNameInput.trim()) return;
-
-    setIsProcessing(true);
-    try {
-      const updated = await updateWorkspace(workspaceInAction.id, workspaceNameInput);
-      setWorkspaces(prev => prev.map(ws => ws.id === workspaceInAction.id ? updated : ws));
-      setIsEditModalOpen(false);
-      setWorkspaceInAction(null);
-      setWorkspaceNameInput('');
-    } catch (error) {
-      console.error("Failed to update workspace", error);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleDeleteWorkspace = async () => {
-    if (!workspaceInAction) return;
-
-    setIsProcessing(true);
-    try {
-      await deleteWorkspace(workspaceInAction.id);
-      const remaining = workspaces.filter(ws => ws.id !== workspaceInAction.id);
-      setWorkspaces(remaining);
-      
-      if (activeWorkspaceId === workspaceInAction.id) {
-        if (remaining.length > 0) {
-          setActiveWorkspaceId(remaining[0].id);
-        } else {
-          setActiveWorkspaceId('');
-          setIsCreateModalOpen(true);
-        }
-      }
-      
-      setIsDeleteModalOpen(false);
-      setWorkspaceInAction(null);
-    } catch (error) {
-      console.error("Failed to delete workspace", error);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 
   const handleOpenProfile = () => {
       const user = getUser();
@@ -310,12 +250,10 @@ const App: React.FC = () => {
         activeWorkspaceId={activeWorkspaceId}
         onSwitchWorkspace={setActiveWorkspaceId}
         onCreateWorkspace={() => {
-          setWorkspaceNameInput('');
           setIsCreateModalOpen(true);
         }}
         onEditWorkspace={(ws) => {
           setWorkspaceInAction(ws);
-          setWorkspaceNameInput(ws.name);
           setIsEditModalOpen(true);
         }}
         onDeleteWorkspace={(ws) => {
@@ -485,141 +423,41 @@ const App: React.FC = () => {
       )}
 
       {/* Create Workspace Modal */}
-      {isCreateModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-          <div className="bg-surface border border-border w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-border flex justify-between items-center bg-surfaceHighlight/50">
-              <h3 className="text-lg font-bold text-text">
-                {workspaces.length === 0 ? 'Welcome' : 'New Workspace'}
-              </h3>
-              {workspaces.length > 0 && (
-                <button onClick={() => setIsCreateModalOpen(false)} className="text-textMuted hover:text-text transition-colors">
-                  <X className="w-5 h-5" />
-                </button>
-              )}
-            </div>
-            <form onSubmit={handleCreateWorkspace} className="p-6 space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-semibold text-textMuted uppercase">Workspace Name</label>
-                <input 
-                  type="text" 
-                  value={workspaceNameInput}
-                  onChange={(e) => setWorkspaceNameInput(e.target.value)}
-                  placeholder="e.g., Engineering Alpha"
-                  className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-text focus:outline-none focus:border-primary shadow-sm"
-                  autoFocus
-                />
-              </div>
-              <div className="pt-2 flex gap-3">
-                 {workspaces.length > 0 && (
-                   <button 
-                     type="button" 
-                     onClick={() => setIsCreateModalOpen(false)}
-                     className="flex-1 px-4 py-2 border border-border rounded-md text-sm font-medium text-text hover:bg-surfaceHighlight transition-colors"
-                     disabled={isProcessing}
-                   >
-                     Cancel
-                   </button>
-                 )}
-                 <button 
-                   type="submit" 
-                   disabled={!workspaceNameInput.trim() || isProcessing}
-                   className="flex-1 px-4 py-2 bg-primary hover:bg-primaryHover text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
-                 >
-                   {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create Workspace'}
-                 </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Workspace Modal */}
-      {isEditModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-          <div className="bg-surface border border-border w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-border flex justify-between items-center bg-surfaceHighlight/50">
-              <h3 className="text-lg font-bold text-text flex items-center gap-2">
-                <Pencil className="w-4 h-4 text-primary" /> Edit
-              </h3>
-              <button onClick={() => setIsEditModalOpen(false)} className="text-textMuted hover:text-text transition-colors">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <form onSubmit={handleUpdateWorkspace} className="p-6 space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-semibold text-textMuted uppercase">New Name</label>
-                <input 
-                  type="text" 
-                  value={workspaceNameInput}
-                  onChange={(e) => setWorkspaceNameInput(e.target.value)}
-                  placeholder="e.g., Engineering Gamma"
-                  className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-text focus:outline-none focus:border-primary shadow-sm"
-                  autoFocus
-                />
-              </div>
-              <div className="pt-2 flex gap-3">
-                <button 
-                  type="button" 
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="flex-1 px-4 py-2 border border-border rounded-md text-sm font-medium text-text hover:bg-surfaceHighlight transition-colors"
-                  disabled={isProcessing}
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit" 
-                  disabled={!workspaceNameInput.trim() || isProcessing}
-                  className="flex-1 px-4 py-2 bg-primary hover:bg-primaryHover text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
-                >
-                  {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Changes'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Workspace Modal */}
-      {isDeleteModalOpen && workspaceInAction && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-          <div className="bg-surface border border-border w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-border flex justify-between items-center bg-surfaceHighlight/50">
-              <h3 className="text-lg font-bold text-text flex items-center gap-2">
-                <Trash2 className="w-4 h-4 text-red-500" /> Delete
-              </h3>
-              <button onClick={() => setIsDeleteModalOpen(false)} className="text-textMuted hover:text-text transition-colors">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4 text-center">
-              <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-2 text-red-500">
-                <AlertTriangle className="w-8 h-8" />
-              </div>
-              <p className="text-sm text-text">
-                Confirm delete <span className="font-bold">"{workspaceInAction.name}"</span>?
-              </p>
-              <div className="pt-2 flex gap-3">
-                <button 
-                  type="button" 
-                  onClick={() => setIsDeleteModalOpen(false)}
-                  className="flex-1 px-4 py-2 border border-border rounded-md text-sm font-medium text-text hover:bg-surfaceHighlight transition-colors"
-                  disabled={isProcessing}
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={handleDeleteWorkspace}
-                  disabled={isProcessing}
-                  className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-red-500/20"
-                >
-                  {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Confirm'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <WorkspaceModals
+        workspaces={workspaces}
+        isCreateModalOpen={isCreateModalOpen}
+        isEditModalOpen={isEditModalOpen}
+        isDeleteModalOpen={isDeleteModalOpen}
+        workspaceInAction={workspaceInAction}
+        onCreateModalClose={() => setIsCreateModalOpen(false)}
+        onEditModalClose={() => {
+          setIsEditModalOpen(false);
+          setWorkspaceInAction(null);
+        }}
+        onDeleteModalClose={() => {
+          setIsDeleteModalOpen(false);
+          setWorkspaceInAction(null);
+        }}
+        onWorkspaceCreated={(workspace) => {
+          setWorkspaces([...workspaces, workspace]);
+          setActiveWorkspaceId(workspace.id);
+        }}
+        onWorkspaceUpdated={(workspace) => {
+          setWorkspaces(prev => prev.map(ws => ws.id === workspace.id ? workspace : ws));
+        }}
+        onWorkspaceDeleted={(id) => {
+          const remaining = workspaces.filter(ws => ws.id !== id);
+          setWorkspaces(remaining);
+          if (activeWorkspaceId === id) {
+            if (remaining.length > 0) {
+              setActiveWorkspaceId(remaining[0].id);
+            } else {
+              setActiveWorkspaceId('');
+              setIsCreateModalOpen(true);
+            }
+          }
+        }}
+      />
 
     </div>
   );

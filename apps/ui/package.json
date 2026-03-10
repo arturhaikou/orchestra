@@ -9,16 +9,21 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react-dom": "^19.2.0",
-    "react": "^19.2.0",
-    "lucide-react": "^0.555.0",
-    "reactflow": "^11.11.4",
-    "recharts": "^3.5.0",
     "@microsoft/signalr": "^8.0.0",
-    "marked": "15.0.0"
+    "lucide-react": "^0.555.0",
+    "marked": "15.0.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "reactflow": "^11.11.4",
+    "recharts": "^3.5.0"
   },
   "devDependencies": {
-    "@types/node": "^22.14.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^22.19.15",
+    "@types/react": "^19.2.14",
     "@vitejs/plugin-react": "^5.0.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"

@@ -312,10 +312,11 @@ export const convertToExternal = async (
 /**
  * Generates an AI-powered summary for a ticket by calling the backend API.
  * The backend combines the ticket's title, description, and comments to generate a summary.
+ * Returns a response that contains either the ticket with summary or a feature-disabled message.
  * @param ticketId - The ID of the ticket to summarize
- * @returns A Promise that resolves to the ticket with the summary field populated
+ * @returns A Promise that resolves to a response with ticket (optional), featureDisabled flag, and optional message
  */
-export const generateSummary = async (ticketId: string): Promise<Ticket> => {
+export const generateSummary = async (ticketId: string): Promise<{ ticket?: Ticket; featureDisabled: boolean; message?: string }> => {
   try {
     const response = await fetch(`${API_BASE_URL}/${ticketId}/summarize`, {
       method: 'POST',
