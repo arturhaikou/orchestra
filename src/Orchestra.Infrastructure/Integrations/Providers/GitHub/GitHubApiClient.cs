@@ -28,6 +28,37 @@ public class GitHubApiClient : IGitHubApiClient
         _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiToken}");
     }
 
+    private async Task ThrowForGitHubStatusAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        if (response.IsSuccessStatusCode)
+            return;
+
+        // Rate limit: 429, or 403 with X-RateLimit-Remaining = 0
+        if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests ||
+            (response.StatusCode == System.Net.HttpStatusCode.Forbidden &&
+             response.Headers.TryGetValues("X-RateLimit-Remaining", out var remaining) &&
+             remaining.FirstOrDefault() == "0"))
+        {
+            throw new InvalidOperationException("GitHub API rate limit exceeded. Please try again later.");
+        }
+
+        // Auth failure: 401 or 403 (not rate-limited)
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
+            response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            throw new InvalidOperationException("Failed to authenticate with GitHub. Please verify the API key.");
+        }
+
+        // Not found: 404
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            throw new InvalidOperationException("GitHub repository not found or insufficient permissions.");
+        }
+
+        // Other non-2xx
+        throw new InvalidOperationException($"GitHub API error: {(int)response.StatusCode} {response.ReasonPhrase}");
+    }
+
     public async Task<(List<GitHubIssue> Issues, bool HasNextPage)> GetRepositoryIssuesAsync(int page = 1, int perPage = 30, CancellationToken cancellationToken = default)
     {
         try
@@ -62,30 +93,28 @@ public class GitHubApiClient : IGitHubApiClient
         }
     }
 
-    public async Task<GitHubIssue?> GetIssueAsync(int issueNumber, CancellationToken cancellationToken = default)
+    public async Task<GitHubIssue> GetIssueAsync(int issueNumber, CancellationToken cancellationToken = default)
     {
         try
         {
             var url = $"/repos/{_owner}/{_repo}/issues/{issueNumber}";
             var response = await _httpClient.GetAsync(url, cancellationToken);
-            
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogWarning($"Issue {issueNumber} not found in {_owner}/{_repo}");
-                return null;
-            }
+            await ThrowForGitHubStatusAsync(response, cancellationToken);
 
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
-            var issue = JsonSerializer.Deserialize<GitHubIssue>(content, new JsonSerializerOptions
+            return JsonSerializer.Deserialize<GitHubIssue>(content, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
-            });
-
-            return issue;
+            }) ?? throw new InvalidOperationException("GitHub repository not found or insufficient permissions.");
+        }
+        catch (HttpRequestException ex) when (ex.InnerException is System.Net.Sockets.SocketException)
+        {
+            _logger.LogError(ex, $"Network error retrieving issue {issueNumber}");
+            throw;
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogError(ex, $"Error retrieving issue {issueNumber} from GitHub");
+            _logger.LogError(ex, $"HTTP error retrieving issue {issueNumber}");
             throw;
         }
     }
@@ -141,6 +170,14 @@ public class GitHubApiClient : IGitHubApiClient
         }
     }
 
+    /// <summary>
+    /// Creates a new GitHub issue in the repository.
+    /// </summary>
+    /// <param name="title">The title of the issue.</param>
+    /// <param name="body">The body/description of the issue.</param>
+    /// <param name="cancellationToken">A cancellation token for the operation.</param>
+    /// <returns>The created GitHub issue.</returns>
+    /// <exception cref="HttpRequestException">Thrown when the HTTP request fails.</exception>
     public async Task<GitHubIssue> CreateIssueAsync(string title, string body, List<string>? labels = null, CancellationToken cancellationToken = default)
     {
         try
@@ -170,6 +207,106 @@ public class GitHubApiClient : IGitHubApiClient
         catch (HttpRequestException ex)
         {
             _logger.LogError(ex, $"Error creating issue in {_owner}/{_repo}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Updates an existing GitHub issue.
+    /// </summary>
+    /// <param name="issueNumber">The number of the issue to update.</param>
+    /// <param name="title">The new title of the issue, or null to leave unchanged.</param>
+    /// <param name="body">The new body of the issue, or null to leave unchanged.</param>
+    /// <param name="cancellationToken">A cancellation token for the operation.</param>
+    /// <returns>The updated GitHub issue.</returns>
+    /// <exception cref="HttpRequestException">Thrown when the HTTP request fails.</exception>
+    public async Task<GitHubIssue> UpdateIssueAsync(int issueNumber, string? title, string? body, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var url = $"/repos/{_owner}/{_repo}/issues/{issueNumber}";
+            var payload = new Dictionary<string, object?>();
+            
+            if (title != null)
+                payload["title"] = title;
+            if (body != null)
+                payload["body"] = body;
+
+            var json = System.Text.Json.JsonSerializer.Serialize(payload);
+            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+            var request = new HttpRequestMessage(HttpMethod.Patch, url)
+            {
+                Content = content
+            };
+            var response = await _httpClient.SendAsync(request, cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+            var issue = JsonSerializer.Deserialize<GitHubIssue>(responseContent, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            }) ?? throw new InvalidOperationException("Failed to parse issue response");
+
+            _logger.LogInformation($"Updated issue #{issueNumber} in {_owner}/{_repo}");
+            return issue;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, $"Error updating issue {issueNumber}");
+            throw;
+        }
+    }
+
+    public async Task<GitHubPullRequest> GetPullRequestAsync(int pullNumber, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var url = $"/repos/{_owner}/{_repo}/pulls/{pullNumber}";
+            var response = await _httpClient.GetAsync(url, cancellationToken);
+            await ThrowForGitHubStatusAsync(response, cancellationToken);
+
+            var content = await response.Content.ReadAsStringAsync(cancellationToken);
+            return JsonSerializer.Deserialize<GitHubPullRequest>(content, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            }) ?? throw new InvalidOperationException("GitHub repository not found or insufficient permissions.");
+        }
+        catch (HttpRequestException ex) when (ex.InnerException is System.Net.Sockets.SocketException)
+        {
+            _logger.LogError(ex, $"Network error retrieving pull request {pullNumber}");
+            throw;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, $"HTTP error retrieving pull request {pullNumber}");
+            throw;
+        }
+    }
+
+    public async Task<GitHubSearchResult> SearchIssuesAsync(string query, int limit, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var encodedQuery = Uri.EscapeDataString($"{query} is:issue repo:{_owner}/{_repo}");
+            var url = $"/search/issues?q={encodedQuery}&per_page={limit}";
+            var response = await _httpClient.GetAsync(url, cancellationToken);
+            await ThrowForGitHubStatusAsync(response, cancellationToken);
+
+            var content = await response.Content.ReadAsStringAsync(cancellationToken);
+            return JsonSerializer.Deserialize<GitHubSearchResult>(content, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            }) ?? new GitHubSearchResult();
+        }
+        catch (HttpRequestException ex) when (ex.InnerException is System.Net.Sockets.SocketException)
+        {
+            _logger.LogError(ex, "Network error searching GitHub issues");
+            throw;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "HTTP error searching GitHub issues");
             throw;
         }
     }

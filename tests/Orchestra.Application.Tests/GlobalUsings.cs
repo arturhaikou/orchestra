@@ -10,3 +10,6 @@ global using Orchestra.Application.Integrations.DTOs;
 global using Orchestra.Domain;
 global using Orchestra.Domain.Entities;
 global using Orchestra.Domain.Enums;
+global using Orchestra.Tests.Shared.Builders;
+global using Orchestra.Tests.Shared.Fixtures;
+global using Orchestra.Tests.Shared.Utilities;

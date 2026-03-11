@@ -7,9 +7,6 @@ using Orchestra.Application.Auth.DTOs;
 using Orchestra.Application.Auth.Services;
 using Orchestra.Application.Common.Exceptions;
 using Orchestra.Application.Common.Interfaces;
-using Orchestra.Application.Tests.Builders;
-using Orchestra.Application.Tests.Fixtures;
-using Orchestra.Application.Tests.Utilities;
 using Orchestra.Domain.Entities;
 using Xunit;
 

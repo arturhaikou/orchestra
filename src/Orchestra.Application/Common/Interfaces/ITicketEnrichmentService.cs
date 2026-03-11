@@ -13,28 +13,47 @@ public interface ITicketEnrichmentService
     /// - External tickets with comments are analyzed by the sentiment service
     /// </summary>
     /// <param name="tickets">List of tickets to enrich (modified in-place)</param>
+    /// <param name="modelId">
+    /// Optional workspace-configured model identifier. If null, the sentiment service uses its startup default.
+    /// If non-null but unavailable (stale), the sentiment service silently falls back to the default.
+    /// </param>
     /// <param name="cancellationToken">Cancellation token</param>
-    Task CalculateSentimentAsync(List<Orchestra.Application.Tickets.DTOs.TicketDto> tickets, CancellationToken cancellationToken = default);
+    Task CalculateSentimentAsync(
+        List<Orchestra.Application.Tickets.DTOs.TicketDto> tickets,
+        string? modelId = null,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Calculates sentiment/satisfaction score for a single ticket.
     /// Mirrors CalculateSentimentAsync logic for individual ticket processing.
     /// </summary>
     /// <param name="ticket">The ticket to enrich</param>
+    /// <param name="modelId">
+    /// Optional workspace-configured model identifier. If null, the sentiment service uses its startup default.
+    /// If non-null but unavailable (stale), the sentiment service silently falls back to the default.
+    /// </param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The ticket with Satisfaction score populated</returns>
     Task<Orchestra.Application.Tickets.DTOs.TicketDto> CalculateSentimentForSingleAsync(
         Orchestra.Application.Tickets.DTOs.TicketDto ticket,
+        string? modelId = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Generates an AI summary of ticket content (title + description + comments).
+    /// The optional modelId parameter is the workspace-configured model preference and is forwarded
+    /// unchanged to the underlying ISummarizationService. Model resolution (availability check and fallback)
+    /// is the responsibility of ISummarizationService, not this layer.
     /// </summary>
     /// <param name="content">The content to summarize (pre-formatted ticket content)</param>
+    /// <param name="modelId">
+    /// Optional workspace-configured model identifier. Forwarded unchanged to ISummarizationService.
+    /// If null, the service will use its startup-configured default model.
+    /// </param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The generated summary text</returns>
     /// <exception cref="Exception">Thrown when summarization fails</exception>
-    Task<string> GenerateSummaryAsync(string content, CancellationToken cancellationToken = default);
+    Task<string> GenerateSummaryAsync(string content, string? modelId = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Builds a formatted summary content string from ticket details.

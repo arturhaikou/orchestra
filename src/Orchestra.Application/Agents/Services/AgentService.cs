@@ -38,7 +38,8 @@ public class AgentService : IAgentService
             request.Name,
             request.Role,
             request.Capabilities?.ToList() ?? new List<string>(),
-            request.CustomInstructions);
+            request.CustomInstructions,
+            request.Model);
 
         // 3. Persist using data access layer
         await _agentDataAccess.AddAsync(agent, cancellationToken);
@@ -143,6 +144,12 @@ public class AgentService : IAgentService
             updatedCapabilities,
             updatedCustomInstructions);
 
+        // 4b. Apply model update if the field was explicitly included in the request
+        if (request.Model.HasValue)
+        {
+            agent.SetModel(request.Model.Value);
+        }
+
         // 5. Persist changes using data access layer
         await _agentDataAccess.UpdateAsync(agent, cancellationToken);
 
@@ -229,7 +236,8 @@ public class AgentService : IAgentService
             ToolActionIds: toolActionIds.Select(id => id.ToString()).ToArray(),
             ToolCategories: toolCategories.ToArray(),
             AvatarUrl: agent.AvatarUrl,
-            CustomInstructions: agent.CustomInstructions
+            CustomInstructions: agent.CustomInstructions,
+            Model: agent.Model
         );
     }
 }

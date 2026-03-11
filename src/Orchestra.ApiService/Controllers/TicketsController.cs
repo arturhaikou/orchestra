@@ -610,7 +610,7 @@ public async Task<IActionResult> UpdateTicket(
     /// <response code="404">Ticket not found</response>
     /// <response code="500">AI summarization service error or unexpected error</response>
     [HttpPost("{id}/summarize")]
-    [ProducesResponseType(typeof(TicketDto), 200)]
+    [ProducesResponseType(typeof(TicketSummarizationResponse), 200)]
     [ProducesResponseType(typeof(ErrorResponse), 400)]
     [ProducesResponseType(typeof(ErrorResponse), 401)]
     [ProducesResponseType(typeof(ErrorResponse), 403)]
@@ -630,12 +630,12 @@ public async Task<IActionResult> UpdateTicket(
             }
 
             // Call service to generate summary
-            var ticketWithSummary = await _ticketService.GenerateSummaryAsync(
+            var response = await _ticketService.GenerateSummaryAsync(
                 id,
                 userId,
                 cancellationToken);
 
-            return Ok(ticketWithSummary);
+            return Ok(response);
         }
         catch (TicketNotFoundException ex)
         {

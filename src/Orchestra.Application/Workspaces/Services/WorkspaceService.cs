@@ -8,19 +8,47 @@ namespace Orchestra.Application.Workspaces.Services;
 public class WorkspaceService : IWorkspaceService
 {
     private readonly IWorkspaceDataAccess _workspaceDataAccess;
+    private readonly IWorkspaceAIModelValidationService _aiModelValidationService;
 
-    public WorkspaceService(IWorkspaceDataAccess workspaceDataAccess)
+    public WorkspaceService(
+        IWorkspaceDataAccess workspaceDataAccess,
+        IWorkspaceAIModelValidationService aiModelValidationService)
     {
         _workspaceDataAccess = workspaceDataAccess;
+        _aiModelValidationService = aiModelValidationService;
     }
 
     public async Task<WorkspaceDto> CreateWorkspaceAsync(Guid userId, CreateWorkspaceRequest request, CancellationToken cancellationToken = default)
     {
-        var workspace = Workspace.Create(request.Name, userId);
+        // Validate AI model identifiers before creating the workspace
+        await _aiModelValidationService.ValidateAIModelIdentifiersAsync(
+            request.AiSummarizationModelId,
+            request.CustomerSatisfactionAnalysisModelId,
+            cancellationToken);
+
+        var workspace = Workspace.Create(
+            request.Name, 
+            userId,
+            request.AiSummarizationModelId,
+            request.CustomerSatisfactionAnalysisModelId);
+
+        // Apply AI settings if provided in the request
+        if (request.IsAiSummarizationEnabled.HasValue || request.IsCustomerSatisfactionAnalysisEnabled.HasValue)
+        {
+            workspace.UpdateAiSettings(
+                request.IsAiSummarizationEnabled ?? false,
+                request.IsCustomerSatisfactionAnalysisEnabled ?? false);
+        }
 
         await _workspaceDataAccess.CreateAsync(workspace, cancellationToken);
 
-        return new WorkspaceDto(workspace.Id.ToString(), workspace.Name);
+        return new WorkspaceDto(
+            workspace.Id.ToString(), 
+            workspace.Name, 
+            workspace.IsAiSummarizationEnabled, 
+            workspace.IsCustomerSatisfactionAnalysisEnabled,
+            workspace.AiSummarizationModelId,
+            workspace.CustomerSatisfactionAnalysisModelId);
     }
 
     public async Task<WorkspaceDto[]> GetUserWorkspacesAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -28,7 +56,13 @@ public class WorkspaceService : IWorkspaceService
         var workspaces = await _workspaceDataAccess.GetUserWorkspacesAsync(userId, cancellationToken);
         
         return workspaces
-            .Select(w => new WorkspaceDto(w.Id.ToString(), w.Name))
+            .Select(w => new WorkspaceDto(
+                w.Id.ToString(), 
+                w.Name, 
+                w.IsAiSummarizationEnabled, 
+                w.IsCustomerSatisfactionAnalysisEnabled,
+                w.AiSummarizationModelId,
+                w.CustomerSatisfactionAnalysisModelId))
             .ToArray();
     }
 
@@ -65,14 +99,43 @@ public class WorkspaceService : IWorkspaceService
                 workspaceId);
         }
         
+        // Validate AI model identifiers before mutating the workspace
+        await _aiModelValidationService.ValidateAIModelIdentifiersAsync(
+            request.AiSummarizationModelId,
+            request.CustomerSatisfactionAnalysisModelId,
+            cancellationToken);
+        
         // Update using domain method (validates and sets UpdatedAt)
         workspace.UpdateName(request.Name);
+
+        // Determine if model IDs should be updated (partial-update semantics)
+        // If either AI setting or model ID field is present, we apply the update
+        bool shouldUpdateAiSettings = request.IsAiSummarizationEnabled.HasValue || 
+                                      request.IsCustomerSatisfactionAnalysisEnabled.HasValue;
+        bool shouldUpdateModelIds = request.AiSummarizationModelId != null || 
+                                    request.CustomerSatisfactionAnalysisModelId != null;
         
+        if (shouldUpdateAiSettings || shouldUpdateModelIds)
+        {
+            workspace.UpdateAiSettings(
+                request.IsAiSummarizationEnabled ?? workspace.IsAiSummarizationEnabled,
+                request.IsCustomerSatisfactionAnalysisEnabled ?? workspace.IsCustomerSatisfactionAnalysisEnabled,
+                request.AiSummarizationModelId,
+                request.CustomerSatisfactionAnalysisModelId,
+                updateModelIds: shouldUpdateModelIds);
+        }
+
         // Persist changes
         await _workspaceDataAccess.UpdateAsync(workspace, cancellationToken);
         
-        // Return DTO
-        return new WorkspaceDto(workspace.Id.ToString(), workspace.Name);
+        // Return DTO with model IDs
+        return new WorkspaceDto(
+            workspace.Id.ToString(), 
+            workspace.Name, 
+            workspace.IsAiSummarizationEnabled, 
+            workspace.IsCustomerSatisfactionAnalysisEnabled,
+            workspace.AiSummarizationModelId,
+            workspace.CustomerSatisfactionAnalysisModelId);
     }
 
     public async Task DeleteWorkspaceAsync(Guid userId, Guid workspaceId, CancellationToken cancellationToken = default)

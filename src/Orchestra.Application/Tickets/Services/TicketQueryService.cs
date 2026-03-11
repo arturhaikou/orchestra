@@ -35,6 +35,7 @@ public class TicketQueryService : ITicketQueryService
     private readonly IExternalTicketFetchingService _externalFetchingService;
     private readonly ISentimentAnalysisService _sentimentAnalysisService;
     private readonly ITicketPaginationService _ticketPaginationService;
+    private readonly IWorkspaceDataAccess _workspaceDataAccess;
     private readonly ILogger<TicketQueryService> _logger;
 
     public TicketQueryService(
@@ -48,6 +49,7 @@ public class TicketQueryService : ITicketQueryService
         IExternalTicketFetchingService externalFetchingService,
         ISentimentAnalysisService sentimentAnalysisService,
         ITicketPaginationService ticketPaginationService,
+        IWorkspaceDataAccess workspaceDataAccess,
         ILogger<TicketQueryService> logger)
     {
         _ticketDataAccess = ticketDataAccess;
@@ -60,6 +62,7 @@ public class TicketQueryService : ITicketQueryService
         _externalFetchingService = externalFetchingService;
         _sentimentAnalysisService = sentimentAnalysisService;
         _ticketPaginationService = ticketPaginationService;
+        _workspaceDataAccess = workspaceDataAccess;
         _logger = logger;
     }
 
@@ -85,7 +88,7 @@ public class TicketQueryService : ITicketQueryService
 
         // 4. Deduplicate and finalize response
         resultTickets = DeduplicateTickets(resultTickets);
-        await CalculateSentimentForTicketsAsync(resultTickets, cancellationToken);
+        await CalculateSentimentForTicketsAsync(resultTickets, workspaceId, cancellationToken);
 
         var nextPageTokenString = GenerateNextPageToken(nextToken, isLastPage);
 
@@ -794,141 +797,71 @@ public class TicketQueryService : ITicketQueryService
         TicketDto ticket,
         CancellationToken cancellationToken)
     {
-        // Pure internal tickets always get 100
-        if (ticket.Internal && ticket.IntegrationId == null)
+        // Fetch workspace to read the configured CSAT model ID
+        var workspace = await _workspaceDataAccess.GetByIdAsync(ticket.WorkspaceId, cancellationToken);
+        
+        // Check if CSAT is enabled for this workspace
+        if (workspace != null && !workspace.IsCustomerSatisfactionAnalysisEnabled)
         {
+            _logger.LogInformation(
+                "CSAT analysis is disabled for workspace {WorkspaceId}. Setting ticket {TicketId} to Satisfaction=100",
+                ticket.WorkspaceId, ticket.Id);
+            
             return ticket with { Satisfaction = 100 };
         }
 
-        // Tickets without comments get 100
-        if (ticket.Comments == null || ticket.Comments.Count == 0)
-        {
-            return ticket with { Satisfaction = 100 };
-        }
+        // Extract the workspace-configured model ID for CSAT (may be null)
+        var cstModelId = workspace?.CustomerSatisfactionAnalysisModelId;
 
-        // External tickets with comments need sentiment analysis
-        var commentContents = ticket.Comments
-            .Select(c => c.Content)
-            .Where(c => !string.IsNullOrWhiteSpace(c))
-            .ToList();
-
-        if (commentContents.Count == 0)
-        {
-            return ticket with { Satisfaction = 100 };
-        }
-
-        try
-        {
-            var sentimentRequest = new TicketSentimentRequest(
-                ticket.WorkspaceId,
-                ticket.Id,
-                commentContents
-            );
-
-            var sentimentResults = await _sentimentAnalysisService.AnalyzeBatchSentimentAsync(
-                new List<TicketSentimentRequest> { sentimentRequest },
-                cancellationToken);
-
-            var result = sentimentResults.FirstOrDefault();
-            if (result != null)
-            {
-                _logger.LogInformation(
-                    "Sentiment analysis complete for ticket {TicketId}: {Sentiment}",
-                    ticket.Id, result.Sentiment);
-                
-                return ticket with { Satisfaction = result.Sentiment };
-            }
-
-            return ticket with { Satisfaction = 100 };
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to analyze sentiment for ticket {TicketId}, defaulting to 100", ticket.Id);
-            return ticket with { Satisfaction = 100 };
-        }
+        // Delegate to enrichment service for sentiment calculation
+        return await _ticketEnrichmentService.CalculateSentimentForSingleAsync(
+            ticket,
+            cstModelId,
+            cancellationToken);
     }
 
     private async Task CalculateSentimentForTicketsAsync(
         List<TicketDto> tickets,
+        Guid workspaceId,
         CancellationToken cancellationToken)
     {
         if (tickets == null || tickets.Count == 0)
             return;
 
-        var ticketsToAnalyze = new List<TicketSentimentRequest>();
-        var ticketIndexMap = new Dictionary<string, int>();
-
-        for (int i = 0; i < tickets.Count; i++)
+        // Fetch workspace to check CSAT enabled flag and read the configured model ID
+        var workspace = await _workspaceDataAccess.GetByIdAsync(workspaceId, cancellationToken);
+        
+        if (workspace != null && !workspace.IsCustomerSatisfactionAnalysisEnabled)
         {
-            var ticket = tickets[i];
+            // CSAT is disabled for this workspace - set all tickets to 100 and skip sentiment analysis
+            _logger.LogInformation(
+                "CSAT analysis is disabled for workspace {WorkspaceId}. Setting all tickets to Satisfaction=100",
+                workspaceId);
 
-            if (ticket.Internal && ticket.IntegrationId == null)
+            for (int i = 0; i < tickets.Count; i++)
             {
-                tickets[i] = ticket with { Satisfaction = 100 };
-                continue;
-            }
-
-            if (ticket.Comments == null || ticket.Comments.Count == 0)
-            {
-                tickets[i] = ticket with { Satisfaction = 100 };
-                continue;
-            }
-
-            var commentContents = ticket.Comments
-                .Select(c => c.Content)
-                .Where(c => !string.IsNullOrWhiteSpace(c))
-                .ToList();
-
-            if (commentContents.Count > 0)
-            {
-                ticketsToAnalyze.Add(new TicketSentimentRequest(
-                    ticket.WorkspaceId,
-                    ticket.Id,
-                    commentContents
-                ));
-                ticketIndexMap[ticket.Id] = i;
-            }
-            else
-            {
+                var ticket = tickets[i];
                 tickets[i] = ticket with { Satisfaction = 100 };
             }
+
+            return;
         }
 
-        if (ticketsToAnalyze.Count > 0)
-        {
-            try
-            {
-                var sentimentResults = await _sentimentAnalysisService.AnalyzeBatchSentimentAsync(
-                    ticketsToAnalyze,
-                    cancellationToken);
+        // Extract the workspace-configured model ID for CSAT (may be null)
+        var cstModelId = workspace?.CustomerSatisfactionAnalysisModelId;
 
-                foreach (var result in sentimentResults)
-                {
-                    if (ticketIndexMap.TryGetValue(result.TicketId, out var index))
-                    {
-                        var ticket = tickets[index];
-                        tickets[index] = ticket with { Satisfaction = result.Sentiment };
-                    }
-                }
+        // Delegate to enrichment service, which will:
+        // 1. Apply automatic scores (100) to internal and commentless tickets
+        // 2. Pass eligible tickets to sentiment analysis with the workspace modelId
+        // 3. The sentiment analysis service will resolve the model (valid, null, or stale) via IChatClientResolver
+        await _ticketEnrichmentService.CalculateSentimentAsync(
+            tickets,
+            cstModelId,
+            cancellationToken);
 
-                _logger.LogInformation(
-                    "Sentiment analysis complete for {Count} tickets",
-                    sentimentResults.Count);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to analyze sentiment for tickets, defaulting to 100");
-                
-                foreach (var ticketId in ticketIndexMap.Keys)
-                {
-                    if (ticketIndexMap.TryGetValue(ticketId, out var index))
-                    {
-                        var ticket = tickets[index];
-                        tickets[index] = ticket with { Satisfaction = 100 };
-                    }
-                }
-            }
-        }
+        _logger.LogInformation(
+            "Sentiment enrichment complete for {Count} tickets using model {ModelId}",
+            tickets.Count, cstModelId ?? "default");
     }
 
     // Pagination token structure is now handled by TicketPageToken in ITicketPaginationService

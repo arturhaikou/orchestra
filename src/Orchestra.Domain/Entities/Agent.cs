@@ -59,6 +59,12 @@ public class Agent
     public DateTime? UpdatedAt { get; private set; }
 
     /// <summary>
+    /// Gets the optional LLM model identifier the agent is configured to use.
+    /// A null value means no model override — the execution pipeline falls back to the system default.
+    /// </summary>
+    public string? Model { get; private set; }
+
+    /// <summary>
     /// Private constructor to enforce factory method usage.
     /// </summary>
     private Agent() { }
@@ -78,7 +84,8 @@ public class Agent
         string name,
         string role,
         IEnumerable<string>? capabilities,
-        string customInstructions)
+        string customInstructions,
+        string? model = null)
     {
         if (workspaceId == Guid.Empty)
             throw new ArgumentException("WorkspaceId cannot be empty.", nameof(workspaceId));
@@ -110,7 +117,8 @@ public class Agent
             Status = AgentStatus.Offline,
             CustomInstructions = customInstructions.Trim(),
             Capabilities = capabilities?.ToList() ?? new List<string>(),
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            Model = model
         };
 
         agent.AvatarUrl = $"https://api.dicebear.com/7.x/bottts/svg?seed={agent.Id}";
@@ -164,6 +172,17 @@ public class Agent
     public void UpdateStatus(AgentStatus status)
     {
         Status = status;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Sets (or clears) the LLM model override for this agent.
+    /// Pass null to clear the override and revert to the system default.
+    /// </summary>
+    /// <param name="model">The model identifier, or null to clear.</param>
+    public void SetModel(string? model)
+    {
+        Model = model;
         UpdatedAt = DateTime.UtcNow;
     }
 }

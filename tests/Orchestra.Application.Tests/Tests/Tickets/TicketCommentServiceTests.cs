@@ -8,7 +8,6 @@ using Orchestra.Application.Tickets.Common;
 using Orchestra.Application.Tickets.DTOs;
 using Orchestra.Application.Tickets.Services;
 using Orchestra.Domain.Entities;
-using Orchestra.Application.Tests.Builders;
 using Xunit;
 
 namespace Orchestra.Application.Tests.Tests.Tickets;

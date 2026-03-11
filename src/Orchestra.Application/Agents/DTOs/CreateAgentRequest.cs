@@ -9,5 +9,6 @@ public record CreateAgentRequest(
     string Role,
     string[] Capabilities,
     string[]? ToolActionIds,
-    string CustomInstructions
+    string CustomInstructions,
+    string? Model
 );

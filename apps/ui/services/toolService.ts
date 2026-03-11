@@ -5,11 +5,12 @@ import { getToken } from './authService';
 // Map providerType to icon name
 const getIconForProviderType = (providerType: string): string => {
   const iconMap: Record<string, string> = {
-    'INTERNAL': 'settings',
-    'TRACKER': 'ticket',
+    'COMMUNICATION': 'message',
     'CODE': 'code',
+    'GITLAB': 'code',
+    'INTERNAL': 'settings',
     'KNOWLEDGE': 'book',
-    'COMMUNICATION': 'message'
+    'TRACKER': 'ticket'
   };
   return iconMap[providerType] || 'tool';
 };

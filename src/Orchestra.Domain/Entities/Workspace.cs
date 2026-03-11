@@ -8,10 +8,18 @@ public class Workspace
     public DateTime CreatedAt { get; private set; }
     public DateTime? UpdatedAt { get; private set; }
     public bool IsActive { get; private set; }
+    public bool IsAiSummarizationEnabled { get; private set; }
+    public bool IsCustomerSatisfactionAnalysisEnabled { get; private set; }
+    public string? AiSummarizationModelId { get; private set; }
+    public string? CustomerSatisfactionAnalysisModelId { get; private set; }
 
     private Workspace() { } // For EF Core
 
-    public static Workspace Create(string name, Guid ownerId)
+    public static Workspace Create(
+        string name, 
+        Guid ownerId, 
+        string? aiSummarizationModelId = null, 
+        string? customerSatisfactionAnalysisModelId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -30,7 +38,9 @@ public class Workspace
             Name = trimmedName,
             OwnerId = ownerId,
             CreatedAt = DateTime.UtcNow,
-            IsActive = true
+            IsActive = true,
+            AiSummarizationModelId = aiSummarizationModelId,
+            CustomerSatisfactionAnalysisModelId = customerSatisfactionAnalysisModelId
         };
     }
 
@@ -46,6 +56,26 @@ public class Workspace
         }
         
         Name = trimmedName;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void UpdateAiSettings(
+        bool isAiSummarizationEnabled, 
+        bool isCustomerSatisfactionAnalysisEnabled,
+        string? aiSummarizationModelId = null,
+        string? customerSatisfactionAnalysisModelId = null,
+        bool updateModelIds = false)
+    {
+        IsAiSummarizationEnabled = isAiSummarizationEnabled;
+        IsCustomerSatisfactionAnalysisEnabled = isCustomerSatisfactionAnalysisEnabled;
+        
+        // Only update model IDs if the updateModelIds flag is true (partial-update semantics)
+        if (updateModelIds)
+        {
+            AiSummarizationModelId = aiSummarizationModelId;
+            CustomerSatisfactionAnalysisModelId = customerSatisfactionAnalysisModelId;
+        }
+        
         UpdatedAt = DateTime.UtcNow;
     }
 }

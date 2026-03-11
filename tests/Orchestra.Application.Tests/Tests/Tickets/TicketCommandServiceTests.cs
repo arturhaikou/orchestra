@@ -12,8 +12,6 @@ using Orchestra.Application.Tickets.Services;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
 using Orchestra.Domain.Interfaces;
-using Orchestra.Application.Tests.Builders;
-using Orchestra.Application.Tests.Fixtures;
 using Xunit;
 
 namespace Orchestra.Application.Tests.Tests.Tickets;

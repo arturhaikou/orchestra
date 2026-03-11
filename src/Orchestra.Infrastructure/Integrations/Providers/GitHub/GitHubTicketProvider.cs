@@ -89,9 +89,6 @@ public class GitHubTicketProvider : ITicketProvider
 
             var issue = await client.GetIssueAsync(issueNumber, cancellationToken);
             
-            if (issue == null)
-                return null;
-
             var comments = await client.GetIssueCommentsAsync(issueNumber, cancellationToken);
             var commentDtos = comments.Select(c => new CommentDto(
                 Id: c.Id.ToString(),

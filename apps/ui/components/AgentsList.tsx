@@ -5,6 +5,7 @@ import { marked } from 'marked';
 import { Agent, Tool } from '../types';
 import { getAgents, createAgent, updateAgent, deleteAgent } from '../services/agentService';
 import { getTools } from '../services/toolService';
+import { fetchWorkspaceModels } from '../services/workspaceService';
 
 interface AgentsListProps {
   workspaceId: string;
@@ -46,6 +47,7 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
   const [availableTools, setAvailableTools] = useState<Tool[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
   
   // Form State
   const [formState, setFormState] = useState({
@@ -54,8 +56,10 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
       currentCapability: '',
       capabilities: [] as string[],
       toolActionIds: [] as string[],
-      customInstructions: ''
+      customInstructions: '',
+      selectedModel: 'Default'
   });
+  const [initialModel, setInitialModel] = useState<string>('Default');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [toolSearch, setToolSearch] = useState('');
@@ -84,29 +88,42 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
       if (workspaceId) fetchData();
   }, [workspaceId]);
 
+  useEffect(() => {
+    if (!isModalOpen) return;
+    setAvailableModels([]);
+    fetchWorkspaceModels(workspaceId)
+      .then(models => setAvailableModels(models))
+      .catch(() => setAvailableModels([]));
+  }, [isModalOpen, workspaceId]);
+
   const handleOpenCreate = () => {
     setEditingId(null);
+    setInitialModel('Default');
     setFormState({
         name: '',
         role: '',
         currentCapability: '',
         capabilities: [],
         toolActionIds: [],
-        customInstructions: ''
+        customInstructions: '',
+        selectedModel: 'Default'
     });
     setToolSearch('');
     setIsModalOpen(true);
   };
 
   const handleOpenEdit = (agent: Agent) => {
+    const modelValue = agent.model ?? 'Default';
     setEditingId(agent.id);
+    setInitialModel(modelValue);
     setFormState({
         name: agent.name,
         role: agent.role,
         currentCapability: '',
         capabilities: [...agent.capabilities],
         toolActionIds: [...(agent.toolActionIds || [])],
-        customInstructions: agent.customInstructions || ''
+        customInstructions: agent.customInstructions || '',
+        selectedModel: modelValue
     });
     setToolSearch('');
     setIsModalOpen(true);
@@ -167,12 +184,14 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
       setIsSaving(true);
       try {
           if (editingId) {
+              const modelChanged = formState.selectedModel !== initialModel;
               const updated = await updateAgent(editingId, {
                   name: formState.name,
                   role: formState.role,
                   capabilities: formState.capabilities,
                   toolActionIds: formState.toolActionIds,
-                  customInstructions: formState.customInstructions
+                  customInstructions: formState.customInstructions,
+                  ...(modelChanged && { model: formState.selectedModel === 'Default' ? null : formState.selectedModel })
               });
               setAgents(prev => prev.map(a => a.id === editingId ? { ...a, ...updated } : a));
           } else {
@@ -181,7 +200,8 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
                   role: formState.role,
                   capabilities: formState.capabilities,
                   toolActionIds: formState.toolActionIds,
-                  customInstructions: formState.customInstructions
+                  customInstructions: formState.customInstructions,
+                  model: formState.selectedModel === 'Default' ? null : formState.selectedModel
               });
               setAgents(prev => [...prev, newAgent]);
           }
@@ -298,6 +318,17 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
                                 </span>
                             );
                         }) : <span className="text-[10px] text-textMuted italic">No tools authorized</span>}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="text-[10px] font-bold text-textMuted uppercase tracking-widest flex items-center gap-1.5">
+                        <Bot className="w-3 h-3" /> Model
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                        <span className="text-[10px] bg-surfaceHighlight border border-border text-textMuted px-2 py-0.5 rounded">
+                            {agent.model ?? 'Default'}
+                        </span>
                     </div>
                   </div>
                 </div>
@@ -502,6 +533,20 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
                                 placeholder="e.g., Frontend Specialist"
                                 className="w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-text focus:outline-none focus:border-primary shadow-sm"
                                 />
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-semibold text-textMuted uppercase">LLM Model</label>
+                                <select
+                                    value={formState.selectedModel}
+                                    onChange={(e) => setFormState({...formState, selectedModel: e.target.value})}
+                                    className="w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-text focus:outline-none focus:border-primary shadow-sm"
+                                >
+                                    <option value="Default">Default</option>
+                                    {availableModels.map(m => (
+                                        <option key={m} value={m}>{m}</option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
 

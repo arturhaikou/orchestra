@@ -121,24 +121,22 @@ public interface ITicketService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Generates an AI-powered summary for a ticket by combining its description and comments.
-    /// The summary is generated on-demand and not persisted to the database.
-    /// </summary>
-    /// <param name="ticketId">
-    /// The ticket identifier. Can be either:
-    /// - Internal ticket: GUID string (e.g., "3fa85f64-5717-4562-b3fc-2c963f66afa6")
-    /// - External ticket: Composite format (e.g., "{integrationId}:{externalTicketId}")
-    /// </param>
-    /// <param name="userId">The user identifier for authorization checks.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The ticket DTO with the Summary field populated.</returns>
-    /// <exception cref="TicketNotFoundException">Thrown when the ticket does not exist.</exception>
-    /// <exception cref="UnauthorizedTicketAccessException">Thrown when user lacks access to the ticket's workspace.</exception>
-    /// <exception cref="SummarizationException">Thrown when AI summarization fails.</exception>
-    /// <summary>
     /// Generates a summary for a ticket using the enrichment service.
+    /// Returns a wrapper that indicates whether the feature is enabled for the workspace.
+    /// If the workspace has disabled AI Summarization, the response contains
+    /// <c>FeatureDisabled: true</c> and a user-friendly message; the AI model is not called.
+    /// If the feature is enabled, the response contains the ticket DTO with the Summary field populated.
     /// </summary>
-    Task<TicketDto> GenerateSummaryAsync(
+    /// <param name="ticketId">Internal ticket GUID or composite format "{integrationId}:{externalTicketId}"</param>
+    /// <param name="userId">User ID from JWT claims for workspace authorization</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>A TicketSummarizationResponse wrapper. When FeatureDisabled is true,
+    /// Ticket is null and Message explains why. When FeatureDisabled is false,
+    /// Ticket is populated with the summary and Message is null.</returns>
+    /// <exception cref="TicketNotFoundException">Thrown when the ticket does not exist or the user lacks access.</exception>
+    /// <exception cref="UnauthorizedTicketAccessException">Thrown when user lacks access to the ticket's workspace (before flag is checked).</exception>
+    /// <exception cref="SummarizationException">Thrown when the AI summarization service fails (only if feature is enabled).</exception>
+    Task<TicketSummarizationResponse> GenerateSummaryAsync(
         string ticketId,
         Guid userId,
         CancellationToken cancellationToken = default);

@@ -28,7 +28,7 @@ export const getAgents = async (workspaceId: string): Promise<Agent[]> => {
   }
 };
 
-export const createAgent = async (workspaceId: string, data: { name: string; role: string; capabilities: string[]; toolActionIds: string[]; customInstructions?: string }): Promise<Agent> => {
+export const createAgent = async (workspaceId: string, data: { name: string; role: string; capabilities: string[]; toolActionIds: string[]; customInstructions?: string; model?: string | null }): Promise<Agent> => {
   try {
     const response = await fetch(API_BASE_URL, {
       method: 'POST',

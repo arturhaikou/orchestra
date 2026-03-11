@@ -2,7 +2,6 @@ using System;
 using Orchestra.Application.Tickets.Services;
 using Orchestra.Application.Tickets.Common;
 using Orchestra.Application.Common.Interfaces;
-using Orchestra.Application.Tests.Utilities;
 using Xunit;
 
 namespace Orchestra.Application.Tests.Tests.Tickets;

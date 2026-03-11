@@ -19,18 +19,21 @@ public class TicketService : ITicketService
     private readonly ITicketCommentService _commentService;
     private readonly ILogger<TicketService> _logger;
     private readonly ITicketEnrichmentService _enrichmentService;
+    private readonly IWorkspaceDataAccess _workspaceDataAccess;
 
     public TicketService(
         ITicketQueryService queryService,
         ITicketCommandService commandService,
         ITicketCommentService commentService,
         ITicketEnrichmentService enrichmentService,
+        IWorkspaceDataAccess workspaceDataAccess,
         ILogger<TicketService> logger)
     {
         _queryService = queryService;
         _commandService = commandService;
         _commentService = commentService;
         _enrichmentService = enrichmentService;
+        _workspaceDataAccess = workspaceDataAccess;
         _logger = logger;
     }
 
@@ -87,21 +90,55 @@ public class TicketService : ITicketService
         return await _commentService.AddCommentAsync(ticketId, userId, request, cancellationToken);
     }
 
-    public async Task<TicketDto> GenerateSummaryAsync(
+    public async Task<TicketSummarizationResponse> GenerateSummaryAsync(
         string ticketId,
         Guid userId,
         CancellationToken cancellationToken = default)
     {
         // 1. Fetch the ticket (handles both internal and external tickets)
+        // This call validates authentication and workspace membership before anything else.
         var ticketDto = await _queryService.GetTicketByIdAsync(ticketId, userId, cancellationToken);
 
-        // 2. Build content string for summarization
+        // 2. Look up the workspace to check the AI Summarization flag
+        var workspace = await _workspaceDataAccess.GetByIdAsync(ticketDto.WorkspaceId, cancellationToken);
+
+        // Defensive check: workspace should exist if ticket exists (referential integrity).
+        // If null, log warning and return feature-disabled response as a safe fallback.
+        if (workspace == null)
+        {
+            _logger.LogWarning(
+                "Workspace {WorkspaceId} not found for ticket {TicketId}, returning feature-disabled response.",
+                ticketDto.WorkspaceId, ticketId);
+            return new TicketSummarizationResponse(
+                null,
+                true,
+                "Summarization is not enabled for this workspace. Go to workspace settings to enable it.");
+        }
+
+        // 3. Check if AI Summarization is enabled for this workspace
+        if (!workspace.IsAiSummarizationEnabled)
+        {
+            return new TicketSummarizationResponse(
+                null,
+                true,
+                "Summarization is not enabled for this workspace. Go to workspace settings to enable it.");
+        }
+
+        // 4. Feature is enabled; proceed with summarization
+        // Extract the workspace-configured model ID to forward to the enrichment service.
+        // The workspace GUID was already valid when we fetched the workspace record, so
+        // AiSummarizationModelId is guaranteed to be accessible (nullable, but present).
+        var workspaceModelId = workspace.AiSummarizationModelId;
+
         var content = _enrichmentService.BuildSummaryContent(ticketDto);
 
-        // 3. Generate summary using enrichment service
-        string summary = await _enrichmentService.GenerateSummaryAsync(content, cancellationToken);
+        // 5. Generate summary using enrichment service, forwarding the workspace model ID.
+        // If modelId is null, the service will use the startup-configured default.
+        // If modelId is set but unavailable (stale), the service will silently fall back to the default.
+        string summary = await _enrichmentService.GenerateSummaryAsync(content, workspaceModelId, cancellationToken);
 
-        // 4. Return ticket DTO with summary populated
-        return ticketDto with { Summary = summary };
+        // 6. Return success response with summary populated
+        var summarizedTicket = ticketDto with { Summary = summary };
+        return new TicketSummarizationResponse(summarizedTicket, false, null);
     }
 }

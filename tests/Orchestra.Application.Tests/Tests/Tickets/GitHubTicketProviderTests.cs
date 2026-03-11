@@ -1,6 +1,4 @@
 using Microsoft.Extensions.Logging;
-using Orchestra.Application.Tests.Builders;
-using Orchestra.Application.Tests.Fixtures;
 using Orchestra.Infrastructure.Integrations.Providers.GitHub;
 using Orchestra.Infrastructure.Integrations.Providers.GitHub.Models;
 
