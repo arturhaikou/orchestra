@@ -13,5 +13,6 @@ public record AgentDto(
     string[] ToolActionIds,     // Used for create/update operations
     string[] ToolCategories,    // Unique category names for display
     string AvatarUrl,
-    string? CustomInstructions
+    string? CustomInstructions,
+    string? Model
 );

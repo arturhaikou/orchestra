@@ -15,6 +15,7 @@ public class AgentBuilder
     private AgentStatus _status = AgentStatus.Idle;
     private string _customInstructions = new Faker().Lorem.Sentence(10);
     private List<string> _capabilities = new() { "code_execution", "document_analysis" };
+    private string? _model = null;
 
     /// <summary>
     /// Sets the agent ID.
@@ -80,6 +81,15 @@ public class AgentBuilder
     }
 
     /// <summary>
+    /// Sets the LLM model override for the agent. Pass null (default) for no override.
+    /// </summary>
+    public AgentBuilder WithModel(string? model)
+    {
+        _model = model;
+        return this;
+    }
+
+    /// <summary>
     /// Builds the Agent entity.
     /// </summary>
     public Agent Build()
@@ -89,7 +99,8 @@ public class AgentBuilder
             _name,
             _role,
             _capabilities,
-            _customInstructions);
+            _customInstructions,
+            _model);
     }
 
     /// <summary>

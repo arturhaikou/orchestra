@@ -1,5 +1,4 @@
 using Microsoft.Agents.AI;
-using Microsoft.Extensions.AI;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Common.Interfaces;
 
@@ -10,23 +9,25 @@ namespace Orchestra.Infrastructure.Agents;
 /// </summary>
 public class AgentRuntimeService : IAgentRuntimeService
 {
-    private readonly IChatClient _chatClient;
+    private readonly IChatClientResolver _chatClientResolver;
     private readonly IAgentDataAccess _agentDataAccess;
     private readonly IToolRetrieverService _toolRetrieverService;
 
     public AgentRuntimeService(
-        IChatClient chatClient,
+        IChatClientResolver chatClientResolver,
         IAgentDataAccess agentDataAccess,
         IToolRetrieverService toolRetrieverService)
     {
-        _chatClient = chatClient;
+        _chatClientResolver = chatClientResolver;
         _agentDataAccess = agentDataAccess;
         _toolRetrieverService = toolRetrieverService;
     }
 
+    /// <inheritdoc/>
     public async Task<string> ExecuteAgentAsync(
         Guid agentId,
         string contextPrompt,
+        string? agentModel = null,
         CancellationToken cancellationToken = default)
     {
         // Load agent entity from database
@@ -36,13 +37,18 @@ public class AgentRuntimeService : IAgentRuntimeService
             throw new InvalidOperationException($"Agent {agentId} not found");
         }
 
+        // Resolve the LLM client: uses the agent's configured model when non-null,
+        // or falls back to the system-configured default when null.
+        var chatClient = await _chatClientResolver.ResolveChatClientAsync(agentModel, cancellationToken);
+
         // Get AIFunction instances for the agent's tools
         var aiFunctions = await _toolRetrieverService.GetAgentToolsAsync(
             agentId,
             cancellationToken);
 
-        // Create AIAgent using Microsoft Agent Framework with existing IChatClient
-        var agent = _chatClient.AsAIAgent(
+        // Create AIAgent using Microsoft Agent Framework with the resolved IChatClient
+        var agent = new ChatClientAgent(
+            chatClient,
             instructions: agentEntity.CustomInstructions,
             name: agentEntity.Name,
             tools: aiFunctions.ToArray());

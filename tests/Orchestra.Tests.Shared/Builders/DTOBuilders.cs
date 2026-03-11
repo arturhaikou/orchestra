@@ -1,6 +1,7 @@
 using Bogus;
 using Orchestra.Application.Auth.DTOs;
 using Orchestra.Application.Agents.DTOs;
+using Orchestra.Application.Common;
 using Orchestra.Application.Tickets.DTOs;
 using Orchestra.Application.Integrations.DTOs;
 using Orchestra.Domain.Enums;
@@ -176,6 +177,7 @@ public class CreateAgentRequestBuilder
     private string[] _capabilities = new[] { "code_execution", "document_analysis" };
     private string[]? _toolActionIds;
     private string _customInstructions = new Faker().Lorem.Sentence(10);
+    private string? _model = "gpt-4";
 
     /// <summary>
     /// Sets the workspace ID.
@@ -232,11 +234,20 @@ public class CreateAgentRequestBuilder
     }
 
     /// <summary>
+    /// Sets the model.
+    /// </summary>
+    public CreateAgentRequestBuilder WithModel(string? model)
+    {
+        _model = model;
+        return this;
+    }
+
+    /// <summary>
     /// Builds the CreateAgentRequest.
     /// </summary>
     public CreateAgentRequest Build()
     {
-        return new CreateAgentRequest(_workspaceId, _name, _role, _capabilities, _toolActionIds, _customInstructions);
+        return new CreateAgentRequest(_workspaceId, _name, _role, _capabilities, _toolActionIds, _customInstructions, _model);
     }
 }
 
@@ -251,6 +262,7 @@ public class UpdateAgentRequestBuilder
     private string[] _capabilities = new[] { "code_execution" };
     private string[]? _toolActionIds;
     private string _customInstructions = new Faker().Lorem.Sentence(10);
+    private Optional<string?> _model = Optional<string?>.None;
 
     /// <summary>
     /// Sets the agent ID.
@@ -307,11 +319,21 @@ public class UpdateAgentRequestBuilder
     }
 
     /// <summary>
+    /// Includes the model field in the request (Optional.Some). Pass null to explicitly clear the model.
+    /// Omit this call entirely to leave the model field absent (Optional.None — partial update, no change).
+    /// </summary>
+    public UpdateAgentRequestBuilder WithModel(string? model)
+    {
+        _model = Optional<string?>.Some(model);
+        return this;
+    }
+
+    /// <summary>
     /// Builds the UpdateAgentRequest.
     /// </summary>
     public UpdateAgentRequest Build()
     {
-        return new UpdateAgentRequest(_name, _role, _capabilities, _toolActionIds, _customInstructions);
+        return new UpdateAgentRequest(_name, _role, _capabilities, _toolActionIds, _customInstructions, _model);
     }
 }
 

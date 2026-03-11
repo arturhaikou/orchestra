@@ -92,6 +92,7 @@ export interface Agent {
   toolCategories: string[]; // Unique category names for display
   avatarUrl: string;
   customInstructions?: string;
+  model?: string | null; // LLM model override; null means system default
 }
 
 export interface Job {

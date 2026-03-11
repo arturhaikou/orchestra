@@ -48,6 +48,9 @@ public class AgentConfiguration : IEntityTypeConfiguration<Agent>
 
         builder.Property(a => a.UpdatedAt);
 
+        builder.Property(a => a.Model)
+            .HasMaxLength(500);
+
         builder.HasIndex(a => a.WorkspaceId);
     }
 }

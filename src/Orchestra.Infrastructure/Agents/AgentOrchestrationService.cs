@@ -105,14 +105,18 @@ public class AgentOrchestrationService : IAgentOrchestrationService
                 ticketId,
                 contextPrompt.Length);
 
-            // 6. Execute AI agent
+            // 6. Execute AI agent — resolve model at execution time from the agent entity.
+            // agentEntity.Model is non-null when the agent has a configured model override;
+            // null causes AgentRuntimeService to fall back to the system-configured default.
             _logger.LogInformation(
-                "Executing agent {AgentName}",
-                agentEntity.Name);
+                "Executing agent {AgentName} with model {AgentModel}",
+                agentEntity.Name,
+                agentEntity.Model ?? "<system default>");
 
             var responseText = await _agentRuntimeService.ExecuteAgentAsync(
                 agentEntity.Id,
                 contextPrompt,
+                agentEntity.Model,
                 cancellationToken);
 
             _logger.LogInformation(

@@ -4,6 +4,7 @@ using System.Text;
 using Orchestra.ApiService.Hubs;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
+using Orchestra.Application.Common;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -43,6 +44,7 @@ builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.Converters.Add(new OptionalJsonConverterFactory());
     });
 builder.AddInfrastructureServices();
 
