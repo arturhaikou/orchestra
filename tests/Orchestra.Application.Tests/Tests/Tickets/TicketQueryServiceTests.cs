@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using NSubstitute;
 using Orchestra.Application.Common.Exceptions;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Tickets.Common;
@@ -12,6 +13,7 @@ using Orchestra.Application.Tickets.Services;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
 using Orchestra.Domain.Interfaces;
+using Orchestra.Tests.Shared.Builders;
 using Xunit;
 
 namespace Orchestra.Application.Tests.Tests.Tickets;
@@ -62,6 +64,24 @@ public class TicketQueryServiceTests
 
         _workspaceDataAccess.GetByIdAsync(workspaceId, Arg.Any<CancellationToken>())
             .Returns(workspace);
+    }
+
+    private void SetupEnrichmentService()
+    {
+        // Use real TicketEnrichmentService with mocked sentiment service
+        var enrichmentService = new TicketEnrichmentService(
+            _sentimentAnalysisService,
+            Substitute.For<ISummarizationService>(),
+            Substitute.For<ILogger<TicketEnrichmentService>>()
+        );
+        
+        _ticketEnrichmentService
+            .CalculateSentimentAsync(Arg.Any<List<TicketDto>>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(x => enrichmentService.CalculateSentimentAsync(
+                (List<TicketDto>)x[0],
+                (string)x[1],
+                (CancellationToken)x[2]
+            ));
     }
 
     [Fact]
@@ -155,6 +175,7 @@ public class TicketQueryServiceTests
         var workspaceId = Guid.NewGuid();
         var userId = Guid.NewGuid();
         SetupPaginationService();
+        SetupEnrichmentService();
         _workspaceAuth.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
         var ticket = new TicketBuilder()
             .WithId(Guid.NewGuid())
@@ -175,7 +196,7 @@ public class TicketQueryServiceTests
         _ticketDataAccess.GetAllStatusesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketStatus>());
         _ticketDataAccess.GetAllPrioritiesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketPriority>());
         _integrationDataAccess.GetByWorkspaceIdAsync(workspaceId, Arg.Any<CancellationToken>()).Returns(new List<Integration>());
-        _sentimentAnalysisService.AnalyzeBatchSentimentAsync(Arg.Any<List<TicketSentimentRequest>>(), Arg.Any<CancellationToken>()).Returns<Task<List<TicketSentimentResult>>>(_ => throw new Exception("Sentiment error"));
+        _sentimentAnalysisService.AnalyzeBatchSentimentAsync(Arg.Any<List<TicketSentimentRequest>>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns<Task<List<TicketSentimentResult>>>(_ => throw new Exception("Sentiment error"));
         var service = CreateService();
         var result = await service.GetTicketsAsync(workspaceId, userId);
         Assert.Equal(100, result.Items[0].Satisfaction);
@@ -219,7 +240,7 @@ public class TicketQueryServiceTests
         Assert.True(result.IsLast);
         Assert.Empty(result.Items);
         await _sentimentAnalysisService.DidNotReceive()
-            .AnalyzeBatchSentimentAsync(Arg.Any<List<TicketSentimentRequest>>(), Arg.Any<CancellationToken>());
+            .AnalyzeBatchSentimentAsync(Arg.Any<List<TicketSentimentRequest>>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -267,7 +288,7 @@ public class TicketQueryServiceTests
         Assert.NotEmpty(result.Items);
         Assert.All(result.Items, ticket => Assert.Equal(100, ticket.Satisfaction));
         await _sentimentAnalysisService.DidNotReceive()
-            .AnalyzeBatchSentimentAsync(Arg.Any<List<TicketSentimentRequest>>(), Arg.Any<CancellationToken>());
+            .AnalyzeBatchSentimentAsync(Arg.Any<List<TicketSentimentRequest>>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -710,6 +731,7 @@ public class TicketQueryServiceTests
         var sentimentResult = new TicketSentimentResult(externalTicketDto.Id, 85);
 
         SetupPaginationService();
+        SetupEnrichmentService();
         SetupWorkspaceWithCsatEnabled(workspaceId, csatEnabled: true);
         _workspaceAuth.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
         _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
@@ -727,7 +749,7 @@ public class TicketQueryServiceTests
                 HasMore: false,
                 State: new ExternalPaginationState { CurrentProviderIndex = 0, ProviderTokens = new Dictionary<string, string?>(), TotalExternalFetched = 1, ExhaustedProviderIds = new List<string> { integrationId.ToString() } }
             ));
-        _sentimentAnalysisService.AnalyzeBatchSentimentAsync(Arg.Any<List<TicketSentimentRequest>>(), Arg.Any<CancellationToken>())
+        _sentimentAnalysisService.AnalyzeBatchSentimentAsync(Arg.Any<List<TicketSentimentRequest>>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new List<TicketSentimentResult> { sentimentResult });
 
         var service = CreateService();
@@ -739,7 +761,7 @@ public class TicketQueryServiceTests
         Assert.NotEmpty(result.Items);
         Assert.Equal(85, result.Items.First().Satisfaction);
         await _sentimentAnalysisService.Received(1)
-            .AnalyzeBatchSentimentAsync(Arg.Any<List<TicketSentimentRequest>>(), Arg.Any<CancellationToken>());
+            .AnalyzeBatchSentimentAsync(Arg.Any<List<TicketSentimentRequest>>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -764,6 +786,7 @@ public class TicketQueryServiceTests
         comments.Add(comment);
 
         SetupPaginationService();
+        SetupEnrichmentService();
         SetupWorkspaceWithCsatEnabled(workspaceId, csatEnabled: true);
         _workspaceAuth.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
         _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
@@ -781,7 +804,7 @@ public class TicketQueryServiceTests
         Assert.NotEmpty(result.Items);
         Assert.Equal(100, result.Items.First().Satisfaction);
         await _sentimentAnalysisService.DidNotReceive()
-            .AnalyzeBatchSentimentAsync(Arg.Any<List<TicketSentimentRequest>>(), Arg.Any<CancellationToken>());
+            .AnalyzeBatchSentimentAsync(Arg.Any<List<TicketSentimentRequest>>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -799,6 +822,7 @@ public class TicketQueryServiceTests
         // No comments added - empty comment list
 
         SetupPaginationService();
+        SetupEnrichmentService();
         SetupWorkspaceWithCsatEnabled(workspaceId, csatEnabled: true);
         _workspaceAuth.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
         _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
@@ -816,7 +840,7 @@ public class TicketQueryServiceTests
         Assert.NotEmpty(result.Items);
         Assert.Equal(100, result.Items.First().Satisfaction);
         await _sentimentAnalysisService.DidNotReceive()
-            .AnalyzeBatchSentimentAsync(Arg.Any<List<TicketSentimentRequest>>(), Arg.Any<CancellationToken>());
+            .AnalyzeBatchSentimentAsync(Arg.Any<List<TicketSentimentRequest>>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -852,6 +876,7 @@ public class TicketQueryServiceTests
         );
 
         SetupPaginationService();
+        SetupEnrichmentService();
         SetupWorkspaceWithCsatEnabled(workspaceId, csatEnabled: true);
         _workspaceAuth.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
         _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
@@ -869,7 +894,7 @@ public class TicketQueryServiceTests
                 HasMore: false,
                 State: new ExternalPaginationState { CurrentProviderIndex = 0, ProviderTokens = new Dictionary<string, string?>(), TotalExternalFetched = 1, ExhaustedProviderIds = new List<string> { integrationId.ToString() } }
             ));
-        _sentimentAnalysisService.AnalyzeBatchSentimentAsync(Arg.Any<List<TicketSentimentRequest>>(), Arg.Any<CancellationToken>())
+        _sentimentAnalysisService.AnalyzeBatchSentimentAsync(Arg.Any<List<TicketSentimentRequest>>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns<Task<List<TicketSentimentResult>>>(_ => throw new Exception("AI service unavailable"));
 
         var service = CreateService();
@@ -879,7 +904,7 @@ public class TicketQueryServiceTests
 
         // Assert
         Assert.NotEmpty(result.Items);
-        Assert.Equal(75, result.Items.First().Satisfaction);
+        Assert.Equal(100, result.Items.First().Satisfaction);
     }
 
     [Fact]
@@ -917,6 +942,7 @@ public class TicketQueryServiceTests
         var sentimentResult = new TicketSentimentResult(externalTicketDto.Id, 75);
 
         SetupPaginationService();
+        SetupEnrichmentService();
         _workspaceDataAccess.GetByIdAsync(workspaceId, Arg.Any<CancellationToken>()).Returns((Workspace)null);
         _workspaceAuth.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
         _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
@@ -934,7 +960,7 @@ public class TicketQueryServiceTests
                 HasMore: false,
                 State: new ExternalPaginationState { CurrentProviderIndex = 0, ProviderTokens = new Dictionary<string, string?>(), TotalExternalFetched = 1, ExhaustedProviderIds = new List<string> { integrationId.ToString() } }
             ));
-        _sentimentAnalysisService.AnalyzeBatchSentimentAsync(Arg.Any<List<TicketSentimentRequest>>(), Arg.Any<CancellationToken>())
+        _sentimentAnalysisService.AnalyzeBatchSentimentAsync(Arg.Any<List<TicketSentimentRequest>>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new List<TicketSentimentResult> { sentimentResult });
 
         var service = CreateService();
@@ -946,6 +972,145 @@ public class TicketQueryServiceTests
         Assert.NotEmpty(result.Items);
         Assert.Equal(75, result.Items.First().Satisfaction);
         await _sentimentAnalysisService.Received(1)
-            .AnalyzeBatchSentimentAsync(Arg.Any<List<TicketSentimentRequest>>(), Arg.Any<CancellationToken>());
+            .AnalyzeBatchSentimentAsync(Arg.Any<List<TicketSentimentRequest>>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+}
+
+public class TicketQueryServiceCSATModelResolutionTests
+{
+    private readonly ITicketDataAccess _ticketDataAccessMock = Substitute.For<ITicketDataAccess>();
+    private readonly IWorkspaceAuthorizationService _authMock = Substitute.For<IWorkspaceAuthorizationService>();
+    private readonly IIntegrationDataAccess _integrationDataAccessMock = Substitute.For<IIntegrationDataAccess>();
+    private readonly ITicketProviderFactory _providerFactoryMock = Substitute.For<ITicketProviderFactory>();
+    private readonly ITicketIdParsingService _idParserMock = Substitute.For<ITicketIdParsingService>();
+    private readonly ITicketMappingService _mappingServiceMock = Substitute.For<ITicketMappingService>();
+    private readonly ITicketEnrichmentService _enrichmentServiceMock = Substitute.For<ITicketEnrichmentService>();
+    private readonly IExternalTicketFetchingService _externalFetchMock = Substitute.For<IExternalTicketFetchingService>();
+    private readonly ISentimentAnalysisService _sentimentMock = Substitute.For<ISentimentAnalysisService>();
+    private readonly ITicketPaginationService _paginationMock = Substitute.For<ITicketPaginationService>();
+    private readonly IWorkspaceDataAccess _workspaceDataAccessMock = Substitute.For<IWorkspaceDataAccess>();
+    private readonly ILogger<TicketQueryService> _loggerMock = Substitute.For<ILogger<TicketQueryService>>();
+    private readonly TicketQueryService _sut;
+
+    public TicketQueryServiceCSATModelResolutionTests()
+    {
+        _sut = new TicketQueryService(
+            _ticketDataAccessMock,
+            _authMock,
+            _integrationDataAccessMock,
+            _providerFactoryMock,
+            _idParserMock,
+            _mappingServiceMock,
+            _enrichmentServiceMock,
+            _externalFetchMock,
+            _sentimentMock,
+            _paginationMock,
+            _workspaceDataAccessMock,
+            _loggerMock);
+    }
+
+    [Fact]
+    public async Task GetTicketsAsync_WithValidWorkspaceModel_PassesModelIdToEnrichmentService()
+    {
+        // Arrange
+        var workspaceId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        const string workspaceModelId = "gpt-4-turbo";
+        
+        var workspace = new WorkspaceBuilder()
+            .WithId(workspaceId)
+            .WithIsCustomerSatisfactionAnalysisEnabled(true)
+            .WithCustomerSatisfactionAnalysisModelId(workspaceModelId)
+            .Build();
+
+        var internalTicket = new TicketBuilder()
+            .WithId(Guid.NewGuid())
+            .WithWorkspaceId(workspaceId)
+            .AsInternal()
+            .Build();
+        var comment = new TicketCommentBuilder()
+            .WithTicketId(internalTicket.Id)
+            .WithAuthor("a")
+            .WithContent("Comment with sentiment")
+            .Build();
+        internalTicket.Comments.Add(comment);
+
+        var tickets = new List<Ticket> { internalTicket };
+
+        // Mock setup
+        _authMock.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true));
+        _paginationMock.NormalizePageSize(Arg.Any<int>()).Returns(50);
+        _paginationMock.ParsePageToken(null).Returns(new TicketPageToken { Phase = "internal" });
+        _ticketDataAccessMock.GetInternalTicketsByWorkspaceAsync(workspaceId, 0, 50, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(tickets));
+        _ticketDataAccessMock.GetAllStatusesAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(new List<TicketStatus>()));
+        _ticketDataAccessMock.GetAllPrioritiesAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(new List<TicketPriority>()));
+        _integrationDataAccessMock.GetByWorkspaceIdAsync(workspaceId, Arg.Any<CancellationToken>()).Returns(Task.FromResult(new List<Integration>()));
+        _workspaceDataAccessMock.GetByIdAsync(workspaceId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(workspace));
+        _enrichmentServiceMock.CalculateSentimentAsync(Arg.Any<List<TicketDto>>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await _sut.GetTicketsAsync(workspaceId, userId, null, 50, CancellationToken.None);
+
+        // Assert
+        await _enrichmentServiceMock.Received(1).CalculateSentimentAsync(
+            Arg.Any<List<TicketDto>>(),
+            Arg.Is(workspaceModelId),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GetTicketsAsync_WithNullWorkspaceModel_PassesNullToEnrichmentService()
+    {
+        // Arrange
+        var workspaceId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        
+        var workspace = new WorkspaceBuilder()
+            .WithId(workspaceId)
+            .WithIsCustomerSatisfactionAnalysisEnabled(true)
+            .WithCustomerSatisfactionAnalysisModelId(null)
+            .Build();
+
+        var internalTicket = new TicketBuilder()
+            .WithId(Guid.NewGuid())
+            .WithWorkspaceId(workspaceId)
+            .AsInternal()
+            .Build();
+        var comment = new TicketCommentBuilder()
+            .WithTicketId(internalTicket.Id)
+            .WithAuthor("a")
+            .WithContent("Comment with sentiment")
+            .Build();
+        internalTicket.Comments.Add(comment);
+
+        var tickets = new List<Ticket> { internalTicket };
+
+        // Mock setup
+        _authMock.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true));
+        _paginationMock.NormalizePageSize(Arg.Any<int>()).Returns(50);
+        _paginationMock.ParsePageToken(null).Returns(new TicketPageToken { Phase = "internal" });
+        _ticketDataAccessMock.GetInternalTicketsByWorkspaceAsync(workspaceId, 0, 50, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(tickets));
+        _ticketDataAccessMock.GetAllStatusesAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(new List<TicketStatus>()));
+        _ticketDataAccessMock.GetAllPrioritiesAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(new List<TicketPriority>()));
+        _integrationDataAccessMock.GetByWorkspaceIdAsync(workspaceId, Arg.Any<CancellationToken>()).Returns(Task.FromResult(new List<Integration>()));
+        _workspaceDataAccessMock.GetByIdAsync(workspaceId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(workspace));
+        _enrichmentServiceMock.CalculateSentimentAsync(Arg.Any<List<TicketDto>>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await _sut.GetTicketsAsync(workspaceId, userId, null, 50, CancellationToken.None);
+
+        // Assert
+        await _enrichmentServiceMock.Received(1).CalculateSentimentAsync(
+            Arg.Any<List<TicketDto>>(),
+            Arg.Is((string?)null),
+            Arg.Any<CancellationToken>());
     }
 }

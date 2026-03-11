@@ -13,23 +13,32 @@ namespace Orchestra.Infrastructure.Services;
 /// <summary>
 /// Service for analyzing sentiment of ticket comments using an external AI service.
 /// </summary>
-public class SentimentAnalysisService : ISentimentAnalysisService
+public sealed class SentimentAnalysisService : ISentimentAnalysisService
 {
-    private readonly IChatClient _chatClient;
+    private readonly IChatClient _defaultChatClient;
+    private readonly IChatClientResolver _chatClientResolver;
     private readonly ILogger<SentimentAnalysisService> _logger;
     // In-memory cache: key is workspaceId|ticketId|commentHash, value is sentiment score
     private static readonly ConcurrentDictionary<string, int> _sentimentCache = new();
 
-    public SentimentAnalysisService(IChatClient chatClient, ILogger<SentimentAnalysisService> logger)
+    public SentimentAnalysisService(
+        IChatClient defaultChatClient,
+        IChatClientResolver chatClientResolver,
+        ILogger<SentimentAnalysisService> logger)
     {
-        _chatClient = chatClient;
+        _defaultChatClient = defaultChatClient;
+        _chatClientResolver = chatClientResolver;
         _logger = logger;
     }
     /// <summary>
     /// Analyzes sentiment for multiple tickets based on their comments.
+    /// If a workspace-configured modelId is provided and is currently available,
+    /// that model is used. If modelId is null or the specified model is no longer available (stale),
+    /// the service silently falls back to the startup-configured default model without raising an error.
     /// </summary>
     public async Task<List<TicketSentimentResult>> AnalyzeBatchSentimentAsync(
         List<TicketSentimentRequest> requests,
+        string? modelId = null,
         CancellationToken cancellationToken = default)
     {
         if (requests == null || requests.Count == 0)
@@ -37,6 +46,8 @@ public class SentimentAnalysisService : ISentimentAnalysisService
             return new List<TicketSentimentResult>();
         }
 
+        // Resolve the appropriate chat client based on workspace-configured model ID
+        var chatClient = await _chatClientResolver.ResolveChatClientAsync(modelId, cancellationToken);
 
         int cacheHits = 0, aiCalls = 0;
         var results = new List<TicketSentimentResult>();
@@ -70,7 +81,7 @@ public class SentimentAnalysisService : ISentimentAnalysisService
                         </tickets>
                         """;
 
-                var response = await _chatClient.GetResponseAsync<List<TicketSentimentResult>>([
+                var response = await chatClient.GetResponseAsync<List<TicketSentimentResult>>([
                     new ChatMessage(ChatRole.System, SystemMessages.SentimentAnalysisSystemMessage),
                     new ChatMessage(ChatRole.User, ticketsInfo)
                 ]);

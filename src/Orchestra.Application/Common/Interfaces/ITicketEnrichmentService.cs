@@ -13,18 +13,30 @@ public interface ITicketEnrichmentService
     /// - External tickets with comments are analyzed by the sentiment service
     /// </summary>
     /// <param name="tickets">List of tickets to enrich (modified in-place)</param>
+    /// <param name="modelId">
+    /// Optional workspace-configured model identifier. If null, the sentiment service uses its startup default.
+    /// If non-null but unavailable (stale), the sentiment service silently falls back to the default.
+    /// </param>
     /// <param name="cancellationToken">Cancellation token</param>
-    Task CalculateSentimentAsync(List<Orchestra.Application.Tickets.DTOs.TicketDto> tickets, CancellationToken cancellationToken = default);
+    Task CalculateSentimentAsync(
+        List<Orchestra.Application.Tickets.DTOs.TicketDto> tickets,
+        string? modelId = null,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Calculates sentiment/satisfaction score for a single ticket.
     /// Mirrors CalculateSentimentAsync logic for individual ticket processing.
     /// </summary>
     /// <param name="ticket">The ticket to enrich</param>
+    /// <param name="modelId">
+    /// Optional workspace-configured model identifier. If null, the sentiment service uses its startup default.
+    /// If non-null but unavailable (stale), the sentiment service silently falls back to the default.
+    /// </param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The ticket with Satisfaction score populated</returns>
     Task<Orchestra.Application.Tickets.DTOs.TicketDto> CalculateSentimentForSingleAsync(
         Orchestra.Application.Tickets.DTOs.TicketDto ticket,
+        string? modelId = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>

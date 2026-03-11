@@ -30,11 +30,12 @@ public class TicketEnrichmentService : ITicketEnrichmentService
     /// <summary>
     /// Calculates sentiment/satisfaction scores for a list of tickets.
     /// Modifies tickets in-place to populate Satisfaction field.
-    /// Extracted logic from TicketService.CalculateSentimentForTicketsAsync (no changes).
+    /// Forwards the optional workspace-configured modelId to the sentiment service.
     /// </summary>
     public async Task CalculateSentimentAsync(
         List<TicketDto> tickets,
-        CancellationToken cancellationToken)
+        string? modelId = null,
+        CancellationToken cancellationToken = default)
     {
         if (tickets == null || tickets.Count == 0)
             return;
@@ -89,6 +90,7 @@ public class TicketEnrichmentService : ITicketEnrichmentService
             {
                 var sentimentResults = await _sentimentAnalysisService.AnalyzeBatchSentimentAsync(
                     ticketsToAnalyze,
+                    modelId,
                     cancellationToken);
 
                 // Map results back to tickets
@@ -124,11 +126,12 @@ public class TicketEnrichmentService : ITicketEnrichmentService
 
     /// <summary>
     /// Calculates sentiment/satisfaction score for a single ticket.
-    /// Extracted logic from TicketService.CalculateSentimentForSingleTicketAsync (no changes).
+    /// Forwards the optional workspace-configured modelId to the sentiment service.
     /// </summary>
     public async Task<TicketDto> CalculateSentimentForSingleAsync(
         TicketDto ticket,
-        CancellationToken cancellationToken)
+        string? modelId = null,
+        CancellationToken cancellationToken = default)
     {
         // Pure internal tickets always get 100
         if (ticket.Internal && ticket.IntegrationId == null)
@@ -163,6 +166,7 @@ public class TicketEnrichmentService : ITicketEnrichmentService
 
             var sentimentResults = await _sentimentAnalysisService.AnalyzeBatchSentimentAsync(
                 new List<TicketSentimentRequest> { sentimentRequest },
+                modelId,
                 cancellationToken);
 
             var result = sentimentResults.FirstOrDefault();
