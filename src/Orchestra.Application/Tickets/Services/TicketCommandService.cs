@@ -212,10 +212,10 @@ public class TicketCommandService : ITicketCommandService
             throw new IntegrationNotFoundException(integrationId);
         }
 
-        if (integration.Type != IntegrationType.TRACKER)
+        if (!integration.Types.Contains(IntegrationType.TRACKER))
         {
             throw new InvalidOperationException(
-                $"Integration must be a tracker type. Current type: {integration.Type}");
+                $"Integration must be a tracker type. Current types: {string.Join(", ", integration.Types)}");
         }
 
         if (!integration.IsActive)

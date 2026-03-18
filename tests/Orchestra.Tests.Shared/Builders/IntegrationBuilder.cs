@@ -11,7 +11,7 @@ public class IntegrationBuilder
     private Guid _id = Guid.NewGuid();
     private Guid _workspaceId = Guid.NewGuid();
     private string _name = new Faker().Company.CompanyName();
-    private IntegrationType _type = IntegrationType.TRACKER;
+    private List<IntegrationType> _types = [IntegrationType.TRACKER];
     private ProviderType _provider = ProviderType.JIRA;
     private string? _url;
     private string? _username;
@@ -48,11 +48,20 @@ public class IntegrationBuilder
     }
 
     /// <summary>
-    /// Sets the integration type.
+    /// Sets the integration types (single type — convenience overload).
     /// </summary>
     public IntegrationBuilder WithType(IntegrationType type)
     {
-        _type = type;
+        _types = [type];
+        return this;
+    }
+
+    /// <summary>
+    /// Sets multiple integration types.
+    /// </summary>
+    public IntegrationBuilder WithTypes(IEnumerable<IntegrationType> types)
+    {
+        _types = types.ToList();
         return this;
     }
 
@@ -127,7 +136,7 @@ public class IntegrationBuilder
         var integration = Integration.Create(
             _workspaceId,
             _name,
-            _type,
+            _types,
             _provider,
             _url,
             _username,
@@ -140,6 +149,7 @@ public class IntegrationBuilder
         {
             integration.Update(
                 _name,
+                _types,
                 _provider,
                 _url,
                 _username,

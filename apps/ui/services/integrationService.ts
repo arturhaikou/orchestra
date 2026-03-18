@@ -6,7 +6,7 @@ const API_BASE_URL = `${import.meta.env.VITE_API_URL}/v1/integrations`;
 
 export interface IntegrationDTO {
   name: string;
-  type: IntegrationType;
+  types: IntegrationType[];
   provider: string;
   url: string;
   username?: string;

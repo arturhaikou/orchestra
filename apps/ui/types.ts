@@ -128,7 +128,7 @@ export interface Integration {
   id: string;
   workspaceId: string;
   name: string;
-  type: IntegrationType;
+  types: IntegrationType[];
   icon: string; // Used for UI display logic (jira, github, etc)
   connected: boolean;
   lastSync: string;

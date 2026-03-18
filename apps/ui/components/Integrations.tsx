@@ -25,6 +25,7 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
   const [testFailed, setTestFailed] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [typesError, setTypesError] = useState<string | null>(null);
 
   const fetchAll = async () => {
     setIsLoading(true);
@@ -44,7 +45,7 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
 
   const [formState, setFormState] = useState({
     name: '',
-    type: IntegrationType.TRACKER,
+    types: [IntegrationType.TRACKER] as IntegrationType[],
     provider: 'jira',
     url: '',
     username: '',
@@ -58,6 +59,12 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
     { type: IntegrationType.KNOWLEDGE_BASE, label: 'Knowledge Bases', icon: Database, color: 'text-purple-600' },
     { type: IntegrationType.CODE_SOURCE, label: 'Code Sources', icon: GitBranch, color: 'text-blue-600' },
   ];
+
+  const TYPE_LABELS: Record<IntegrationType, string> = {
+    [IntegrationType.TRACKER]: 'Tracker',
+    [IntegrationType.KNOWLEDGE_BASE]: 'Knowledge Base',
+    [IntegrationType.CODE_SOURCE]: 'Code Source',
+  };
 
   const providers = [
     { value: 'jira', label: 'Jira' },
@@ -130,7 +137,7 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
       setEditingId(integration.id);
       setFormState({
         name: integration.name,
-        type: integration.type,
+        types: Array.isArray(integration.types) ? integration.types : [],
         provider: (integration.provider || 'custom').toLowerCase(),
         url: integration.url || '',
         username: integration.username || '',
@@ -142,7 +149,7 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
       setEditingId(null);
       setFormState({
         name: '',
-        type: IntegrationType.TRACKER,
+        types: [IntegrationType.TRACKER] as IntegrationType[],
         provider: 'jira',
         url: '',
         username: '',
@@ -153,6 +160,7 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
     }
     setValidationError(null);
     setSaveError(null);
+    setTypesError(null);
     setConnectionTestError(null);
     setIsModalOpen(true);
   };
@@ -173,6 +181,13 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate that at least one type is selected
+    if (formState.types.length === 0) {
+      setTypesError('At least one integration type must be selected.');
+      return;
+    }
+    setTypesError(null);
     
     // Check if filter warning should be shown
     if (shouldShowFilterWarning()) {
@@ -185,7 +200,7 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
   };
 
   const shouldShowFilterWarning = (): boolean => {
-    const needsFilter = formState.type === IntegrationType.TRACKER || formState.type === IntegrationType.KNOWLEDGE_BASE;
+    const needsFilter = formState.provider === 'jira' || formState.provider === 'confluence';
     return needsFilter && !formState.filterQuery.trim();
   };
 
@@ -276,7 +291,7 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
         </div>
       ) : (
         categories.map((category) => {
-          const categoryIntegrations = integrations.filter(i => i.type === category.type);
+          const categoryIntegrations = integrations.filter(i => Array.isArray(i.types) && i.types.includes(category.type));
           const Icon = category.icon;
           
           return (
@@ -317,6 +332,11 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
                                   <span className="text-[10px] font-mono bg-surfaceHighlight px-1.5 py-0.5 rounded border border-border/50 text-textMuted">
                                       {integration.provider?.toUpperCase() || 'CUSTOM'}
                                   </span>
+                                  {(integration.types ?? []).map(type => (
+                                    <span key={type} className="text-[10px] font-mono bg-surfaceHighlight px-1.5 py-0.5 rounded border border-border/50 text-textMuted">
+                                      {TYPE_LABELS[type] ?? type}
+                                    </span>
+                                  ))}
                                   {integration.vectorize && (
                                       <span className="text-[10px] font-mono bg-emerald-500/10 text-emerald-500 px-1.5 py-0.5 rounded border border-emerald-500/20 flex items-center gap-1">
                                           <Database className="w-2.5 h-2.5" /> VECTORIZED
@@ -377,35 +397,69 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
             </div>
             
             <form onSubmit={handleSave} className="px-6 pb-6 space-y-4 overflow-y-auto custom-scrollbar">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                   <label className="text-[10px] font-bold text-textMuted uppercase tracking-wider">Integration Type</label>
-                   <div className="relative">
-                       <select 
-                            value={formState.type} 
-                            onChange={(e) => setFormState({...formState, type: e.target.value as IntegrationType})}
-                            className="w-full bg-background border border-border rounded-lg pl-3 pr-10 py-2.5 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary appearance-none transition-all shadow-sm"
-                        >
-                            <option value={IntegrationType.TRACKER}>Tracker System</option>
-                            <option value={IntegrationType.KNOWLEDGE_BASE}>Knowledge Base</option>
-                            <option value={IntegrationType.CODE_SOURCE}>Code Source</option>
-                       </select>
-                       <Layers className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-textMuted pointer-events-none" />
-                   </div>
+              {/* Provider selector — always full-width */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-textMuted uppercase tracking-wider">Provider</label>
+                <div className="relative">
+                  <select
+                    value={formState.provider}
+                    onChange={(e) => {
+                      const newProvider = e.target.value;
+                      let newTypes: IntegrationType[];
+                      if (newProvider === 'jira') newTypes = [IntegrationType.TRACKER];
+                      else if (newProvider === 'confluence') newTypes = [IntegrationType.KNOWLEDGE_BASE];
+                      else newTypes = [];
+                      setFormState({ ...formState, provider: newProvider, types: newTypes });
+                      setTypesError(null);
+                    }}
+                    className="w-full bg-background border border-border rounded-lg pl-3 pr-10 py-2.5 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary appearance-none transition-all shadow-sm"
+                  >
+                    {providers.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                  </select>
+                  <Globe className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-textMuted pointer-events-none" />
                 </div>
-                <div className="space-y-1.5">
-                   <label className="text-[10px] font-bold text-textMuted uppercase tracking-wider">Provider</label>
-                   <div className="relative">
-                       <select 
-                            value={formState.provider} 
-                            onChange={(e) => setFormState({...formState, provider: e.target.value})}
-                            className="w-full bg-background border border-border rounded-lg pl-3 pr-10 py-2.5 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary appearance-none transition-all shadow-sm"
-                        >
-                            {providers.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-                       </select>
-                       <Globe className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-textMuted pointer-events-none" />
-                   </div>
-                </div>
+              </div>
+
+              {/* Integration Type selector — provider-aware */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-textMuted uppercase tracking-wider">Integration Type</label>
+                {(formState.provider === 'github' || formState.provider === 'gitlab') ? (
+                  /* Multi-select checkbox group for providers that support multiple types */
+                  <div className="space-y-2 p-3 bg-background border border-border rounded-lg">
+                    {[
+                      { value: IntegrationType.TRACKER, label: 'Tracker' },
+                      { value: IntegrationType.KNOWLEDGE_BASE, label: 'Knowledge Base' },
+                      { value: IntegrationType.CODE_SOURCE, label: 'Code Source' },
+                    ].map(({ value, label }) => (
+                      <label key={value} className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={formState.types.includes(value)}
+                          onChange={(e) => {
+                            const updated = e.target.checked
+                              ? [...formState.types, value]
+                              : formState.types.filter(t => t !== value);
+                            setFormState({ ...formState, types: updated });
+                            if (updated.length > 0) setTypesError(null);
+                          }}
+                          className="w-4 h-4 accent-primary rounded"
+                        />
+                        <span className="text-sm text-text">{label}</span>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  /* Read-only badge for providers locked to a single type (Jira, Confluence) */
+                  <div className="flex items-center gap-3 py-1">
+                    <span className="bg-surfaceHighlight border border-border text-text text-sm px-3 py-2 rounded-lg font-medium">
+                      {formState.provider === 'jira' ? 'Tracker' : 'Knowledge Base'}
+                    </span>
+                    <span className="text-[10px] text-textMuted italic">This provider supports only this type</span>
+                  </div>
+                )}
+                {typesError && (
+                  <p className="text-[10px] text-red-500 ml-1">⚠ {typesError}</p>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -489,7 +543,7 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
               </div>
 
               {/* JQL Query / Filter Query Section - Improved with dynamic labeling */}
-              {(formState.type === IntegrationType.TRACKER || formState.type === IntegrationType.KNOWLEDGE_BASE) && (
+              {(formState.provider === 'jira' || formState.provider === 'confluence') && (
                 <div className="space-y-1.5 pt-2 border-t border-border/40">
                     <div className="flex justify-between items-center mb-1">
                         <label className="text-[10px] font-bold text-textMuted uppercase tracking-wider">
@@ -521,7 +575,7 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
               )}
 
               {/* Vectorize toggle ONLY for Knowledge Bases */}
-              {formState.type === IntegrationType.KNOWLEDGE_BASE && (
+              {formState.types.includes(IntegrationType.KNOWLEDGE_BASE) && (
                 <div className="pt-2 border-t border-border/40 flex items-center justify-between">
                     <div className="flex flex-col">
                         <span className="text-sm font-bold text-text tracking-tight uppercase">Vectorize Context</span>

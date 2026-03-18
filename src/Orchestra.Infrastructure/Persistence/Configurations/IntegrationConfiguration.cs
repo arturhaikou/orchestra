@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Orchestra.Domain.Entities;
+using Orchestra.Domain.Enums;
 
 namespace Orchestra.Infrastructure.Persistence.Configurations;
 
@@ -22,10 +24,18 @@ public class IntegrationConfiguration : IEntityTypeConfiguration<Integration>
             .IsRequired()
             .HasMaxLength(100);
         
-        builder.Property(i => i.Type)
+        var typesComparer = new ValueComparer<List<IntegrationType>>(
+            (a, b) => a != null && b != null && a.SequenceEqual(b),
+            v => v.Aggregate(0, (h, e) => HashCode.Combine(h, e.GetHashCode())),
+            v => v.ToList());
+
+        builder.Property(i => i.Types)
             .IsRequired()
-            .HasConversion<string>()
-            .HasMaxLength(50);
+            .HasConversion(
+                v => v.Select(t => t.ToString()).ToArray(),
+                v => v.Select(s => Enum.Parse<IntegrationType>(s)).ToList(),
+                typesComparer)
+            .HasColumnType("text[]");
         
         builder.Property(i => i.Icon)
             .HasMaxLength(50);
@@ -69,9 +79,6 @@ public class IntegrationConfiguration : IEntityTypeConfiguration<Integration>
         // Indexes
         builder.HasIndex(i => i.WorkspaceId)
             .HasDatabaseName("IX_Integrations_WorkspaceId");
-        
-        builder.HasIndex(i => i.Type)
-            .HasDatabaseName("IX_Integrations_Type");
         
         builder.HasIndex(i => i.IsActive)
             .HasDatabaseName("IX_Integrations_IsActive");

@@ -108,6 +108,16 @@ public class IntegrationController : ControllerBase
         {
             return StatusCode(403, new ErrorResponse(ex.Message));
         }
+        catch (InvalidIntegrationTypeForProviderException ex)
+        {
+            return BadRequest(new
+            {
+                error = "InvalidTypeForProvider",
+                provider = ex.ProviderName,
+                submittedTypes = ex.SubmittedTypes,
+                allowedTypes = ex.AllowedTypes
+            });
+        }
         catch (ArgumentException ex)
         {
             return BadRequest(new ErrorResponse(ex.Message));
@@ -161,6 +171,16 @@ public class IntegrationController : ControllerBase
         catch (UnauthorizedWorkspaceAccessException ex)
         {
             return StatusCode(403, new ErrorResponse(ex.Message));
+        }
+        catch (InvalidIntegrationTypeForProviderException ex)
+        {
+            return BadRequest(new
+            {
+                error = "InvalidTypeForProvider",
+                provider = ex.ProviderName,
+                submittedTypes = ex.SubmittedTypes,
+                allowedTypes = ex.AllowedTypes
+            });
         }
         catch (ArgumentException ex)
         {

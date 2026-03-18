@@ -8,7 +8,7 @@ public record IntegrationDto(
     string Id,
     string WorkspaceId,
     string Name,
-    string Type,
+    string[] Types,
     string? Icon,
     string? Provider,
     string? Url,

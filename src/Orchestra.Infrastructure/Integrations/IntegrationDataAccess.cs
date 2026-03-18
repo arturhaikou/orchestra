@@ -22,8 +22,7 @@ public class IntegrationDataAccess : IIntegrationDataAccess
     {
         return await _context.Integrations
             .Where(i => i.WorkspaceId == workspaceId && i.IsActive)
-            .OrderBy(i => i.Type)
-            .ThenBy(i => i.Name)
+            .OrderBy(i => i.Name)
             .ToListAsync(cancellationToken);
     }
 

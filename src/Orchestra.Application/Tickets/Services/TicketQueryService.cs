@@ -313,7 +313,7 @@ public class TicketQueryService : ITicketQueryService
             cancellationToken);
 
         var trackerIntegrations = integrations
-            .Where(i => i.Type == IntegrationType.TRACKER)
+            .Where(i => i.Types.Contains(IntegrationType.TRACKER))
             .ToList();
 
         if (!trackerIntegrations.Any())
@@ -368,7 +368,7 @@ public class TicketQueryService : ITicketQueryService
             cancellationToken);
 
         var trackerIntegrations = integrations
-            .Where(i => i.Type == IntegrationType.TRACKER)
+            .Where(i => i.Types.Contains(IntegrationType.TRACKER))
             .ToList();
 
         if (!trackerIntegrations.Any())

@@ -6,7 +6,7 @@ namespace Orchestra.Application.Integrations.DTOs;
 public record CreateIntegrationRequest(
     Guid WorkspaceId,
     string Name,
-    string Type,  // Will be parsed to IntegrationType enum
+    string[] Types,  // Each element will be parsed to IntegrationType enum; must be non-empty
     string Provider,
     string Url,
     string? Username,

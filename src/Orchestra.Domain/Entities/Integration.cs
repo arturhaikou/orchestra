@@ -15,7 +15,7 @@ public class Integration
         string? url,
         string apiKey, // Decrypted API key
         string? filterQuery,
-        IntegrationType integrationType)
+        IEnumerable<IntegrationType> integrationTypes)
     {
         Id = id;
         WorkspaceId = workspaceId;
@@ -24,7 +24,7 @@ public class Integration
         Url = url;
         // Note: ApiKey is not stored, only used transiently
         FilterQuery = filterQuery;
-        Type = integrationType;
+        Types = integrationTypes.ToList();
         CreatedAt = DateTime.UtcNow;
         IsActive = true;
     }
@@ -32,7 +32,7 @@ public class Integration
     public Guid Id { get; private set; }
     public Guid WorkspaceId { get; private set; }
     public string Name { get; private set; } = string.Empty;
-    public IntegrationType Type { get; private set; }
+    public List<IntegrationType> Types { get; private set; } = [];
     public string? Icon { get; private set; }
     public ProviderType Provider { get; private set; }
     public string? Url { get; private set; }
@@ -55,7 +55,7 @@ public class Integration
     public static Integration Create(
         Guid workspaceId,
         string name,
-        IntegrationType type,
+        IEnumerable<IntegrationType> types,
         ProviderType provider,
         string? url = null,
         string? username = null,
@@ -75,13 +75,18 @@ public class Integration
         // Validate URL format if provided
         if (!string.IsNullOrEmpty(url) && !Uri.TryCreate(url, UriKind.Absolute, out _))
             throw new ArgumentException("URL must be a valid absolute URL.", nameof(url));
+
+        // Validate types: at least one must be provided
+        var typeList = types?.ToList() ?? [];
+        if (typeList.Count == 0)
+            throw new ArgumentException("At least one integration type must be provided.", nameof(types));
         
         return new Integration
         {
             Id = Guid.NewGuid(),
             WorkspaceId = workspaceId,
             Name = trimmedName,
-            Type = type,
+            Types = typeList,
             Icon = provider.ToString().ToLowerInvariant(),
             Provider = provider,
             Url = url,
@@ -107,6 +112,7 @@ public class Integration
     /// <param name="connected">The connection status (optional, only updated if provided).</param>
     public void Update(
         string name,
+        IEnumerable<IntegrationType> integrationTypes,
         ProviderType? provider = null,
         string? url = null,
         string? username = null,
@@ -119,13 +125,19 @@ public class Integration
         var trimmedName = name?.Trim() ?? string.Empty;
         if (trimmedName.Length < 2 || trimmedName.Length > 100)
             throw new ArgumentException("Name must be between 2 and 100 characters.", nameof(name));
-        
+
         // Validate URL format if provided
         if (!string.IsNullOrEmpty(url) && !Uri.TryCreate(url, UriKind.Absolute, out _))
             throw new ArgumentException("URL must be a valid absolute URL.", nameof(url));
-        
+
+        // Validate integration types: at least one must be provided
+        var typeList = integrationTypes?.ToList() ?? [];
+        if (typeList.Count == 0)
+            throw new ArgumentException("At least one integration type must be provided.", nameof(integrationTypes));
+
         // Update properties
         Name = trimmedName;
+        Types = typeList;
         if (provider.HasValue)
         {
             Icon = provider.Value.ToString().ToLowerInvariant();
@@ -136,7 +148,7 @@ public class Integration
         FilterQuery = filterQuery;
         Vectorize = vectorize;
         UpdatedAt = DateTime.UtcNow;
-        
+
         // Only update API key if a new value is provided
         if (!string.IsNullOrEmpty(encryptedApiKey))
         {

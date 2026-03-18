@@ -60,10 +60,20 @@ public class IntegrationService : IIntegrationService
             request.WorkspaceId, 
             cancellationToken);
 
-        // 2. Parse and validate integration type
-        if (!Enum.TryParse<IntegrationType>(request.Type, ignoreCase: true, out var integrationType))
+        // 2. Parse and validate integration types
+        if (request.Types == null || request.Types.Length == 0)
         {
-            throw new ArgumentException($"Invalid integration type: {request.Type}", nameof(request.Type));
+            throw new ArgumentException("At least one integration type must be selected.", nameof(request.Types));
+        }
+
+        var integrationTypes = new List<IntegrationType>();
+        foreach (var typeStr in request.Types)
+        {
+            if (!Enum.TryParse<IntegrationType>(typeStr, ignoreCase: true, out var parsedType))
+            {
+                throw new ArgumentException($"Invalid integration type: {typeStr}", nameof(request.Types));
+            }
+            integrationTypes.Add(parsedType);
         }
 
         // 3. Parse and validate provider type
@@ -73,20 +83,28 @@ public class IntegrationService : IIntegrationService
             throw new ArgumentException($"Invalid provider: {request.Provider}. Valid providers are: {validProviders}", nameof(request.Provider));
         }
 
-        // 3a. Validate filter query for Jira and Confluence TRACKER integrations
-        if (integrationType == IntegrationType.TRACKER)
+        // 3a. Validate provider-type constraints (provider-driven rules, single authority: ProviderTypeConstraints)
+        var allowedTypes = ProviderTypeConstraints.GetAllowedTypes(providerType);
+        var invalidTypes = integrationTypes.Where(t => !allowedTypes.Contains(t)).ToList();
+        if (invalidTypes.Any())
         {
-            if (providerType == ProviderType.JIRA)
-            {
-                FilterQueryValidator.ValidateJiraFilterQuery(request.FilterQuery);
-            }
-            else if (providerType == ProviderType.CONFLUENCE)
-            {
-                FilterQueryValidator.ValidateConfluenceFilterQuery(request.FilterQuery);
-            }
+            throw new InvalidIntegrationTypeForProviderException(
+                providerType.ToString(),
+                integrationTypes.Select(t => t.ToString()).ToList(),
+                allowedTypes.Select(t => t.ToString()).ToList());
         }
 
-        // 3b. Validate duplicate name
+        // 3b. Validate filter query based on provider (provider-driven, not type-gated)
+        if (providerType == ProviderType.JIRA)
+        {
+            FilterQueryValidator.ValidateJiraFilterQuery(request.FilterQuery);
+        }
+        else if (providerType == ProviderType.CONFLUENCE)
+        {
+            FilterQueryValidator.ValidateConfluenceFilterQuery(request.FilterQuery);
+        }
+
+        // 3c. Validate duplicate name
         var isDuplicate = await _integrationDataAccess.ExistsByNameInWorkspaceAsync(
             request.Name, 
             request.WorkspaceId, 
@@ -106,7 +124,7 @@ public class IntegrationService : IIntegrationService
         var integration = Integration.Create(
             workspaceId: request.WorkspaceId,
             name: request.Name,
-            type: integrationType,
+            types: integrationTypes,
             provider: providerType,
             url: request.Url,
             username: request.Username,
@@ -120,6 +138,7 @@ public class IntegrationService : IIntegrationService
         {
             integration.Update(
                 name: integration.Name,
+                integrationTypes: integration.Types,
                 provider: integration.Provider,
                 url: integration.Url,
                 username: integration.Username,
@@ -156,10 +175,20 @@ public class IntegrationService : IIntegrationService
             integration.WorkspaceId, 
             cancellationToken);
 
-        // 3. Parse and validate integration type
-        if (!Enum.TryParse<IntegrationType>(request.Type, ignoreCase: true, out var integrationType))
+        // 3. Parse and validate integration types
+        if (request.Types == null || request.Types.Length == 0)
         {
-            throw new ArgumentException($"Invalid integration type: {request.Type}", nameof(request.Type));
+            throw new ArgumentException("At least one integration type must be selected.", nameof(request.Types));
+        }
+
+        var integrationTypes = new List<IntegrationType>();
+        foreach (var typeStr in request.Types)
+        {
+            if (!Enum.TryParse<IntegrationType>(typeStr, ignoreCase: true, out var parsedType))
+            {
+                throw new ArgumentException($"Invalid integration type: {typeStr}", nameof(request.Types));
+            }
+            integrationTypes.Add(parsedType);
         }
 
         // 4. Parse provider type if provided
@@ -174,20 +203,29 @@ public class IntegrationService : IIntegrationService
             providerType = parsedProvider;
         }
 
-        // 4a. Validate filter query for Jira and Confluence TRACKER integrations
-        if (integrationType == IntegrationType.TRACKER)
+        // 4b. Validate provider-type constraints using the same effective-provider resolution as filter validation
+        var effectiveProviderForConstraint = providerType ?? integration.Provider;
+        var allowedTypesForConstraint = ProviderTypeConstraints.GetAllowedTypes(effectiveProviderForConstraint);
+        var invalidTypesForConstraint = integrationTypes.Where(t => !allowedTypesForConstraint.Contains(t)).ToList();
+        if (invalidTypesForConstraint.Any())
         {
-            // Use provided provider if specified, otherwise use existing integration's provider
-            var effectiveProvider = providerType ?? integration.Provider;
-            
-            if (effectiveProvider == ProviderType.JIRA)
-            {
-                FilterQueryValidator.ValidateJiraFilterQuery(request.FilterQuery);
-            }
-            else if (effectiveProvider == ProviderType.CONFLUENCE)
-            {
-                FilterQueryValidator.ValidateConfluenceFilterQuery(request.FilterQuery);
-            }
+            throw new InvalidIntegrationTypeForProviderException(
+                effectiveProviderForConstraint.ToString(),
+                integrationTypes.Select(t => t.ToString()).ToList(),
+                allowedTypesForConstraint.Select(t => t.ToString()).ToList());
+        }
+
+        // 4a. Validate filter query based on effective provider (provider-driven, not type-gated).
+        // Jira always triggers JQL validation; Confluence always triggers CQL validation.
+        // GitHub and GitLab bypass structural filter validation entirely.
+        var effectiveProvider = providerType ?? integration.Provider;
+        if (effectiveProvider == ProviderType.JIRA)
+        {
+            FilterQueryValidator.ValidateJiraFilterQuery(request.FilterQuery);
+        }
+        else if (effectiveProvider == ProviderType.CONFLUENCE)
+        {
+            FilterQueryValidator.ValidateConfluenceFilterQuery(request.FilterQuery);
         }
 
         var isDuplicate = await _integrationDataAccess.ExistsByNameInWorkspaceAsync(
@@ -211,6 +249,7 @@ public class IntegrationService : IIntegrationService
         // 6. Update the integration using domain method
         integration.Update(
             name: request.Name,
+            integrationTypes: integrationTypes,
             provider: providerType,
             url: request.Url,
             username: request.Username,
@@ -485,7 +524,7 @@ public class IntegrationService : IIntegrationService
             Id: integration.Id.ToString(),
             WorkspaceId: integration.WorkspaceId.ToString(),
             Name: integration.Name,
-            Type: integration.Type.ToString(),
+            Types: integration.Types.Select(t => t.ToString()).ToArray(),
             Icon: integration.Icon,
             Provider: integration.Provider.ToString(),
             Url: integration.Url,

@@ -538,7 +538,7 @@ public class CreateIntegrationRequestBuilder
 {
     private Guid _workspaceId = Guid.NewGuid();
     private string _name = new Faker().Company.CompanyName();
-    private string _type = "TRACKER";
+    private string[] _types = ["TRACKER"];
     private string _provider = "JIRA";
     private string _url = "https://example.atlassian.net";
     private string? _username;
@@ -566,11 +566,20 @@ public class CreateIntegrationRequestBuilder
     }
 
     /// <summary>
-    /// Sets the integration type.
+    /// Sets the integration types (single type — convenience overload).
     /// </summary>
     public CreateIntegrationRequestBuilder WithType(string type)
     {
-        _type = type;
+        _types = [type];
+        return this;
+    }
+
+    /// <summary>
+    /// Sets multiple integration types.
+    /// </summary>
+    public CreateIntegrationRequestBuilder WithTypes(params string[] types)
+    {
+        _types = types;
         return this;
     }
 
@@ -634,7 +643,7 @@ public class CreateIntegrationRequestBuilder
     public CreateIntegrationRequest Build()
     {
         return new CreateIntegrationRequest(
-            _workspaceId, _name, _type, _provider, _url, _username, _encryptedApiKey, _filterQuery, _vectorize, _connected);
+            _workspaceId, _name, _types, _provider, _url, _username, _encryptedApiKey, _filterQuery, _vectorize, _connected);
     }
 }
 
@@ -644,7 +653,7 @@ public class CreateIntegrationRequestBuilder
 public class UpdateIntegrationRequestBuilder
 {
     private string _name = new Faker().Company.CompanyName();
-    private string _type = "TRACKER";
+    private string[] _types = ["TRACKER"];
     private string? _provider;
     private string? _url;
     private string? _username;
@@ -672,10 +681,55 @@ public class UpdateIntegrationRequestBuilder
     }
 
     /// <summary>
+    /// Sets the integration types (single type — convenience overload).
+    /// </summary>
+    public UpdateIntegrationRequestBuilder WithType(string type)
+    {
+        _types = [type];
+        return this;
+    }
+
+    /// <summary>
+    /// Sets multiple integration types.
+    /// </summary>
+    public UpdateIntegrationRequestBuilder WithTypes(params string[] types)
+    {
+        _types = types;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the filter query.
+    /// </summary>
+    public UpdateIntegrationRequestBuilder WithFilterQuery(string? filterQuery)
+    {
+        _filterQuery = filterQuery;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the URL.
+    /// </summary>
+    public UpdateIntegrationRequestBuilder WithUrl(string? url)
+    {
+        _url = url;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the API key.
+    /// </summary>
+    public UpdateIntegrationRequestBuilder WithApiKey(string? apiKey)
+    {
+        _encryptedApiKey = apiKey;
+        return this;
+    }
+
+    /// <summary>
     /// Builds the UpdateIntegrationRequest.
     /// </summary>
     public UpdateIntegrationRequest Build()
     {
-        return new UpdateIntegrationRequest(_name, _type, _provider, _url, _username, _encryptedApiKey, _filterQuery, _vectorize, _connected);
+        return new UpdateIntegrationRequest(_name, _types, _provider, _url, _username, _encryptedApiKey, _filterQuery, _vectorize, _connected);
     }
 }

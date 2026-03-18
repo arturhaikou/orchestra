@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getIntegrations } from '../services/integrationService';
-import { Integration } from '../types';
+import { Integration, IntegrationType } from '../types';
 
 interface IntegrationSelectorProps {
   workspaceId: string;
@@ -26,10 +26,10 @@ export const IntegrationSelector: React.FC<IntegrationSelectorProps> = ({
         setError(null);
         const allIntegrations = await getIntegrations(workspaceId);
         
-        // Filter for TRACKER type integrations only
+        // Filter for integrations that include the TRACKER type
         // No provider filtering here; GitHub will be included if present in backend response
         const trackerIntegrations = allIntegrations.filter(
-          integration => integration.type === 'TRACKER'
+          integration => integration.types?.includes(IntegrationType.TRACKER) ?? false
         );
         setIntegrations(trackerIntegrations);
       } catch (err) {
