@@ -42,10 +42,13 @@ public class AgentOrchestrationServiceModelRoutingTests
                 Arg.Any<CancellationToken>())
             .Returns("Agent response");
 
-        // Default stub: context builder returns a non-empty prompt
+        // Default stub: context builder returns a fully enriched prompt
         contextBuilder
-            .BuildContextPromptAsync(Arg.Any<Ticket>(), Arg.Any<CancellationToken>())
-            .Returns("Context prompt");
+            .BuildAgentContextWithIntegrationsAsync(
+                Arg.Any<Ticket>(),
+                Arg.Any<Guid>(),
+                Arg.Any<CancellationToken>())
+            .Returns("Enriched context prompt");
 
         var sut = new AgentOrchestrationService(
             runtimeService,

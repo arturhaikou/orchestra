@@ -10,20 +10,20 @@ namespace Orchestra.Infrastructure.Tools.Services;
 public class GitHubToolService : IGitHubToolService
 {
     private readonly IGitHubApiClientFactory _apiClientFactory;
-    private readonly IIntegrationDataAccess _integrationDataAccess;
+    private readonly IIntegrationResolver _integrationResolver;
     private readonly ILogger<GitHubToolService> _logger;
 
     public GitHubToolService(
         IGitHubApiClientFactory apiClientFactory,
-        IIntegrationDataAccess integrationDataAccess,
+        IIntegrationResolver integrationResolver,
         ILogger<GitHubToolService> logger)
     {
         _apiClientFactory = apiClientFactory;
-        _integrationDataAccess = integrationDataAccess;
+        _integrationResolver = integrationResolver;
         _logger = logger;
     }
 
-    public async Task<GitHubIssueResult> GetIssueAsync(string workspaceId, string issueNumber)
+    public async Task<GitHubIssueResult> GetIssueAsync(string workspaceId, string integrationId, string issueNumber)
     {
         try
         {
@@ -35,7 +35,7 @@ public class GitHubToolService : IGitHubToolService
             if (!int.TryParse(issueNumber, out var issueNum))
                 return new GitHubIssueResult { Success = false, Error = $"Invalid issue number: {issueNumber}" };
 
-            var integration = await GetAndValidateIntegrationAsync(workspaceGuid);
+            var integration = await _integrationResolver.ResolveAsync(workspaceGuid, integrationId, ProviderType.GITHUB);
             var apiClient = _apiClientFactory.CreateClient(integration);
             var issue = await apiClient.GetIssueAsync(issueNum);
 
@@ -53,10 +53,17 @@ public class GitHubToolService : IGitHubToolService
                 Labels = issue.Labels.Select(l => l.Name).ToArray()
             };
         }
+        catch (InvalidOperationException ex) when (
+            ex.Message.Contains("integrationId is required") ||
+            ex.Message.Contains("No active integration found for the supplied ID"))
+        {
+            _logger.LogWarning(ex, "Integration resolution failed for workspace {WorkspaceId}", workspaceId);
+            return new GitHubIssueResult { Success = false, Error = ex.Message };
+        }
         catch (InvalidOperationException ex) when (ex.Message.Contains("No active GitHub integration"))
         {
             _logger.LogWarning(ex, "No GitHub integration for workspace {WorkspaceId}", workspaceId);
-            return new GitHubIssueResult { Success = false, Error = "No active GitHub integration found for this workspace." };
+            return new GitHubIssueResult { Success = false, Error = ex.Message };
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("authenticate"))
         {
@@ -85,7 +92,7 @@ public class GitHubToolService : IGitHubToolService
         }
     }
 
-    public async Task<GitHubPullRequestResult> GetPullRequestAsync(string workspaceId, string pullNumber)
+    public async Task<GitHubPullRequestResult> GetPullRequestAsync(string workspaceId, string integrationId, string pullNumber)
     {
         try
         {
@@ -97,7 +104,7 @@ public class GitHubToolService : IGitHubToolService
             if (!int.TryParse(pullNumber, out var pullNum))
                 return new GitHubPullRequestResult { Success = false, Error = $"Invalid pull request number: {pullNumber}" };
 
-            var integration = await GetAndValidateIntegrationAsync(workspaceGuid);
+            var integration = await _integrationResolver.ResolveAsync(workspaceGuid, integrationId, ProviderType.GITHUB);
             var apiClient = _apiClientFactory.CreateClient(integration);
             var pr = await apiClient.GetPullRequestAsync(pullNum);
 
@@ -115,10 +122,17 @@ public class GitHubToolService : IGitHubToolService
                 Mergeable = pr.Mergeable
             };
         }
+        catch (InvalidOperationException ex) when (
+            ex.Message.Contains("integrationId is required") ||
+            ex.Message.Contains("No active integration found for the supplied ID"))
+        {
+            _logger.LogWarning(ex, "Integration resolution failed for workspace {WorkspaceId}", workspaceId);
+            return new GitHubPullRequestResult { Success = false, Error = ex.Message };
+        }
         catch (InvalidOperationException ex) when (ex.Message.Contains("No active GitHub integration"))
         {
             _logger.LogWarning(ex, "No GitHub integration for workspace {WorkspaceId}", workspaceId);
-            return new GitHubPullRequestResult { Success = false, Error = "No active GitHub integration found for this workspace." };
+            return new GitHubPullRequestResult { Success = false, Error = ex.Message };
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("authenticate"))
         {
@@ -147,7 +161,7 @@ public class GitHubToolService : IGitHubToolService
         }
     }
 
-    public async Task<GitHubSearchIssuesResult> SearchIssuesAsync(string workspaceId, string query, int? limit = 10)
+    public async Task<GitHubSearchIssuesResult> SearchIssuesAsync(string workspaceId, string integrationId, string query, int? limit = 10)
     {
         try
         {
@@ -161,7 +175,7 @@ public class GitHubToolService : IGitHubToolService
 
             var clampedLimit = Math.Min(limit ?? 10, 30);
 
-            var integration = await GetAndValidateIntegrationAsync(workspaceGuid);
+            var integration = await _integrationResolver.ResolveAsync(workspaceGuid, integrationId, ProviderType.GITHUB);
             var apiClient = _apiClientFactory.CreateClient(integration);
             var result = await apiClient.SearchIssuesAsync(query, clampedLimit);
 
@@ -178,10 +192,17 @@ public class GitHubToolService : IGitHubToolService
                     }).ToArray()
                 };
         }
+        catch (InvalidOperationException ex) when (
+            ex.Message.Contains("integrationId is required") ||
+            ex.Message.Contains("No active integration found for the supplied ID"))
+        {
+            _logger.LogWarning(ex, "Integration resolution failed for workspace {WorkspaceId}", workspaceId);
+            return new GitHubSearchIssuesResult { Success = false, Error = ex.Message };
+        }
         catch (InvalidOperationException ex) when (ex.Message.Contains("No active GitHub integration"))
         {
             _logger.LogWarning(ex, "No GitHub integration for workspace {WorkspaceId}", workspaceId);
-            return new GitHubSearchIssuesResult { Success = false, Error = "No active GitHub integration found for this workspace." };
+            return new GitHubSearchIssuesResult { Success = false, Error = ex.Message };
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("authenticate"))
         {
@@ -212,7 +233,7 @@ public class GitHubToolService : IGitHubToolService
     /// <param name="title">The issue title.</param>
     /// <param name="body">The issue body/description.</param>
     /// <returns>A result object indicating success or failure with details.</returns>
-    public async Task<GitHubCreateIssueResult> CreateIssueAsync(string workspaceId, string title, string body)
+    public async Task<GitHubCreateIssueResult> CreateIssueAsync(string workspaceId, string integrationId, string title, string body)
     {
         try
         {
@@ -232,7 +253,7 @@ public class GitHubToolService : IGitHubToolService
                 return new GitHubCreateIssueResult { Success = false, Error = $"Invalid workspace ID format: {workspaceId}" };
 
             // Integration lookup
-            var integration = await GetAndValidateIntegrationAsync(workspaceGuid);
+            var integration = await _integrationResolver.ResolveAsync(workspaceGuid, integrationId, ProviderType.GITHUB);
 
             // API client creation
             var apiClient = _apiClientFactory.CreateClient(integration);
@@ -250,10 +271,17 @@ public class GitHubToolService : IGitHubToolService
                 Title = issue.Title
             };
         }
+        catch (InvalidOperationException ex) when (
+            ex.Message.Contains("integrationId is required") ||
+            ex.Message.Contains("No active integration found for the supplied ID"))
+        {
+            _logger.LogWarning(ex, "Integration resolution failed for workspace {WorkspaceId}", workspaceId);
+            return new GitHubCreateIssueResult { Success = false, Error = ex.Message };
+        }
         catch (InvalidOperationException ex) when (ex.Message.Contains("No active GitHub integration"))
         {
             _logger.LogWarning(ex, "No GitHub integration for workspace {WorkspaceId}", workspaceId);
-            return new GitHubCreateIssueResult { Success = false, Error = "No active GitHub integration found for this workspace." };
+            return new GitHubCreateIssueResult { Success = false, Error = ex.Message };
         }
         catch (HttpRequestException ex)
         {
@@ -313,7 +341,7 @@ public class GitHubToolService : IGitHubToolService
     /// <param name="title">New title (optional; if null or empty, omit from patch).</param>
     /// <param name="body">New body (optional; if null or empty, omit from patch).</param>
     /// <returns>A result object indicating success or failure with details.</returns>
-    public async Task<GitHubUpdateIssueResult> UpdateIssueAsync(string workspaceId, string issueNumber, string? title, string? body)
+    public async Task<GitHubUpdateIssueResult> UpdateIssueAsync(string workspaceId, string integrationId, string issueNumber, string? title, string? body)
     {
         try
         {
@@ -336,7 +364,7 @@ public class GitHubToolService : IGitHubToolService
                 return new GitHubUpdateIssueResult { Success = false, Error = $"Invalid issue number format: {issueNumber}" };
 
             // Integration lookup
-            var integration = await GetAndValidateIntegrationAsync(workspaceGuid);
+            var integration = await _integrationResolver.ResolveAsync(workspaceGuid, integrationId, ProviderType.GITHUB);
 
             // API client creation
             var apiClient = _apiClientFactory.CreateClient(integration);
@@ -354,10 +382,17 @@ public class GitHubToolService : IGitHubToolService
                 Title = issue.Title
             };
         }
+        catch (InvalidOperationException ex) when (
+            ex.Message.Contains("integrationId is required") ||
+            ex.Message.Contains("No active integration found for the supplied ID"))
+        {
+            _logger.LogWarning(ex, "Integration resolution failed for workspace {WorkspaceId}", workspaceId);
+            return new GitHubUpdateIssueResult { Success = false, Error = ex.Message };
+        }
         catch (InvalidOperationException ex) when (ex.Message.Contains("No active GitHub integration"))
         {
             _logger.LogWarning(ex, "No GitHub integration for workspace {WorkspaceId}", workspaceId);
-            return new GitHubUpdateIssueResult { Success = false, Error = "No active GitHub integration found for this workspace." };
+            return new GitHubUpdateIssueResult { Success = false, Error = ex.Message };
         }
         catch (HttpRequestException ex)
         {
@@ -409,21 +444,4 @@ public class GitHubToolService : IGitHubToolService
         }
     }
 
-    // ── Private Helpers ────────────────────────────────────────────────────────
-
-    private async Task<Integration> GetAndValidateIntegrationAsync(
-        Guid workspaceId,
-        CancellationToken cancellationToken = default)
-    {
-        var integrations = await _integrationDataAccess.GetByWorkspaceIdAsync(workspaceId, cancellationToken);
-        var integration = integrations.FirstOrDefault(i => i.Provider == ProviderType.GITHUB);
-
-        if (integration == null)
-        {
-            _logger.LogError("No active GitHub integration found for workspace {WorkspaceId}", workspaceId);
-            throw new InvalidOperationException("No active GitHub integration found for this workspace.");
-        }
-
-        return integration;
-    }
 }

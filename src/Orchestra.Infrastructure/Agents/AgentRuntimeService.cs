@@ -46,7 +46,9 @@ public class AgentRuntimeService : IAgentRuntimeService
             agentId,
             cancellationToken);
 
-        // Create AIAgent using Microsoft Agent Framework with the resolved IChatClient
+        // Create AIAgent using Microsoft Agent Framework with the resolved IChatClient.
+        // The contextPrompt is expected to be fully enriched by the caller, including
+        // any integration context blocks needed for external tool invocation.
         var agent = new ChatClientAgent(
             chatClient,
             instructions: agentEntity.CustomInstructions,

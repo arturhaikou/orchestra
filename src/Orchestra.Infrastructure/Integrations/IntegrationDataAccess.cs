@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Orchestra.Application.Common.Interfaces;
+using Orchestra.Application.Integrations.DTOs;
 using Orchestra.Domain.Entities;
+using Orchestra.Domain.Enums;
 using Orchestra.Infrastructure.Persistence;
 
 namespace Orchestra.Infrastructure.Integrations;
@@ -60,5 +62,30 @@ public class IntegrationDataAccess : IIntegrationDataAccess
     {
         _context.Integrations.Update(integration);
         await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<List<IntegrationSummaryDto>> GetActiveByWorkspaceAndProvidersAsync(
+        Guid workspaceId,
+        IEnumerable<ProviderType> providerTypes,
+        CancellationToken cancellationToken = default)
+    {
+        // Materialise to a list once so EF Core can translate the Contains call.
+        var providers = providerTypes?.ToList() ?? [];
+
+        // Short-circuit: no external tools assigned → no integrations needed.
+        if (providers.Count == 0)
+            return [];
+
+        // Credential-safe projection: only Id, Name, Provider are selected.
+        // EncryptedApiKey and Username are intentionally excluded at query level.
+        return await _context.Integrations
+            .AsNoTracking()
+            .Where(i => i.WorkspaceId == workspaceId
+                     && i.IsActive
+                     && providers.Contains(i.Provider))
+            .OrderBy(i => i.Provider)
+            .ThenBy(i => i.Name)
+            .Select(i => new IntegrationSummaryDto(i.Id, i.Name, i.Provider))
+            .ToListAsync(cancellationToken);
     }
 }

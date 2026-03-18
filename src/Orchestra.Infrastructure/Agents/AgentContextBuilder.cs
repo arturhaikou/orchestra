@@ -1,7 +1,7 @@
-using System.Text;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Domain.Entities;
+using System.Text;
 
 namespace Orchestra.Infrastructure.Agents;
 
@@ -13,21 +13,25 @@ public class AgentContextBuilder : IAgentContextBuilder
     private readonly ITicketDataAccess _ticketDataAccess;
     private readonly IIntegrationDataAccess _integrationDataAccess;
     private readonly ITicketProviderFactory _ticketProviderFactory;
+    private readonly IAgentToolActionDataAccess _agentToolActionDataAccess;
 
     public AgentContextBuilder(
         ITicketDataAccess ticketDataAccess,
         IIntegrationDataAccess integrationDataAccess,
-        ITicketProviderFactory ticketProviderFactory)
+        ITicketProviderFactory ticketProviderFactory,
+        IAgentToolActionDataAccess agentToolActionDataAccess)
     {
         _ticketDataAccess = ticketDataAccess;
         _integrationDataAccess = integrationDataAccess;
         _ticketProviderFactory = ticketProviderFactory;
+        _agentToolActionDataAccess = agentToolActionDataAccess;
     }
 
     public async Task<string> BuildContextPromptAsync(
         Ticket ticket,
         CancellationToken cancellationToken = default)
     {
+        string result = string.Empty;
         if (ticket.IsInternal)
         {
             return await BuildInternalTicketPromptAsync(ticket, cancellationToken);
@@ -132,6 +136,62 @@ public class AgentContextBuilder : IAgentContextBuilder
         else
         {
             sb.AppendLine("No comments yet.");
+        }
+
+        return sb.ToString();
+    }
+
+    /// <inheritdoc/>
+    public async Task<string> BuildAgentContextWithIntegrationsAsync(
+        Ticket ticket,
+        Guid agentId,
+        CancellationToken cancellationToken = default)
+    {
+        // 1. Build base ticket context
+        var contextPrompt = await BuildContextPromptAsync(ticket, cancellationToken);
+
+        // 2. Determine which external provider types the agent's tools require.
+        // INTERNAL tools are excluded — they never need an integrationId.
+        var externalProviderTypes = await _agentToolActionDataAccess
+            .GetExternalProviderTypesByAgentIdAsync(agentId, cancellationToken);
+
+        // 3. Load active integration summaries scoped to this workspace + provider types.
+        // Credential-safe projection: only Id, Name, Provider are fetched.
+        // If no external tools are assigned, the list is empty and no context block is injected.
+        if (externalProviderTypes.Count == 0)
+        {
+            return contextPrompt;
+        }
+
+        var integrationSummaries = await _integrationDataAccess
+            .GetActiveByWorkspaceAndProvidersAsync(
+                ticket.WorkspaceId,
+                externalProviderTypes,
+                cancellationToken);
+
+        // 4. Enrich context with integrations
+        return EnrichContextWithIntegrations(contextPrompt, integrationSummaries);
+    }
+
+    /// <summary>
+    /// Appends a structured integration context block to the context prompt.
+    /// When <paramref name="integrationSummaries"/> is null or empty, the original
+    /// context prompt is returned unchanged — no section is injected.
+    /// </summary>
+    private static string EnrichContextWithIntegrations(
+        string contextPrompt,
+        IReadOnlyList<Orchestra.Application.Integrations.DTOs.IntegrationSummaryDto>? integrationSummaries)
+    {
+        if (integrationSummaries == null || integrationSummaries.Count == 0)
+            return contextPrompt;
+
+        var sb = new StringBuilder(contextPrompt);
+        sb.AppendLine();
+        sb.AppendLine("[Available Integrations]");
+
+        foreach (var summary in integrationSummaries)
+        {
+            sb.AppendLine($"- ID: {summary.Id} | Name: {summary.Name} | Provider: {summary.Provider}");
         }
 
         return sb.ToString();

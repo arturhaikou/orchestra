@@ -63,18 +63,21 @@ public interface IGitLabToolService
     [Description("Retrieve detailed information about a GitLab issue by its IID")]
     Task<GitLabIssueResult> GetIssueAsync(
         [Description("The workspace ID (GUID)")] string workspaceId,
+        [Description("The ID of the specific GitLab integration instance to use. Required when the workspace has multiple GitLab integrations configured.")] string integrationId,
         [Description("The GitLab issue IID (project-scoped ID)")] string issueIid);
 
     [ToolAction("get_mr", "Get Merge Request", DangerLevel.Safe)]
     [Description("Retrieve detailed information about a GitLab merge request by its IID")]
     Task<GitLabMergeRequestResult> GetMergeRequestAsync(
         [Description("The workspace ID (GUID)")] string workspaceId,
+        [Description("The ID of the specific GitLab integration instance to use. Required when the workspace has multiple GitLab integrations configured.")] string integrationId,
         [Description("The GitLab merge request IID (project-scoped ID)")] string mrIid);
 
     [ToolAction("search_issues", "Search Issues", DangerLevel.Safe)]
     [Description("Search for issues in the workspace's connected GitLab repository by query text")]
     Task<GitLabSearchIssuesResult> SearchIssuesAsync(
         [Description("The workspace ID (GUID)")] string workspaceId,
+        [Description("The ID of the specific GitLab integration instance to use. Required when the workspace has multiple GitLab integrations configured.")] string integrationId,
         [Description("The search query text")] string query,
         [Description("Maximum number of results to return (default 10, max 30)")] int? limit = 10);
 
@@ -82,6 +85,7 @@ public interface IGitLabToolService
     [Description("Create a new issue in the workspace's connected GitLab repository")]
     Task<GitLabCreateIssueResult> CreateIssueAsync(
         [Description("The workspace ID (GUID)")] string workspaceId,
+        [Description("The ID of the specific GitLab integration instance to use. Required when the workspace has multiple GitLab integrations configured.")] string integrationId,
         [Description("The issue title")] string title,
         [Description("The issue description")] string description);
 
@@ -89,6 +93,7 @@ public interface IGitLabToolService
     [Description("Update the title and/or description of an existing GitLab issue")]
     Task<GitLabUpdateIssueResult> UpdateIssueAsync(
         [Description("The workspace ID (GUID)")] string workspaceId,
+        [Description("The ID of the specific GitLab integration instance to use. Required when the workspace has multiple GitLab integrations configured.")] string integrationId,
         [Description("The GitLab issue IID (project-scoped ID)")] string issueIid,
         [Description("New title (optional; if null or empty, omit from update)")] string? title,
         [Description("New description (optional; if null or empty, omit from update)")] string? description);

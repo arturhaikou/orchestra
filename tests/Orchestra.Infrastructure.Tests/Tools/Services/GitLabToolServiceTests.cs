@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
+using NSubstitute.ExceptionExtensions;
 using Xunit;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Domain.Enums;
@@ -20,15 +21,16 @@ namespace Orchestra.Infrastructure.Tests.Tools.Services;
 public class GitLabToolServiceTests : ServiceTestFixture<GitLabToolService>
 {
     private readonly Guid _testWorkspaceId = new("12345678-1234-1234-1234-123456789012");
+    private const string TestIntegrationId = "00000000-0000-0000-0000-000000000001";
     private readonly IGitLabApiClientFactory _apiClientFactory = Substitute.For<IGitLabApiClientFactory>();
     private readonly IGitLabApiClient _apiClient = Substitute.For<IGitLabApiClient>();
-    private readonly IIntegrationDataAccess _integrationDataAccess = Substitute.For<IIntegrationDataAccess>();
+    private readonly IIntegrationResolver _integrationResolver = Substitute.For<IIntegrationResolver>();
     private readonly GitLabToolService _sut;
 
     public GitLabToolServiceTests()
     {
         _apiClientFactory.CreateClient(Arg.Any<Integration>()).Returns(_apiClient);
-        _sut = new GitLabToolService(_apiClientFactory, _integrationDataAccess, Logger);
+        _sut = new GitLabToolService(_apiClientFactory, _integrationResolver, Logger);
     }
 
     #region Attribute Verification Tests
@@ -112,9 +114,8 @@ public class GitLabToolServiceTests : ServiceTestFixture<GitLabToolService>
     public async Task GetIssueAsync_ReturnsIssueData_WhenIntegrationExistsAndApiSucceeds()
     {
         var integration = IntegrationBuilder.GitLabIntegration();
-        var workspaceId = integration.WorkspaceId.ToString();
-        _integrationDataAccess.GetByWorkspaceIdAsync(integration.WorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration> { integration });
+        _integrationResolver.ResolveAsync(integration.WorkspaceId, integration.Id.ToString(), ProviderType.GITLAB)
+            .Returns(integration);
 
         var issue = new GitLabIssue
         {
@@ -126,7 +127,7 @@ public class GitLabToolServiceTests : ServiceTestFixture<GitLabToolService>
         };
         _apiClient.GetIssueAsync(42, Arg.Any<CancellationToken>()).Returns(issue);
 
-        var result = await _sut.GetIssueAsync(workspaceId, "42");
+        var result = await _sut.GetIssueAsync(integration.WorkspaceId.ToString(), integration.Id.ToString(), "42");
 
         Assert.True(result.Success);
         Assert.Equal(42, result.Iid);
@@ -141,27 +142,26 @@ public class GitLabToolServiceTests : ServiceTestFixture<GitLabToolService>
     public async Task GetIssueAsync_ReturnsError_WhenNoGitLabIntegrationExists()
     {
         var workspaceId = _testWorkspaceId.ToString();
-        _integrationDataAccess.GetByWorkspaceIdAsync(_testWorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration>());
+        _integrationResolver.ResolveAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<ProviderType>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("No active integration found for the supplied ID within this workspace."));
 
-        var result = await _sut.GetIssueAsync(workspaceId, "42");
+        var result = await _sut.GetIssueAsync(workspaceId, Guid.NewGuid().ToString(), "42");
 
         Assert.False(result.Success);
         Assert.NotEmpty(result.Error!);
-        Assert.Contains("No active GitLab integration", result.Error);
+        Assert.Contains("No active integration found for the supplied ID", result.Error);
     }
 
     [Fact]
     public async Task GetIssueAsync_ReturnsError_WhenIssueNotFound()
     {
         var integration = IntegrationBuilder.GitLabIntegration();
-        var workspaceId = integration.WorkspaceId.ToString();
-        _integrationDataAccess.GetByWorkspaceIdAsync(integration.WorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration> { integration });
+        _integrationResolver.ResolveAsync(integration.WorkspaceId, integration.Id.ToString(), ProviderType.GITLAB)
+            .Returns(integration);
 
         _apiClient.GetIssueAsync(999, Arg.Any<CancellationToken>()).Returns((GitLabIssue?)null);
 
-        var result = await _sut.GetIssueAsync(workspaceId, "999");
+        var result = await _sut.GetIssueAsync(integration.WorkspaceId.ToString(), integration.Id.ToString(), "999");
 
         Assert.False(result.Success);
         Assert.NotEmpty(result.Error!);
@@ -171,7 +171,7 @@ public class GitLabToolServiceTests : ServiceTestFixture<GitLabToolService>
     [Fact]
     public async Task GetIssueAsync_ReturnsError_WhenInvalidWorkspaceId()
     {
-        var result = await _sut.GetIssueAsync("not-a-guid", "42");
+        var result = await _sut.GetIssueAsync("not-a-guid", TestIntegrationId, "42");
 
         Assert.False(result.Success);
         Assert.NotEmpty(result.Error!);
@@ -186,9 +186,8 @@ public class GitLabToolServiceTests : ServiceTestFixture<GitLabToolService>
     public async Task GetMergeRequestAsync_ReturnsMergeRequestData_WhenIntegrationExistsAndApiSucceeds()
     {
         var integration = IntegrationBuilder.GitLabIntegration();
-        var workspaceId = integration.WorkspaceId.ToString();
-        _integrationDataAccess.GetByWorkspaceIdAsync(integration.WorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration> { integration });
+        _integrationResolver.ResolveAsync(integration.WorkspaceId, integration.Id.ToString(), ProviderType.GITLAB)
+            .Returns(integration);
 
         var mergeRequest = new GitLabMergeRequest
         {
@@ -203,7 +202,7 @@ public class GitLabToolServiceTests : ServiceTestFixture<GitLabToolService>
         };
         _apiClient.GetMergeRequestAsync(17, Arg.Any<CancellationToken>()).Returns(mergeRequest);
 
-        var result = await _sut.GetMergeRequestAsync(workspaceId, "17");
+        var result = await _sut.GetMergeRequestAsync(integration.WorkspaceId.ToString(), integration.Id.ToString(), "17");
 
         Assert.True(result.Success);
         Assert.Equal(17, result.Iid);
@@ -217,13 +216,13 @@ public class GitLabToolServiceTests : ServiceTestFixture<GitLabToolService>
     public async Task GetMergeRequestAsync_ReturnsError_WhenNoGitLabIntegrationExists()
     {
         var workspaceId = _testWorkspaceId.ToString();
-        _integrationDataAccess.GetByWorkspaceIdAsync(_testWorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration>());
+        _integrationResolver.ResolveAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<ProviderType>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("No active integration found for the supplied ID within this workspace."));
 
-        var result = await _sut.GetMergeRequestAsync(workspaceId, "17");
+        var result = await _sut.GetMergeRequestAsync(workspaceId, Guid.NewGuid().ToString(), "17");
 
         Assert.False(result.Success);
-        Assert.Contains("No active GitLab integration", result.Error!);
+        Assert.Contains("No active integration found for the supplied ID", result.Error!);
     }
 
     #endregion
@@ -234,9 +233,8 @@ public class GitLabToolServiceTests : ServiceTestFixture<GitLabToolService>
     public async Task SearchIssuesAsync_ReturnsSearchResults_WhenIntegrationExistsAndApiSucceeds()
     {
         var integration = IntegrationBuilder.GitLabIntegration();
-        var workspaceId = integration.WorkspaceId.ToString();
-        _integrationDataAccess.GetByWorkspaceIdAsync(integration.WorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration> { integration });
+        _integrationResolver.ResolveAsync(integration.WorkspaceId, integration.Id.ToString(), ProviderType.GITLAB)
+            .Returns(integration);
 
         var issues = new List<GitLabIssue>
         {
@@ -245,7 +243,7 @@ public class GitLabToolServiceTests : ServiceTestFixture<GitLabToolService>
         };
         _apiClient.SearchIssuesAsync("login bug", 10, Arg.Any<CancellationToken>()).Returns(issues);
 
-        var result = await _sut.SearchIssuesAsync(workspaceId, "login bug");
+        var result = await _sut.SearchIssuesAsync(integration.WorkspaceId.ToString(), integration.Id.ToString(), "login bug");
 
         Assert.True(result.Success);
         Assert.Equal(2, result.TotalCount);
@@ -257,13 +255,12 @@ public class GitLabToolServiceTests : ServiceTestFixture<GitLabToolService>
     public async Task SearchIssuesAsync_ClampsLimitTo30_WhenLimitExceedsMax()
     {
         var integration = IntegrationBuilder.GitLabIntegration();
-        var workspaceId = integration.WorkspaceId.ToString();
-        _integrationDataAccess.GetByWorkspaceIdAsync(integration.WorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration> { integration });
+        _integrationResolver.ResolveAsync(integration.WorkspaceId, integration.Id.ToString(), ProviderType.GITLAB)
+            .Returns(integration);
         _apiClient.SearchIssuesAsync(Arg.Any<string>(), 30, Arg.Any<CancellationToken>())
             .Returns(new List<GitLabIssue>());
 
-        await _sut.SearchIssuesAsync(workspaceId, "bug", limit: 100);
+        await _sut.SearchIssuesAsync(integration.WorkspaceId.ToString(), integration.Id.ToString(), "bug", limit: 100);
 
         await _apiClient.Received(1).SearchIssuesAsync(Arg.Any<string>(), 30, Arg.Any<CancellationToken>());
     }
@@ -272,11 +269,10 @@ public class GitLabToolServiceTests : ServiceTestFixture<GitLabToolService>
     public async Task SearchIssuesAsync_ReturnsError_WhenQueryIsEmpty()
     {
         var integration = IntegrationBuilder.GitLabIntegration();
-        var workspaceId = integration.WorkspaceId.ToString();
-        _integrationDataAccess.GetByWorkspaceIdAsync(integration.WorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration> { integration });
+        _integrationResolver.ResolveAsync(integration.WorkspaceId, integration.Id.ToString(), ProviderType.GITLAB)
+            .Returns(integration);
 
-        var result = await _sut.SearchIssuesAsync(workspaceId, "   ");
+        var result = await _sut.SearchIssuesAsync(integration.WorkspaceId.ToString(), integration.Id.ToString(), "   ");
 
         Assert.False(result.Success);
         Assert.Contains("empty", result.Error!, StringComparison.OrdinalIgnoreCase);
@@ -290,9 +286,8 @@ public class GitLabToolServiceTests : ServiceTestFixture<GitLabToolService>
     public async Task CreateIssueAsync_ReturnsCreateResult_WhenIntegrationExistsAndApiSucceeds()
     {
         var integration = IntegrationBuilder.GitLabIntegration();
-        var workspaceId = integration.WorkspaceId.ToString();
-        _integrationDataAccess.GetByWorkspaceIdAsync(integration.WorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration> { integration });
+        _integrationResolver.ResolveAsync(integration.WorkspaceId, integration.Id.ToString(), ProviderType.GITLAB)
+            .Returns(integration);
 
         var createdIssue = new GitLabIssue
         {
@@ -305,7 +300,7 @@ public class GitLabToolServiceTests : ServiceTestFixture<GitLabToolService>
         _apiClient.CreateIssueAsync("New issue", "Issue description", Arg.Any<List<string>?>(), Arg.Any<CancellationToken>())
             .Returns(createdIssue);
 
-        var result = await _sut.CreateIssueAsync(workspaceId, "New issue", "Issue description");
+        var result = await _sut.CreateIssueAsync(integration.WorkspaceId.ToString(), integration.Id.ToString(), "New issue", "Issue description");
 
         Assert.True(result.Success);
         Assert.Equal(100, result.Iid);
@@ -317,11 +312,10 @@ public class GitLabToolServiceTests : ServiceTestFixture<GitLabToolService>
     public async Task CreateIssueAsync_ReturnsError_WhenTitleIsEmpty()
     {
         var integration = IntegrationBuilder.GitLabIntegration();
-        var workspaceId = integration.WorkspaceId.ToString();
-        _integrationDataAccess.GetByWorkspaceIdAsync(integration.WorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration> { integration });
+        _integrationResolver.ResolveAsync(integration.WorkspaceId, integration.Id.ToString(), ProviderType.GITLAB)
+            .Returns(integration);
 
-        var result = await _sut.CreateIssueAsync(workspaceId, "   ", "description");
+        var result = await _sut.CreateIssueAsync(integration.WorkspaceId.ToString(), integration.Id.ToString(), "   ", "description");
 
         Assert.False(result.Success);
         Assert.Contains("empty", result.Error!, StringComparison.OrdinalIgnoreCase);
@@ -335,9 +329,8 @@ public class GitLabToolServiceTests : ServiceTestFixture<GitLabToolService>
     public async Task UpdateIssueAsync_ReturnsUpdateResult_WhenIntegrationExistsAndApiSucceeds()
     {
         var integration = IntegrationBuilder.GitLabIntegration();
-        var workspaceId = integration.WorkspaceId.ToString();
-        _integrationDataAccess.GetByWorkspaceIdAsync(integration.WorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration> { integration });
+        _integrationResolver.ResolveAsync(integration.WorkspaceId, integration.Id.ToString(), ProviderType.GITLAB)
+            .Returns(integration);
 
         var updatedIssue = new GitLabIssue
         {
@@ -350,7 +343,7 @@ public class GitLabToolServiceTests : ServiceTestFixture<GitLabToolService>
         _apiClient.UpdateIssueAsync(42, "Updated title", "Updated description", Arg.Any<CancellationToken>())
             .Returns(updatedIssue);
 
-        var result = await _sut.UpdateIssueAsync(workspaceId, "42", "Updated title", "Updated description");
+        var result = await _sut.UpdateIssueAsync(integration.WorkspaceId.ToString(), integration.Id.ToString(), "42", "Updated title", "Updated description");
 
         Assert.True(result.Success);
         Assert.Equal(42, result.Iid);
@@ -361,14 +354,112 @@ public class GitLabToolServiceTests : ServiceTestFixture<GitLabToolService>
     public async Task UpdateIssueAsync_ReturnsError_WhenTitleAndDescriptionAreNull()
     {
         var integration = IntegrationBuilder.GitLabIntegration();
-        var workspaceId = integration.WorkspaceId.ToString();
-        _integrationDataAccess.GetByWorkspaceIdAsync(integration.WorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration> { integration });
+        _integrationResolver.ResolveAsync(integration.WorkspaceId, integration.Id.ToString(), ProviderType.GITLAB)
+            .Returns(integration);
 
-        var result = await _sut.UpdateIssueAsync(workspaceId, "42", null, null);
+        var result = await _sut.UpdateIssueAsync(integration.WorkspaceId.ToString(), integration.Id.ToString(), "42", null, null);
 
         Assert.False(result.Success);
         Assert.Contains("one of", result.Error!, StringComparison.OrdinalIgnoreCase);
+    }
+
+    #endregion
+
+    #region FR-02: Integration Resolution by ID Tests
+
+    [Fact]
+    public async Task GetIssueAsync_ReturnsError_WhenIntegrationIdIsEmpty()
+    {
+        // Arrange
+        _integrationResolver.ResolveAsync(Arg.Any<Guid>(), string.Empty, Arg.Any<ProviderType>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("integrationId is required for this tool action; no integration credentials were accessed."));
+
+        // Act
+        var result = await _sut.GetIssueAsync(_testWorkspaceId.ToString(), string.Empty, "1");
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.Contains("integrationId is required", result.Error);
+    }
+
+    [Fact]
+    public async Task GetIssueAsync_ReturnsError_WhenIntegrationIdIsNull()
+    {
+        // Arrange
+        _integrationResolver.ResolveAsync(Arg.Any<Guid>(), null!, Arg.Any<ProviderType>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("integrationId is required for this tool action; no integration credentials were accessed."));
+
+        // Act
+        var result = await _sut.GetIssueAsync(_testWorkspaceId.ToString(), null!, "1");
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.Contains("integrationId is required", result.Error);
+    }
+
+    [Fact]
+    public async Task GetIssueAsync_ReturnsError_WhenIntegrationIdNotFoundInWorkspace()
+    {
+        // Arrange
+        _integrationResolver.ResolveAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<ProviderType>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("No active integration found for the supplied ID within this workspace."));
+
+        // Act
+        var result = await _sut.GetIssueAsync(
+            _testWorkspaceId.ToString(),
+            Guid.NewGuid().ToString(),
+            "1");
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.Contains("No active integration found for the supplied ID", result.Error);
+    }
+
+    [Fact]
+    public async Task GetIssueAsync_ReturnsError_WhenIntegrationBelongsToDifferentWorkspace()
+    {
+        // Arrange
+        var otherWorkspaceId = Guid.NewGuid();
+        var integration = new IntegrationBuilder()
+            .WithProvider(ProviderType.GITLAB)
+            .WithWorkspaceId(otherWorkspaceId)
+            .Build();
+
+        _integrationResolver.ResolveAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<ProviderType>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("No active integration found for the supplied ID within this workspace."));
+
+        // Act
+        var result = await _sut.GetIssueAsync(
+            _testWorkspaceId.ToString(),
+            integration.Id.ToString(),
+            "1");
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.Contains("No active integration found for the supplied ID", result.Error);
+    }
+
+    [Fact]
+    public async Task GetIssueAsync_ReturnsError_WhenIntegrationHasWrongProviderType()
+    {
+        // Arrange — GitHub integration for correct workspace but wrong provider type
+        var integration = new IntegrationBuilder()
+            .WithProvider(ProviderType.GITHUB)
+            .WithWorkspaceId(_testWorkspaceId)
+            .Build();
+
+        _integrationResolver.ResolveAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<ProviderType>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("No active GitLab integration found for the supplied integrationId; the specified integration is not a GitLab integration."));
+
+        // Act
+        var result = await _sut.GetIssueAsync(
+            _testWorkspaceId.ToString(),
+            integration.Id.ToString(),
+            "1");
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.Contains("No active GitLab integration", result.Error);
     }
 
     #endregion

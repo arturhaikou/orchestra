@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Domain.Entities;
+using Orchestra.Domain.Enums;
 using Orchestra.Infrastructure.Persistence;
 
 namespace Orchestra.Infrastructure.Tools;
@@ -22,6 +23,31 @@ public class AgentToolActionDataAccess : IAgentToolActionDataAccess
             .AsNoTracking()
             .Where(ata => ata.AgentId == agentId)
             .Select(ata => ata.ToolActionId)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<List<ProviderType>> GetExternalProviderTypesByAgentIdAsync(
+        Guid agentId,
+        CancellationToken cancellationToken = default)
+    {
+        // Three-table join: AgentToolActions → ToolActions → ToolCategories
+        // Projects only the ProviderType column, filters out INTERNAL at the DB level,
+        // then deduplicates. A single query replaces three sequential lookups.
+        return await _context.AgentToolActions
+            .AsNoTracking()
+            .Where(ata => ata.AgentId == agentId)
+            .Join(
+                _context.ToolActions,
+                ata => ata.ToolActionId,
+                ta => ta.Id,
+                (ata, ta) => ta)
+            .Join(
+                _context.ToolCategories,
+                ta => ta.ToolCategoryId,
+                tc => tc.Id,
+                (ta, tc) => tc.ProviderType)
+            .Where(pt => pt != ProviderType.INTERNAL)
+            .Distinct()
             .ToListAsync(cancellationToken);
     }
 

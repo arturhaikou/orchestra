@@ -13,6 +13,7 @@ public interface IJiraToolService
     [Description("Create a new Jira issue with summary, description, and issue type")]
     Task<object> CreateIssueAsync(
         [Description("The workspace ID where the Jira integration is configured")] string workspaceId,
+        [Description("The ID of the specific Jira integration instance to use. Required when the workspace has multiple Jira integrations configured.")] string integrationId,
         [Description("Brief summary of the issue")] string summary,
         [Description("Detailed description of the issue in markdown format")] string description,
         [Description("The issue type name (e.g., Bug, Story, Task, Epic)")] string issueTypeName,
@@ -22,6 +23,7 @@ public interface IJiraToolService
     [Description("Update an existing Jira issue's summary and/or description")]
     Task<object> UpdateIssueAsync(
         [Description("The workspace ID where the Jira integration is configured")] string workspaceId,
+        [Description("The ID of the specific Jira integration instance to use. Required when the workspace has multiple Jira integrations configured.")] string integrationId,
         [Description("The Jira issue key (e.g., PROJ-123)")] string issueKey,
         [Description("Optional new summary for the issue")] string? summary = null,
         [Description("Optional new description in markdown format")] string? description = null);
@@ -36,12 +38,14 @@ public interface IJiraToolService
     [Description("Retrieve detailed information about a Jira issue by its key")]
     Task<object> GetIssueAsync(
         [Description("The workspace ID where the Jira integration is configured")] string workspaceId,
+        [Description("The ID of the specific Jira integration instance to use. Required when the workspace has multiple Jira integrations configured.")] string integrationId,
         [Description("The Jira issue key to retrieve (e.g., PROJ-123)")] string issueKey);
 
     [ToolAction("create_epic", "Create a new Jira epic", DangerLevel.Moderate)]
     [Description("Create a new Jira epic with multiple child stories")]
     Task<object> CreateEpicAsync(
         [Description("The workspace ID where the Jira integration is configured")] string workspaceId,
+        [Description("The ID of the specific Jira integration instance to use. Required when the workspace has multiple Jira integrations configured.")] string integrationId,
         [Description("The title of the epic")] string epicTitle,
         [Description("The description of the epic in markdown format")] string epicDescription,
         [Description("List of user stories to create under the epic")] List<StoryRequest> stories,

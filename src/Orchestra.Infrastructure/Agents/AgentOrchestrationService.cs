@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Orchestra.Application.Agents.DTOs;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Common.Interfaces;
+using Orchestra.Application.Integrations.DTOs;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
 
@@ -95,9 +96,10 @@ public class AgentOrchestrationService : IAgentOrchestrationService
             ticket.UpdateStatus(InProgressStatusId);
             await _ticketDataAccess.UpdateTicketAsync(ticket, cancellationToken);
 
-            // 5. Build context prompt
-            var contextPrompt = await _agentContextBuilder.BuildContextPromptAsync(
+            // 5. Build context prompt with integrations
+            var contextPrompt = await _agentContextBuilder.BuildAgentContextWithIntegrationsAsync(
                 ticket,
+                agentEntity.Id,
                 cancellationToken);
 
             _logger.LogDebug(

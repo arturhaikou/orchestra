@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
 using Microsoft.Extensions.Logging;
+using NSubstitute.ExceptionExtensions;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Infrastructure.Integrations.Providers.GitHub;
 using Orchestra.Infrastructure.Integrations.Providers.GitHub.Models;
@@ -11,18 +12,21 @@ using Orchestra.Tests.Shared.Builders;
 
 namespace Orchestra.Infrastructure.Tests.Tools.Services;
 
+using Orchestra.Domain.Enums;
+
 public class GitHubToolServiceTests : ServiceTestFixture<GitHubToolService>
 {
     private readonly Guid _testWorkspaceId = new("12345678-1234-1234-1234-123456789012");
+    private const string TestIntegrationId = "00000000-0000-0000-0000-000000000001";
     private readonly IGitHubApiClientFactory _apiClientFactory = Substitute.For<IGitHubApiClientFactory>();
     private readonly IGitHubApiClient _apiClient = Substitute.For<IGitHubApiClient>();
-    private readonly IIntegrationDataAccess _integrationDataAccess = Substitute.For<IIntegrationDataAccess>();
+    private readonly IIntegrationResolver _integrationResolver = Substitute.For<IIntegrationResolver>();
     private readonly GitHubToolService _sut;
 
     public GitHubToolServiceTests()
     {
         _apiClientFactory.CreateClient(Arg.Any<Integration>()).Returns(_apiClient);
-        _sut = new GitHubToolService(_apiClientFactory, _integrationDataAccess, Logger);
+        _sut = new GitHubToolService(_apiClientFactory, _integrationResolver, Logger);
     }
 
     [Fact]
@@ -30,9 +34,8 @@ public class GitHubToolServiceTests : ServiceTestFixture<GitHubToolService>
     {
         // Arrange
         var integration = IntegrationBuilder.GitHubIntegration();
-        var workspaceId = integration.WorkspaceId.ToString();
-        _integrationDataAccess.GetByWorkspaceIdAsync(integration.WorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration> { integration });
+        _integrationResolver.ResolveAsync(integration.WorkspaceId, integration.Id.ToString(), ProviderType.GITHUB, Arg.Any<CancellationToken>())
+            .Returns(integration);
 
         var issue = new GitHubIssue
         {
@@ -47,7 +50,7 @@ public class GitHubToolServiceTests : ServiceTestFixture<GitHubToolService>
         _apiClient.GetIssueAsync(42, Arg.Any<CancellationToken>()).Returns(issue);
 
         // Act
-        var result = await _sut.GetIssueAsync(workspaceId, "42");
+        var result = await _sut.GetIssueAsync(integration.WorkspaceId.ToString(), integration.Id.ToString(), "42");
 
         // Assert
         Assert.True(result.Success);
@@ -67,9 +70,8 @@ public class GitHubToolServiceTests : ServiceTestFixture<GitHubToolService>
     {
         // Arrange
         var integration = IntegrationBuilder.GitHubIntegration();
-        var workspaceId = integration.WorkspaceId.ToString();
-        _integrationDataAccess.GetByWorkspaceIdAsync(integration.WorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration> { integration });
+        _integrationResolver.ResolveAsync(integration.WorkspaceId, integration.Id.ToString(), ProviderType.GITHUB, Arg.Any<CancellationToken>())
+            .Returns(integration);
 
         var pr = new GitHubPullRequest
         {
@@ -86,7 +88,7 @@ public class GitHubToolServiceTests : ServiceTestFixture<GitHubToolService>
         _apiClient.GetPullRequestAsync(17, Arg.Any<CancellationToken>()).Returns(pr);
 
         // Act
-        var result = await _sut.GetPullRequestAsync(workspaceId, "17");
+        var result = await _sut.GetPullRequestAsync(integration.WorkspaceId.ToString(), integration.Id.ToString(), "17");
 
         // Assert
         Assert.True(result.Success);
@@ -103,9 +105,8 @@ public class GitHubToolServiceTests : ServiceTestFixture<GitHubToolService>
     {
         // Arrange
         var integration = IntegrationBuilder.GitHubIntegration();
-        var workspaceId = integration.WorkspaceId.ToString();
-        _integrationDataAccess.GetByWorkspaceIdAsync(integration.WorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration> { integration });
+        _integrationResolver.ResolveAsync(integration.WorkspaceId, integration.Id.ToString(), ProviderType.GITHUB, Arg.Any<CancellationToken>())
+            .Returns(integration);
 
         var searchResult = new GitHubSearchResult
         {
@@ -119,7 +120,7 @@ public class GitHubToolServiceTests : ServiceTestFixture<GitHubToolService>
         _apiClient.SearchIssuesAsync("login bug", 10, Arg.Any<CancellationToken>()).Returns(searchResult);
 
         // Act
-        var result = await _sut.SearchIssuesAsync(workspaceId, "login bug");
+        var result = await _sut.SearchIssuesAsync(integration.WorkspaceId.ToString(), integration.Id.ToString(), "login bug");
 
         // Assert
         Assert.True(result.Success);
@@ -132,14 +133,13 @@ public class GitHubToolServiceTests : ServiceTestFixture<GitHubToolService>
     {
         // Arrange
         var integration = IntegrationBuilder.GitHubIntegration();
-        var workspaceId = integration.WorkspaceId.ToString();
-        _integrationDataAccess.GetByWorkspaceIdAsync(integration.WorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration> { integration });
+        _integrationResolver.ResolveAsync(integration.WorkspaceId, integration.Id.ToString(), ProviderType.GITHUB, Arg.Any<CancellationToken>())
+            .Returns(integration);
         _apiClient.SearchIssuesAsync(Arg.Any<string>(), 30, Arg.Any<CancellationToken>())
             .Returns(new GitHubSearchResult());
 
         // Act
-        await _sut.SearchIssuesAsync(workspaceId, "bug", limit: 100);
+        await _sut.SearchIssuesAsync(integration.WorkspaceId.ToString(), integration.Id.ToString(), "bug", limit: 100);
 
         // Assert — API client was called with limit clamped to 30
         await _apiClient.Received(1).SearchIssuesAsync(Arg.Any<string>(), 30, Arg.Any<CancellationToken>());
@@ -149,40 +149,39 @@ public class GitHubToolServiceTests : ServiceTestFixture<GitHubToolService>
     public async Task GetIssueAsync_ReturnsError_WhenNoGitHubIntegrationExists()
     {
         // Arrange
-        var workspaceId = Guid.NewGuid().ToString();
-        _integrationDataAccess.GetByWorkspaceIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
-            .Returns(new List<Integration>());
+        _integrationResolver.ResolveAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<ProviderType>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("No active integration found for the supplied ID within this workspace."));
 
         // Act
-        var result = await _sut.GetIssueAsync(workspaceId, "1");
+        var result = await _sut.GetIssueAsync(Guid.NewGuid().ToString(), Guid.NewGuid().ToString(), "1");
 
         // Assert
         Assert.False(result.Success);
-        Assert.Contains("No active GitHub integration", result.Error);
+        Assert.Contains("No active integration found for the supplied ID", result.Error);
     }
 
     [Fact]
     public async Task GetPullRequestAsync_ReturnsError_WhenNoGitHubIntegrationExists()
     {
-        _integrationDataAccess.GetByWorkspaceIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
-            .Returns(new List<Integration>());
+        _integrationResolver.ResolveAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<ProviderType>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("No active integration found for the supplied ID within this workspace."));
 
-        var result = await _sut.GetPullRequestAsync(Guid.NewGuid().ToString(), "1");
+        var result = await _sut.GetPullRequestAsync(Guid.NewGuid().ToString(), Guid.NewGuid().ToString(), "1");
 
         Assert.False(result.Success);
-        Assert.Contains("No active GitHub integration", result.Error);
+        Assert.Contains("No active integration found for the supplied ID", result.Error);
     }
 
     [Fact]
     public async Task SearchIssuesAsync_ReturnsError_WhenNoGitHubIntegrationExists()
     {
-        _integrationDataAccess.GetByWorkspaceIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
-            .Returns(new List<Integration>());
+        _integrationResolver.ResolveAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<ProviderType>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("No active integration found for the supplied ID within this workspace."));
 
-        var result = await _sut.SearchIssuesAsync(Guid.NewGuid().ToString(), "bug");
+        var result = await _sut.SearchIssuesAsync(Guid.NewGuid().ToString(), Guid.NewGuid().ToString(), "bug");
 
         Assert.False(result.Success);
-        Assert.Contains("No active GitHub integration", result.Error);
+        Assert.Contains("No active integration found for the supplied ID", result.Error);
     }
 
     [Fact]
@@ -190,13 +189,13 @@ public class GitHubToolServiceTests : ServiceTestFixture<GitHubToolService>
     {
         // Arrange
         var integration = IntegrationBuilder.GitHubIntegration();
-        _integrationDataAccess.GetByWorkspaceIdAsync(integration.WorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration> { integration });
+        _integrationResolver.ResolveAsync(integration.WorkspaceId, integration.Id.ToString(), ProviderType.GITHUB, Arg.Any<CancellationToken>())
+            .Returns(integration);
         _apiClient.GetIssueAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<GitHubIssue>(new InvalidOperationException("Failed to authenticate with GitHub. Please verify the API key.")));
 
         // Act
-        var result = await _sut.GetIssueAsync(integration.WorkspaceId.ToString(), "1");
+        var result = await _sut.GetIssueAsync(integration.WorkspaceId.ToString(), integration.Id.ToString(), "1");
 
         // Assert
         Assert.False(result.Success);
@@ -208,13 +207,13 @@ public class GitHubToolServiceTests : ServiceTestFixture<GitHubToolService>
     {
         // Arrange
         var integration = IntegrationBuilder.GitHubIntegration();
-        _integrationDataAccess.GetByWorkspaceIdAsync(integration.WorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration> { integration });
+        _integrationResolver.ResolveAsync(integration.WorkspaceId, integration.Id.ToString(), ProviderType.GITHUB, Arg.Any<CancellationToken>())
+            .Returns(integration);
         _apiClient.GetIssueAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<GitHubIssue>(new InvalidOperationException("GitHub repository not found or insufficient permissions.")));
 
         // Act
-        var result = await _sut.GetIssueAsync(integration.WorkspaceId.ToString(), "999");
+        var result = await _sut.GetIssueAsync(integration.WorkspaceId.ToString(), integration.Id.ToString(), "999");
 
         // Assert
         Assert.False(result.Success);
@@ -226,13 +225,13 @@ public class GitHubToolServiceTests : ServiceTestFixture<GitHubToolService>
     {
         // Arrange
         var integration = IntegrationBuilder.GitHubIntegration();
-        _integrationDataAccess.GetByWorkspaceIdAsync(integration.WorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration> { integration });
+        _integrationResolver.ResolveAsync(integration.WorkspaceId, integration.Id.ToString(), ProviderType.GITHUB, Arg.Any<CancellationToken>())
+            .Returns(integration);
         _apiClient.GetIssueAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<GitHubIssue>(new InvalidOperationException("GitHub API rate limit exceeded. Please try again later.")));
 
         // Act
-        var result = await _sut.GetIssueAsync(integration.WorkspaceId.ToString(), "1");
+        var result = await _sut.GetIssueAsync(integration.WorkspaceId.ToString(), integration.Id.ToString(), "1");
 
         // Assert
         Assert.False(result.Success);
@@ -244,15 +243,15 @@ public class GitHubToolServiceTests : ServiceTestFixture<GitHubToolService>
     {
         // Arrange
         var integration = IntegrationBuilder.GitHubIntegration();
-        _integrationDataAccess.GetByWorkspaceIdAsync(integration.WorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration> { integration });
+        _integrationResolver.ResolveAsync(integration.WorkspaceId, integration.Id.ToString(), ProviderType.GITHUB, Arg.Any<CancellationToken>())
+            .Returns(integration);
         var socketException = new SocketException();
         var httpException = new HttpRequestException("Network failure", socketException);
         _apiClient.GetIssueAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<GitHubIssue>(httpException));
 
         // Act
-        var result = await _sut.GetIssueAsync(integration.WorkspaceId.ToString(), "1");
+        var result = await _sut.GetIssueAsync(integration.WorkspaceId.ToString(), integration.Id.ToString(), "1");
 
         // Assert
         Assert.False(result.Success);
@@ -309,7 +308,6 @@ public class GitHubToolServiceTests : ServiceTestFixture<GitHubToolService>
     public async Task CreateIssueAsync_ReturnsSuccessResult_WhenIntegrationExistsAndApiSucceeds()
     {
         // Arrange
-        var workspaceId = _testWorkspaceId.ToString();
         var integration = IntegrationBuilder.GitHubIntegration();
         var title = "Test Issue";
         var body = "This is a test issue body.";
@@ -321,14 +319,14 @@ public class GitHubToolServiceTests : ServiceTestFixture<GitHubToolService>
             HtmlUrl = "https://github.com/myorg/myrepo/issues/42"
         };
 
-        _integrationDataAccess.GetByWorkspaceIdAsync(_testWorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration> { integration });
+        _integrationResolver.ResolveAsync(integration.WorkspaceId, integration.Id.ToString(), ProviderType.GITHUB, Arg.Any<CancellationToken>())
+            .Returns(integration);
 
         _apiClient.CreateIssueAsync(title, body, null, Arg.Any<CancellationToken>())
             .Returns(issue);
 
         // Act
-        var result = await _sut.CreateIssueAsync(workspaceId, title, body);
+        var result = await _sut.CreateIssueAsync(integration.WorkspaceId.ToString(), integration.Id.ToString(), title, body);
 
         // Assert
         Assert.True(result.Success);
@@ -342,35 +340,32 @@ public class GitHubToolServiceTests : ServiceTestFixture<GitHubToolService>
     public async Task CreateIssueAsync_ReturnsError_WhenNoGitHubIntegrationExists()
     {
         // Arrange
-        var workspaceId = _testWorkspaceId.ToString();
-
-        _integrationDataAccess.GetByWorkspaceIdAsync(_testWorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration>());
+        _integrationResolver.ResolveAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<ProviderType>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("No active integration found for the supplied ID within this workspace."));
 
         // Act
-        var result = await _sut.CreateIssueAsync(workspaceId, "Title", "Body");
+        var result = await _sut.CreateIssueAsync(_testWorkspaceId.ToString(), Guid.NewGuid().ToString(), "Title", "Body");
 
         // Assert
         Assert.False(result.Success);
-        Assert.Contains("No active GitHub integration", result.Error);
+        Assert.Contains("No active integration found for the supplied ID", result.Error);
     }
 
     [Fact]
     public async Task CreateIssueAsync_ReturnsError_WhenAuthenticationFails()
     {
         // Arrange
-        var workspaceId = _testWorkspaceId.ToString();
         var integration = IntegrationBuilder.GitHubIntegration();
 
-        _integrationDataAccess.GetByWorkspaceIdAsync(_testWorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration> { integration });
+        _integrationResolver.ResolveAsync(integration.WorkspaceId, integration.Id.ToString(), ProviderType.GITHUB, Arg.Any<CancellationToken>())
+            .Returns(integration);
 
         var httpException = new HttpRequestException("Unauthorized", null, System.Net.HttpStatusCode.Unauthorized);
         _apiClient.CreateIssueAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<List<string>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<GitHubIssue>(httpException));
 
         // Act
-        var result = await _sut.CreateIssueAsync(workspaceId, "Title", "Body");
+        var result = await _sut.CreateIssueAsync(integration.WorkspaceId.ToString(), integration.Id.ToString(), "Title", "Body");
 
         // Assert
         Assert.False(result.Success);
@@ -381,18 +376,17 @@ public class GitHubToolServiceTests : ServiceTestFixture<GitHubToolService>
     public async Task CreateIssueAsync_ReturnsError_WhenRepositoryNotFound()
     {
         // Arrange
-        var workspaceId = _testWorkspaceId.ToString();
         var integration = IntegrationBuilder.GitHubIntegration();
 
-        _integrationDataAccess.GetByWorkspaceIdAsync(_testWorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration> { integration });
+        _integrationResolver.ResolveAsync(integration.WorkspaceId, integration.Id.ToString(), ProviderType.GITHUB, Arg.Any<CancellationToken>())
+            .Returns(integration);
 
         var httpException = new HttpRequestException("Not Found", null, System.Net.HttpStatusCode.NotFound);
         _apiClient.CreateIssueAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<List<string>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<GitHubIssue>(httpException));
 
         // Act
-        var result = await _sut.CreateIssueAsync(workspaceId, "Title", "Body");
+        var result = await _sut.CreateIssueAsync(integration.WorkspaceId.ToString(), integration.Id.ToString(), "Title", "Body");
 
         // Assert
         Assert.False(result.Success);
@@ -403,18 +397,17 @@ public class GitHubToolServiceTests : ServiceTestFixture<GitHubToolService>
     public async Task CreateIssueAsync_ReturnsError_WhenRateLimitExceeded()
     {
         // Arrange
-        var workspaceId = _testWorkspaceId.ToString();
         var integration = IntegrationBuilder.GitHubIntegration();
 
-        _integrationDataAccess.GetByWorkspaceIdAsync(_testWorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration> { integration });
+        _integrationResolver.ResolveAsync(integration.WorkspaceId, integration.Id.ToString(), ProviderType.GITHUB, Arg.Any<CancellationToken>())
+            .Returns(integration);
 
         var httpException = new HttpRequestException("Too Many Requests", null, (System.Net.HttpStatusCode)429);
         _apiClient.CreateIssueAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<List<string>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<GitHubIssue>(httpException));
 
         // Act
-        var result = await _sut.CreateIssueAsync(workspaceId, "Title", "Body");
+        var result = await _sut.CreateIssueAsync(integration.WorkspaceId.ToString(), integration.Id.ToString(), "Title", "Body");
 
         // Assert
         Assert.False(result.Success);
@@ -425,7 +418,6 @@ public class GitHubToolServiceTests : ServiceTestFixture<GitHubToolService>
     public async Task UpdateIssueAsync_ReturnsSuccessResult_WhenTitleAndBodyProvided()
     {
         // Arrange
-        var workspaceId = _testWorkspaceId.ToString();
         var integration = IntegrationBuilder.GitHubIntegration();
         var issueNumber = "42";
         var newTitle = "Updated Title";
@@ -438,14 +430,14 @@ public class GitHubToolServiceTests : ServiceTestFixture<GitHubToolService>
             HtmlUrl = "https://github.com/myorg/myrepo/issues/42"
         };
 
-        _integrationDataAccess.GetByWorkspaceIdAsync(_testWorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration> { integration });
+        _integrationResolver.ResolveAsync(integration.WorkspaceId, integration.Id.ToString(), ProviderType.GITHUB, Arg.Any<CancellationToken>())
+            .Returns(integration);
 
         _apiClient.UpdateIssueAsync(42, newTitle, newBody, Arg.Any<CancellationToken>())
             .Returns(issue);
 
         // Act
-        var result = await _sut.UpdateIssueAsync(workspaceId, issueNumber, newTitle, newBody);
+        var result = await _sut.UpdateIssueAsync(integration.WorkspaceId.ToString(), integration.Id.ToString(), issueNumber, newTitle, newBody);
 
         // Assert
         Assert.True(result.Success);
@@ -459,7 +451,6 @@ public class GitHubToolServiceTests : ServiceTestFixture<GitHubToolService>
     public async Task UpdateIssueAsync_ReturnsSuccessResult_WhenOnlyTitleProvided()
     {
         // Arrange
-        var workspaceId = _testWorkspaceId.ToString();
         var integration = IntegrationBuilder.GitHubIntegration();
         var issueNumber = "42";
         var newTitle = "Updated Title";
@@ -471,14 +462,14 @@ public class GitHubToolServiceTests : ServiceTestFixture<GitHubToolService>
             HtmlUrl = "https://github.com/myorg/myrepo/issues/42"
         };
 
-        _integrationDataAccess.GetByWorkspaceIdAsync(_testWorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration> { integration });
+        _integrationResolver.ResolveAsync(integration.WorkspaceId, integration.Id.ToString(), ProviderType.GITHUB, Arg.Any<CancellationToken>())
+            .Returns(integration);
 
         _apiClient.UpdateIssueAsync(42, newTitle, null, Arg.Any<CancellationToken>())
             .Returns(issue);
 
         // Act
-        var result = await _sut.UpdateIssueAsync(workspaceId, issueNumber, newTitle, null);
+        var result = await _sut.UpdateIssueAsync(integration.WorkspaceId.ToString(), integration.Id.ToString(), issueNumber, newTitle, null);
 
         // Assert
         Assert.True(result.Success);
@@ -489,11 +480,10 @@ public class GitHubToolServiceTests : ServiceTestFixture<GitHubToolService>
     public async Task UpdateIssueAsync_ReturnsError_WhenBothTitleAndBodyAreEmpty()
     {
         // Arrange
-        var workspaceId = _testWorkspaceId.ToString();
         var issueNumber = "42";
 
         // Act
-        var result = await _sut.UpdateIssueAsync(workspaceId, issueNumber, null, null);
+        var result = await _sut.UpdateIssueAsync(_testWorkspaceId.ToString(), Guid.NewGuid().ToString(), issueNumber, null, null);
 
         // Assert
         Assert.False(result.Success);
@@ -504,35 +494,32 @@ public class GitHubToolServiceTests : ServiceTestFixture<GitHubToolService>
     public async Task UpdateIssueAsync_ReturnsError_WhenNoGitHubIntegrationExists()
     {
         // Arrange
-        var workspaceId = _testWorkspaceId.ToString();
-
-        _integrationDataAccess.GetByWorkspaceIdAsync(_testWorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration>());
+        _integrationResolver.ResolveAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<ProviderType>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("No active integration found for the supplied ID within this workspace."));
 
         // Act
-        var result = await _sut.UpdateIssueAsync(workspaceId, "42", "Title", null);
+        var result = await _sut.UpdateIssueAsync(_testWorkspaceId.ToString(), Guid.NewGuid().ToString(), "42", "Title", null);
 
         // Assert
         Assert.False(result.Success);
-        Assert.Contains("No active GitHub integration", result.Error);
+        Assert.Contains("No active integration found for the supplied ID", result.Error);
     }
 
     [Fact]
     public async Task UpdateIssueAsync_ReturnsError_WhenAuthenticationFails()
     {
         // Arrange
-        var workspaceId = _testWorkspaceId.ToString();
         var integration = IntegrationBuilder.GitHubIntegration();
 
-        _integrationDataAccess.GetByWorkspaceIdAsync(_testWorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration> { integration });
+        _integrationResolver.ResolveAsync(integration.WorkspaceId, integration.Id.ToString(), ProviderType.GITHUB, Arg.Any<CancellationToken>())
+            .Returns(integration);
 
         var httpException = new HttpRequestException("Forbidden", null, System.Net.HttpStatusCode.Forbidden);
         _apiClient.UpdateIssueAsync(Arg.Any<int>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<GitHubIssue>(httpException));
 
         // Act
-        var result = await _sut.UpdateIssueAsync(workspaceId, "42", "Title", null);
+        var result = await _sut.UpdateIssueAsync(integration.WorkspaceId.ToString(), integration.Id.ToString(), "42", "Title", null);
 
         // Assert
         Assert.False(result.Success);
@@ -543,18 +530,17 @@ public class GitHubToolServiceTests : ServiceTestFixture<GitHubToolService>
     public async Task UpdateIssueAsync_ReturnsError_WhenIssueNotFound()
     {
         // Arrange
-        var workspaceId = _testWorkspaceId.ToString();
         var integration = IntegrationBuilder.GitHubIntegration();
 
-        _integrationDataAccess.GetByWorkspaceIdAsync(_testWorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration> { integration });
+        _integrationResolver.ResolveAsync(integration.WorkspaceId, integration.Id.ToString(), ProviderType.GITHUB, Arg.Any<CancellationToken>())
+            .Returns(integration);
 
         var httpException = new HttpRequestException("Not Found", null, System.Net.HttpStatusCode.NotFound);
         _apiClient.UpdateIssueAsync(Arg.Any<int>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<GitHubIssue>(httpException));
 
         // Act
-        var result = await _sut.UpdateIssueAsync(workspaceId, "42", "Title", null);
+        var result = await _sut.UpdateIssueAsync(integration.WorkspaceId.ToString(), integration.Id.ToString(), "42", "Title", null);
 
         // Assert
         Assert.False(result.Success);
@@ -565,21 +551,123 @@ public class GitHubToolServiceTests : ServiceTestFixture<GitHubToolService>
     public async Task UpdateIssueAsync_ReturnsError_WhenRateLimitExceeded()
     {
         // Arrange
-        var workspaceId = _testWorkspaceId.ToString();
         var integration = IntegrationBuilder.GitHubIntegration();
 
-        _integrationDataAccess.GetByWorkspaceIdAsync(_testWorkspaceId, Arg.Any<CancellationToken>())
-            .Returns(new List<Integration> { integration });
+        _integrationResolver.ResolveAsync(integration.WorkspaceId, integration.Id.ToString(), ProviderType.GITHUB, Arg.Any<CancellationToken>())
+            .Returns(integration);
 
         var httpException = new HttpRequestException("Too Many Requests", null, (System.Net.HttpStatusCode)429);
         _apiClient.UpdateIssueAsync(Arg.Any<int>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<GitHubIssue>(httpException));
 
         // Act
-        var result = await _sut.UpdateIssueAsync(workspaceId, "42", "Title", null);
+        var result = await _sut.UpdateIssueAsync(integration.WorkspaceId.ToString(), integration.Id.ToString(), "42", "Title", null);
 
         // Assert
         Assert.False(result.Success);
         Assert.Contains("rate limit exceeded", result.Error);
     }
+
+    #region FR-02: Integration Resolution by ID Tests
+
+    [Fact]
+    public async Task GetIssueAsync_ReturnsError_WhenIntegrationIdIsEmpty()
+    {
+        // Arrange
+        var workspaceId = _testWorkspaceId.ToString();
+        _integrationResolver
+            .ResolveAsync(_testWorkspaceId, string.Empty, ProviderType.GITHUB, Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("integrationId is required"));
+
+        // Act — pass empty string as integrationId
+        var result = await _sut.GetIssueAsync(workspaceId, string.Empty, "1");
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.Contains("integrationId is required", result.Error);
+    }
+
+    [Fact]
+    public async Task GetIssueAsync_ReturnsError_WhenIntegrationIdIsNull()
+    {
+        // Arrange
+        var workspaceId = _testWorkspaceId.ToString();
+        _integrationResolver
+            .ResolveAsync(_testWorkspaceId, Arg.Any<string>(), ProviderType.GITHUB, Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("integrationId is required"));
+
+        // Act — pass null as integrationId
+        var result = await _sut.GetIssueAsync(workspaceId, null!, "1");
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.Contains("integrationId is required", result.Error);
+    }
+
+    [Fact]
+    public async Task GetIssueAsync_ReturnsError_WhenIntegrationIdNotFoundInWorkspace()
+    {
+        // Arrange — ResolveAsync throws when integration not found
+        _integrationResolver.ResolveAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<ProviderType>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("No active integration found for the supplied ID within this workspace."));
+
+        // Act
+        var result = await _sut.GetIssueAsync(
+            _testWorkspaceId.ToString(),
+            Guid.NewGuid().ToString(),
+            "1");
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.Contains("No active integration found for the supplied ID", result.Error);
+    }
+
+    [Fact]
+    public async Task GetIssueAsync_ReturnsError_WhenIntegrationBelongsToDifferentWorkspace()
+    {
+        // Arrange — ResolveAsync throws when workspace doesn't match
+        var otherWorkspaceId = Guid.NewGuid();
+        var integration = new IntegrationBuilder()
+            .WithProvider(ProviderType.GITHUB)
+            .WithWorkspaceId(otherWorkspaceId)
+            .Build();
+
+        _integrationResolver.ResolveAsync(_testWorkspaceId, integration.Id.ToString(), ProviderType.GITHUB, Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("No active integration found for the supplied ID within this workspace."));
+
+        // Act — caller is workspace _testWorkspaceId, integration belongs to otherWorkspaceId
+        var result = await _sut.GetIssueAsync(
+            _testWorkspaceId.ToString(),
+            integration.Id.ToString(),
+            "1");
+
+        // Assert — must return not-found (no cross-workspace data leakage)
+        Assert.False(result.Success);
+        Assert.Contains("No active integration found for the supplied ID", result.Error);
+    }
+
+    [Fact]
+    public async Task GetIssueAsync_ReturnsError_WhenIntegrationHasWrongProviderType()
+    {
+        // Arrange — ResolveAsync throws when provider type doesn't match
+        var integration = new IntegrationBuilder()
+            .WithProvider(ProviderType.GITLAB)
+            .WithWorkspaceId(_testWorkspaceId)
+            .Build();
+
+        _integrationResolver.ResolveAsync(_testWorkspaceId, integration.Id.ToString(), ProviderType.GITHUB, Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("No active GitHub integration found for the supplied integrationId; the specified integration is not a GitHub integration."));
+
+        // Act
+        var result = await _sut.GetIssueAsync(
+            _testWorkspaceId.ToString(),
+            integration.Id.ToString(),
+            "1");
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.Contains("No active GitHub integration", result.Error);
+    }
+
+    #endregion
 }

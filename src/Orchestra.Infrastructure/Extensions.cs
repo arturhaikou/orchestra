@@ -60,6 +60,7 @@ public static class Extensions
         builder.Services.AddScoped<IAgentService, AgentService>();
         builder.Services.AddSingleton<ICredentialEncryptionService, CredentialEncryptionService>();
         builder.Services.AddScoped<IIntegrationDataAccess, IntegrationDataAccess>();
+        builder.Services.AddScoped<IIntegrationResolver, IntegrationResolver>();
         builder.Services.AddScoped<IIntegrationService, IntegrationService>();
         builder.Services.AddScoped<IAgentDataAccess, AgentDataAccess>();
         builder.Services.AddScoped<ITicketDataAccess, TicketDataAccess>();

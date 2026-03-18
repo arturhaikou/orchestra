@@ -11,6 +11,7 @@ public interface IConfluenceToolService
     [Description("Search Confluence content by text query. The query is automatically split into keywords (by whitespace) and each keyword is searched separately. Results are deduplicated automatically to avoid returning the same page multiple times. Returns full page contents in markdown format.")]
     Task<object> SearchAsync(
         [Description("The workspace ID where the Confluence integration is configured")] string workspaceId,
+        [Description("The ID of the specific Confluence integration instance to use. Required when the workspace has multiple Confluence integrations configured.")] string integrationId,
         [Description("The text query to search for in Confluence pages. Will be split into keywords by whitespace. Example: 'api documentation' searches for 'api' and 'documentation' separately.")] string query,
         [Description("Maximum number of pages to return across all keywords (1-100, default 10)")] int limit = 10);
 
@@ -18,6 +19,7 @@ public interface IConfluenceToolService
     [Description("Retrieve a specific Confluence page by ID and return its content in markdown format")]
     Task<object> GetPageAsync(
         [Description("The workspace ID where the Confluence integration is configured")] string workspaceId,
+        [Description("The ID of the specific Confluence integration instance to use. Required when the workspace has multiple Confluence integrations configured.")] string integrationId,
         [Description("The Confluence page ID to retrieve")] string pageId);
 
     //[ToolAction("create_page", "Create a new Confluence page from markdown content", DangerLevel.Moderate)]

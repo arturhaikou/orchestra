@@ -1,4 +1,6 @@
+using Orchestra.Application.Integrations.DTOs;
 using Orchestra.Domain.Entities;
+using Orchestra.Domain.Enums;
 
 namespace Orchestra.Application.Common.Interfaces;
 
@@ -25,6 +27,25 @@ public interface IIntegrationDataAccess
     /// <returns>The integration entity or null if not found.</returns>
     Task<Integration?> GetByIdAsync(
         Guid integrationId, 
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns a credential-free projection of active integrations for a workspace,
+    /// scoped to the specified provider types. Only <c>Id</c>, <c>Name</c>, and
+    /// <c>Provider</c> are projected — credential columns are excluded at query level.
+    /// </summary>
+    /// <param name="workspaceId">The workspace to scope the query.</param>
+    /// <param name="providerTypes">
+    /// The provider types to include. If the collection is empty, an empty list is returned immediately
+    /// without touching the database.
+    /// </param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>
+    /// Zero or more <see cref="IntegrationSummaryDto"/> records ordered by provider then name.
+    /// </returns>
+    Task<List<IntegrationSummaryDto>> GetActiveByWorkspaceAndProvidersAsync(
+        Guid workspaceId,
+        IEnumerable<ProviderType> providerTypes,
         CancellationToken cancellationToken = default);
 
     /// <summary>

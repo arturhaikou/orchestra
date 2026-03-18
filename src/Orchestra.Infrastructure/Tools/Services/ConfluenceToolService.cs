@@ -13,23 +13,23 @@ namespace Orchestra.Infrastructure.Tools.Services;
 public class ConfluenceToolService : IConfluenceToolService
 {
     private readonly ConfluenceApiClientFactory _confluenceApiClientFactory;
-    private readonly IIntegrationDataAccess _integrationDataAccess;
+    private readonly IIntegrationResolver _integrationResolver;
     private readonly IAdfConversionService _adfConversionService;
     private readonly ILogger<ConfluenceToolService> _logger;
 
     public ConfluenceToolService(
         ConfluenceApiClientFactory confluenceApiClientFactory,
-        IIntegrationDataAccess integrationDataAccess,
+        IIntegrationResolver integrationResolver,
         IAdfConversionService adfConversionService,
         ILogger<ConfluenceToolService> logger)
     {
         _confluenceApiClientFactory = confluenceApiClientFactory;
-        _integrationDataAccess = integrationDataAccess;
+        _integrationResolver = integrationResolver;
         _adfConversionService = adfConversionService;
         _logger = logger;
     }
 
-    public async Task<object> SearchAsync(string workspaceId, string query, int limit = 10)
+    public async Task<object> SearchAsync(string workspaceId, string integrationId, string query, int limit = 10)
     {
         try
         {
@@ -40,6 +40,16 @@ public class ConfluenceToolService : IConfluenceToolService
                 limit);
 
             // Validate inputs
+            if (string.IsNullOrWhiteSpace(integrationId))
+            {
+                return new
+                {
+                    success = false,
+                    error = "integrationId is required",
+                    errorCode = "INVALID_INTEGRATION_ID"
+                };
+            }
+
             if (string.IsNullOrWhiteSpace(query))
             {
                 return new
@@ -66,7 +76,7 @@ public class ConfluenceToolService : IConfluenceToolService
             }
 
             // Step 1: Load and validate integration
-            var integration = await GetAndValidateIntegrationAsync(workspaceGuid);
+            var integration = await _integrationResolver.ResolveAsync(workspaceGuid, integrationId, ProviderType.CONFLUENCE);
             var apiClient = _confluenceApiClientFactory.CreateClient(integration);
 
             // Step 2: Split query into keywords and search for each
@@ -189,8 +199,9 @@ public class ConfluenceToolService : IConfluenceToolService
             {
                 success = false,
                 error = ex.Message,
-                errorCode = ex.Message.Contains("not active") ? "INTEGRATION_INACTIVE" :
-                           ex.Message.Contains("not a CONFLUENCE provider") ? "INTEGRATION_WRONG_PROVIDER" :
+                errorCode = ex.Message.Contains("integrationId is required") ? "INTEGRATION_ID_REQUIRED" :
+                           ex.Message.Contains("No active integration found for the supplied ID") ? "INTEGRATION_NOT_FOUND" :
+                           ex.Message.Contains("not a Confluence integration") ? "INTEGRATION_WRONG_PROVIDER" :
                            "INVALID_OPERATION"
             };
         }
@@ -222,7 +233,7 @@ public class ConfluenceToolService : IConfluenceToolService
         }
     }
 
-    public async Task<object> GetPageAsync(string workspaceId, string pageId)
+    public async Task<object> GetPageAsync(string workspaceId, string integrationId, string pageId)
     {
         try
         {
@@ -253,7 +264,7 @@ public class ConfluenceToolService : IConfluenceToolService
             }
 
             // Step 1: Load and validate integration
-            var integration = await GetAndValidateIntegrationAsync(workspaceGuid);
+            var integration = await _integrationResolver.ResolveAsync(workspaceGuid, integrationId, ProviderType.CONFLUENCE);
             var apiClient = _confluenceApiClientFactory.CreateClient(integration);
 
             // Step 2: Fetch page content
@@ -351,8 +362,9 @@ public class ConfluenceToolService : IConfluenceToolService
             {
                 success = false,
                 error = ex.Message,
-                errorCode = ex.Message.Contains("not active") ? "INTEGRATION_INACTIVE" :
-                           ex.Message.Contains("not a CONFLUENCE provider") ? "INTEGRATION_WRONG_PROVIDER" :
+                errorCode = ex.Message.Contains("integrationId is required") ? "INTEGRATION_ID_REQUIRED" :
+                           ex.Message.Contains("No active integration found for the supplied ID") ? "INTEGRATION_NOT_FOUND" :
+                           ex.Message.Contains("not a Confluence integration") ? "INTEGRATION_WRONG_PROVIDER" :
                            "INVALID_OPERATION"
             };
         }
@@ -388,6 +400,7 @@ public class ConfluenceToolService : IConfluenceToolService
 
     public async Task<object> CreatePageAsync(
         string workspaceId,
+        string integrationId,
         string spaceKey,
         string title,
         string content,
@@ -444,7 +457,7 @@ public class ConfluenceToolService : IConfluenceToolService
             }
 
             // Step 1: Load and validate integration
-            var integration = await GetAndValidateIntegrationAsync(workspaceGuid);
+            var integration = await _integrationResolver.ResolveAsync(workspaceGuid, integrationId, ProviderType.CONFLUENCE);
             var apiClient = _confluenceApiClientFactory.CreateClient(integration);
 
             // Step 2: Convert markdown to ADF
@@ -515,8 +528,9 @@ public class ConfluenceToolService : IConfluenceToolService
             {
                 success = false,
                 error = ex.Message,
-                errorCode = ex.Message.Contains("not active") ? "INTEGRATION_INACTIVE" :
-                           ex.Message.Contains("not a CONFLUENCE provider") ? "INTEGRATION_WRONG_PROVIDER" :
+                errorCode = ex.Message.Contains("integrationId is required") ? "INTEGRATION_ID_REQUIRED" :
+                           ex.Message.Contains("No active integration found for the supplied ID") ? "INTEGRATION_NOT_FOUND" :
+                           ex.Message.Contains("not a Confluence integration") ? "INTEGRATION_WRONG_PROVIDER" :
                            "INVALID_OPERATION"
             };
         }
@@ -550,6 +564,7 @@ public class ConfluenceToolService : IConfluenceToolService
 
     public async Task<object> UpdatePageAsync(
         string workspaceId,
+        string integrationId,
         string pageId,
         string? title = null,
         string? content = null)
@@ -595,7 +610,7 @@ public class ConfluenceToolService : IConfluenceToolService
             }
 
             // Step 1: Load and validate integration
-            var integration = await GetAndValidateIntegrationAsync(workspaceGuid);
+            var integration = await _integrationResolver.ResolveAsync(workspaceGuid, integrationId, ProviderType.CONFLUENCE);
             var apiClient = _confluenceApiClientFactory.CreateClient(integration);
 
             // Step 2: Get current page to retrieve version number (required by Confluence)
@@ -684,8 +699,9 @@ public class ConfluenceToolService : IConfluenceToolService
             {
                 success = false,
                 error = ex.Message,
-                errorCode = ex.Message.Contains("not active") ? "INTEGRATION_INACTIVE" :
-                           ex.Message.Contains("not a CONFLUENCE provider") ? "INTEGRATION_WRONG_PROVIDER" :
+                errorCode = ex.Message.Contains("integrationId is required") ? "INTEGRATION_ID_REQUIRED" :
+                           ex.Message.Contains("No active integration found for the supplied ID") ? "INTEGRATION_NOT_FOUND" :
+                           ex.Message.Contains("not a Confluence integration") ? "INTEGRATION_WRONG_PROVIDER" :
                            "INVALID_OPERATION"
             };
         }
@@ -832,25 +848,6 @@ public class ConfluenceToolService : IConfluenceToolService
         }
 
         return pages;
-    }
-
-    private async Task<Integration> GetAndValidateIntegrationAsync(
-        Guid workspaceId, 
-        CancellationToken cancellationToken = default)
-    {
-        var integrations = await _integrationDataAccess.GetByWorkspaceIdAsync(workspaceId, cancellationToken);
-        var integration = integrations.FirstOrDefault(i => i.Provider == ProviderType.CONFLUENCE);
-        
-        if (integration == null)
-        {
-            _logger.LogError(
-                "No active Confluence integration found for workspace {WorkspaceId}", 
-                workspaceId);
-            throw new InvalidOperationException(
-                $"No active Confluence integration found for workspace {workspaceId}");
-        }
-
-        return integration;
     }
 
     #endregion

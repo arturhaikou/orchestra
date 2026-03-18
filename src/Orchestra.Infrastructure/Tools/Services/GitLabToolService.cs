@@ -13,33 +13,20 @@ namespace Orchestra.Infrastructure.Tools.Services;
 public class GitLabToolService : IGitLabToolService
 {
     private readonly IGitLabApiClientFactory _apiClientFactory;
-    private readonly IIntegrationDataAccess _integrationDataAccess;
+    private readonly IIntegrationResolver _integrationResolver;
     private readonly ILogger<GitLabToolService> _logger;
 
     public GitLabToolService(
         IGitLabApiClientFactory apiClientFactory,
-        IIntegrationDataAccess integrationDataAccess,
+        IIntegrationResolver integrationResolver,
         ILogger<GitLabToolService> logger)
     {
         _apiClientFactory = apiClientFactory;
-        _integrationDataAccess = integrationDataAccess;
+        _integrationResolver = integrationResolver;
         _logger = logger;
     }
 
-    private async Task<Integration> GetAndValidateIntegrationAsync(Guid workspaceId)
-    {
-        var integrations = await _integrationDataAccess.GetByWorkspaceIdAsync(workspaceId);
-        var gitLabIntegration = integrations.FirstOrDefault(i => i.Provider == ProviderType.GITLAB && i.IsActive);
-        
-        if (gitLabIntegration == null)
-        {
-            throw new InvalidOperationException("No active GitLab integration found for this workspace.");
-        }
-
-        return gitLabIntegration;
-    }
-
-    public async Task<GitLabIssueResult> GetIssueAsync(string workspaceId, string issueIid)
+    public async Task<GitLabIssueResult> GetIssueAsync(string workspaceId, string integrationId, string issueIid)
     {
         try
         {
@@ -51,7 +38,7 @@ public class GitLabToolService : IGitLabToolService
             if (!int.TryParse(issueIid, out var issueNum))
                 return new GitLabIssueResult { Success = false, Error = $"Invalid issue IID: {issueIid}" };
 
-            var integration = await GetAndValidateIntegrationAsync(workspaceGuid);
+            var integration = await _integrationResolver.ResolveAsync(workspaceGuid, integrationId, ProviderType.GITLAB);
             var apiClient = _apiClientFactory.CreateClient(integration);
             var issue = await apiClient.GetIssueAsync(issueNum);
 
@@ -65,13 +52,20 @@ public class GitLabToolService : IGitLabToolService
                 Title = issue.Title,
                 Description = issue.Description,
                 State = issue.State,
-                Url = issue.WebUrl
+                Url = issue.WebUrl,
             };
+        }
+        catch (InvalidOperationException ex) when (
+            ex.Message.Contains("integrationId is required") ||
+            ex.Message.Contains("No active integration found for the supplied ID"))
+        {
+            _logger.LogWarning(ex, "Integration resolution failed for workspace {WorkspaceId}", workspaceId);
+            return new GitLabIssueResult { Success = false, Error = ex.Message };
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("No active GitLab integration"))
         {
             _logger.LogWarning(ex, "No GitLab integration for workspace {WorkspaceId}", workspaceId);
-            return new GitLabIssueResult { Success = false, Error = "No active GitLab integration found for this workspace." };
+            return new GitLabIssueResult { Success = false, Error = ex.Message };
         }
         catch (HttpRequestException ex)
         {
@@ -85,7 +79,7 @@ public class GitLabToolService : IGitLabToolService
         }
     }
 
-    public async Task<GitLabMergeRequestResult> GetMergeRequestAsync(string workspaceId, string mrIid)
+    public async Task<GitLabMergeRequestResult> GetMergeRequestAsync(string workspaceId, string integrationId, string mrIid)
     {
         try
         {
@@ -97,7 +91,7 @@ public class GitLabToolService : IGitLabToolService
             if (!int.TryParse(mrIid, out var mrNum))
                 return new GitLabMergeRequestResult { Success = false, Error = $"Invalid merge request IID: {mrIid}" };
 
-            var integration = await GetAndValidateIntegrationAsync(workspaceGuid);
+            var integration = await _integrationResolver.ResolveAsync(workspaceGuid, integrationId, ProviderType.GITLAB);
             var apiClient = _apiClientFactory.CreateClient(integration);
             var mergeRequest = await apiClient.GetMergeRequestAsync(mrNum);
 
@@ -117,24 +111,26 @@ public class GitLabToolService : IGitLabToolService
                 TargetBranch = mergeRequest.TargetBranch
             };
         }
+        catch (InvalidOperationException ex) when (
+            ex.Message.Contains("integrationId is required") ||
+            ex.Message.Contains("No active integration found for the supplied ID"))
+        {
+            _logger.LogWarning(ex, "Integration resolution failed for workspace {WorkspaceId}", workspaceId);
+            return new GitLabMergeRequestResult { Success = false, Error = ex.Message };
+        }
         catch (InvalidOperationException ex) when (ex.Message.Contains("No active GitLab integration"))
         {
             _logger.LogWarning(ex, "No GitLab integration for workspace {WorkspaceId}", workspaceId);
-            return new GitLabMergeRequestResult { Success = false, Error = "No active GitLab integration found for this workspace." };
+            return new GitLabMergeRequestResult { Success = false, Error = ex.Message };
         }
         catch (HttpRequestException ex)
         {
             _logger.LogError(ex, "GitLab API error in GetMergeRequestAsync for workspace {WorkspaceId}", workspaceId);
-            return new GitLabMergeRequestResult { Success = false, Error = "Unable to reach GitLab API. Please check connectivity." };
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Unexpected error in GetMergeRequestAsync for workspace {WorkspaceId}", workspaceId);
             return new GitLabMergeRequestResult { Success = false, Error = $"Unexpected error: {ex.Message}" };
         }
     }
 
-    public async Task<GitLabSearchIssuesResult> SearchIssuesAsync(string workspaceId, string query, int? limit = 10)
+    public async Task<GitLabSearchIssuesResult> SearchIssuesAsync(string workspaceId, string integrationId, string query, int? limit = 10)
     {
         try
         {
@@ -150,7 +146,7 @@ public class GitLabToolService : IGitLabToolService
             if (searchLimit > 30) searchLimit = 30;
             if (searchLimit < 1) searchLimit = 1;
 
-            var integration = await GetAndValidateIntegrationAsync(workspaceGuid);
+            var integration = await _integrationResolver.ResolveAsync(workspaceGuid, integrationId, ProviderType.GITLAB);
             var apiClient = _apiClientFactory.CreateClient(integration);
             var issues = await apiClient.SearchIssuesAsync(query, searchLimit);
 
@@ -161,24 +157,26 @@ public class GitLabToolService : IGitLabToolService
                 Items = issues.Cast<object>().ToArray()
             };
         }
+        catch (InvalidOperationException ex) when (
+            ex.Message.Contains("integrationId is required") ||
+            ex.Message.Contains("No active integration found for the supplied ID"))
+        {
+            _logger.LogWarning(ex, "Integration resolution failed for workspace {WorkspaceId}", workspaceId);
+            return new GitLabSearchIssuesResult { Success = false, Error = ex.Message };
+        }
         catch (InvalidOperationException ex) when (ex.Message.Contains("No active GitLab integration"))
         {
             _logger.LogWarning(ex, "No GitLab integration for workspace {WorkspaceId}", workspaceId);
-            return new GitLabSearchIssuesResult { Success = false, Error = "No active GitLab integration found for this workspace." };
+            return new GitLabSearchIssuesResult { Success = false, Error = ex.Message };
         }
         catch (HttpRequestException ex)
         {
             _logger.LogError(ex, "GitLab API error in SearchIssuesAsync for workspace {WorkspaceId}", workspaceId);
-            return new GitLabSearchIssuesResult { Success = false, Error = "Unable to reach GitLab API. Please check connectivity." };
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Unexpected error in SearchIssuesAsync for workspace {WorkspaceId}", workspaceId);
             return new GitLabSearchIssuesResult { Success = false, Error = $"Unexpected error: {ex.Message}" };
         }
     }
 
-    public async Task<GitLabCreateIssueResult> CreateIssueAsync(string workspaceId, string title, string description)
+    public async Task<GitLabCreateIssueResult> CreateIssueAsync(string workspaceId, string integrationId, string title, string description)
     {
         try
         {
@@ -190,7 +188,7 @@ public class GitLabToolService : IGitLabToolService
             if (string.IsNullOrWhiteSpace(title))
                 return new GitLabCreateIssueResult { Success = false, Error = "Issue title cannot be empty." };
 
-            var integration = await GetAndValidateIntegrationAsync(workspaceGuid);
+            var integration = await _integrationResolver.ResolveAsync(workspaceGuid, integrationId, ProviderType.GITLAB);
             var apiClient = _apiClientFactory.CreateClient(integration);
             var createdIssue = await apiClient.CreateIssueAsync(title, description);
 
@@ -202,24 +200,26 @@ public class GitLabToolService : IGitLabToolService
                 Title = createdIssue.Title
             };
         }
+        catch (InvalidOperationException ex) when (
+            ex.Message.Contains("integrationId is required") ||
+            ex.Message.Contains("No active integration found for the supplied ID"))
+        {
+            _logger.LogWarning(ex, "Integration resolution failed for workspace {WorkspaceId}", workspaceId);
+            return new GitLabCreateIssueResult { Success = false, Error = ex.Message };
+        }
         catch (InvalidOperationException ex) when (ex.Message.Contains("No active GitLab integration"))
         {
             _logger.LogWarning(ex, "No GitLab integration for workspace {WorkspaceId}", workspaceId);
-            return new GitLabCreateIssueResult { Success = false, Error = "No active GitLab integration found for this workspace." };
+            return new GitLabCreateIssueResult { Success = false, Error = ex.Message };
         }
         catch (HttpRequestException ex)
         {
             _logger.LogError(ex, "GitLab API error in CreateIssueAsync for workspace {WorkspaceId}", workspaceId);
-            return new GitLabCreateIssueResult { Success = false, Error = "Unable to reach GitLab API. Please check connectivity." };
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Unexpected error in CreateIssueAsync for workspace {WorkspaceId}", workspaceId);
             return new GitLabCreateIssueResult { Success = false, Error = $"Unexpected error: {ex.Message}" };
         }
     }
 
-    public async Task<GitLabUpdateIssueResult> UpdateIssueAsync(string workspaceId, string issueIid, string? title, string? description)
+    public async Task<GitLabUpdateIssueResult> UpdateIssueAsync(string workspaceId, string integrationId, string issueIid, string? title, string? description)
     {
         try
         {
@@ -234,7 +234,7 @@ public class GitLabToolService : IGitLabToolService
             if (string.IsNullOrWhiteSpace(title) && description == null)
                 return new GitLabUpdateIssueResult { Success = false, Error = "At least one of title or description must be provided." };
 
-            var integration = await GetAndValidateIntegrationAsync(workspaceGuid);
+            var integration = await _integrationResolver.ResolveAsync(workspaceGuid, integrationId, ProviderType.GITLAB);
             var apiClient = _apiClientFactory.CreateClient(integration);
             var updatedIssue = await apiClient.UpdateIssueAsync(issueNum, title, description);
 
@@ -246,19 +246,21 @@ public class GitLabToolService : IGitLabToolService
                 Title = updatedIssue.Title
             };
         }
+        catch (InvalidOperationException ex) when (
+            ex.Message.Contains("integrationId is required") ||
+            ex.Message.Contains("No active integration found for the supplied ID"))
+        {
+            _logger.LogWarning(ex, "Integration resolution failed for workspace {WorkspaceId}", workspaceId);
+            return new GitLabUpdateIssueResult { Success = false, Error = ex.Message };
+        }
         catch (InvalidOperationException ex) when (ex.Message.Contains("No active GitLab integration"))
         {
             _logger.LogWarning(ex, "No GitLab integration for workspace {WorkspaceId}", workspaceId);
-            return new GitLabUpdateIssueResult { Success = false, Error = "No active GitLab integration found for this workspace." };
+            return new GitLabUpdateIssueResult { Success = false, Error = ex.Message };
         }
         catch (HttpRequestException ex)
         {
             _logger.LogError(ex, "GitLab API error in UpdateIssueAsync for workspace {WorkspaceId}", workspaceId);
-            return new GitLabUpdateIssueResult { Success = false, Error = "Unable to reach GitLab API. Please check connectivity." };
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Unexpected error in UpdateIssueAsync for workspace {WorkspaceId}", workspaceId);
             return new GitLabUpdateIssueResult { Success = false, Error = $"Unexpected error: {ex.Message}" };
         }
     }

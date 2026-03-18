@@ -1,3 +1,5 @@
+using Orchestra.Domain.Enums;
+
 namespace Orchestra.Application.Common.Interfaces;
 
 public interface IAgentToolActionDataAccess
@@ -9,6 +11,20 @@ public interface IAgentToolActionDataAccess
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of tool action IDs assigned to the agent.</returns>
     Task<List<Guid>> GetToolActionIdsByAgentIdAsync(
+        Guid agentId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns the distinct external provider types required by an agent's assigned tool categories.
+    /// <c>ProviderType.INTERNAL</c> is excluded because internal tools never use an integrationId.
+    /// </summary>
+    /// <param name="agentId">The agent identifier.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>
+    /// A list of distinct <see cref="ProviderType"/> values (never includes <c>INTERNAL</c>).
+    /// Returns an empty list when the agent has no external tool assignments.
+    /// </returns>
+    Task<List<ProviderType>> GetExternalProviderTypesByAgentIdAsync(
         Guid agentId,
         CancellationToken cancellationToken = default);
 

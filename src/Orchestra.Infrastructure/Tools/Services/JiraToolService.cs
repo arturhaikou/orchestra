@@ -18,24 +18,25 @@ namespace Orchestra.Infrastructure.Tools.Services;
 public class JiraToolService : IJiraToolService
 {
     private readonly JiraApiClientFactory _apiClientFactory;
-    private readonly IIntegrationDataAccess _integrationDataAccess;
+    private readonly IIntegrationResolver _integrationResolver;
     private readonly ILogger<JiraToolService> _logger;
     private readonly IJiraTextContentConverter _contentConverter;
 
     public JiraToolService(
         JiraApiClientFactory apiClientFactory,
-        IIntegrationDataAccess integrationDataAccess,
+        IIntegrationResolver integrationResolver,
         ILogger<JiraToolService> logger,
         IJiraTextContentConverter contentConverter)
     {
         _apiClientFactory = apiClientFactory;
-        _integrationDataAccess = integrationDataAccess;
+        _integrationResolver = integrationResolver;
         _logger = logger;
         _contentConverter = contentConverter;
     }
 
     public async Task<object> CreateIssueAsync(
         string workspaceId,
+        string integrationId,
         string summary,
         string description,
         string issueTypeName,
@@ -60,7 +61,7 @@ public class JiraToolService : IJiraToolService
             }
 
             // Step 1: Load and validate integration
-            var integration = await GetAndValidateIntegrationAsync(workspaceGuid);
+            var integration = await _integrationResolver.ResolveAsync(workspaceGuid, integrationId, ProviderType.JIRA);
 
             // Step 2: Create API client
             var apiClient = _apiClientFactory.CreateClient(integration);
@@ -121,10 +122,11 @@ public class JiraToolService : IJiraToolService
             {
                 success = false,
                 error = ex.Message,
-                errorCode = ex.Message.Contains("authenticate") ? "JIRA_AUTH_FAILED" :
+                errorCode = ex.Message.Contains("integrationId is required") ? "INTEGRATION_ID_REQUIRED" :
+                           ex.Message.Contains("No active integration found for the supplied ID") ? "INTEGRATION_NOT_FOUND" :
+                           ex.Message.Contains("authenticate") ? "JIRA_AUTH_FAILED" :
                            ex.Message.Contains("permission") ? "JIRA_FORBIDDEN" :
-                           ex.Message.Contains("not active") ? "INTEGRATION_INACTIVE" :
-                           ex.Message.Contains("not a JIRA provider") ? "INTEGRATION_WRONG_PROVIDER" :
+                           ex.Message.Contains("not a Jira integration") ? "INTEGRATION_WRONG_PROVIDER" :
                            "INVALID_OPERATION"
             };
         }
@@ -213,6 +215,7 @@ public class JiraToolService : IJiraToolService
 
     public async Task<object> UpdateIssueAsync(
         string workspaceId,
+        string integrationId,
         string issueKey,
         string? summary = null,
         string? description = null)
@@ -244,7 +247,7 @@ public class JiraToolService : IJiraToolService
             }
 
             // Step 1: Validate integration
-            var integration = await GetAndValidateIntegrationAsync(workspaceGuid);
+            var integration = await _integrationResolver.ResolveAsync(workspaceGuid, integrationId, ProviderType.JIRA);
 
             // Step 2: Create API client
             var apiClient = _apiClientFactory.CreateClient(integration);
@@ -321,11 +324,12 @@ public class JiraToolService : IJiraToolService
             {
                 success = false,
                 error = ex.Message,
-                errorCode = ex.Message.Contains("authenticate") ? "JIRA_AUTH_FAILED" :
+                errorCode = ex.Message.Contains("integrationId is required") ? "INTEGRATION_ID_REQUIRED" :
+                           ex.Message.Contains("No active integration found for the supplied ID") ? "INTEGRATION_NOT_FOUND" :
+                           ex.Message.Contains("authenticate") ? "JIRA_AUTH_FAILED" :
                            ex.Message.Contains("permission") ? "JIRA_FORBIDDEN" :
                            ex.Message.Contains("not found") ? "JIRA_NOT_FOUND" :
-                           ex.Message.Contains("not active") ? "INTEGRATION_INACTIVE" :
-                           ex.Message.Contains("not a JIRA provider") ? "INTEGRATION_WRONG_PROVIDER" :
+                           ex.Message.Contains("not a Jira integration") ? "INTEGRATION_WRONG_PROVIDER" :
                            "INVALID_OPERATION"
             };
         }
@@ -418,6 +422,7 @@ public class JiraToolService : IJiraToolService
 
     public async Task<object> DeleteIssueAsync(
         string workspaceId,
+        string integrationId,
         string issueKey)
     {
         try
@@ -438,7 +443,7 @@ public class JiraToolService : IJiraToolService
             }
 
             // Step 1: Validate integration
-            var integration = await GetAndValidateIntegrationAsync(workspaceGuid);
+            var integration = await _integrationResolver.ResolveAsync(workspaceGuid, integrationId, ProviderType.JIRA);
 
             // Step 2: Create API client
             var apiClient = _apiClientFactory.CreateClient(integration);
@@ -483,11 +488,12 @@ public class JiraToolService : IJiraToolService
             {
                 success = false,
                 error = ex.Message,
-                errorCode = ex.Message.Contains("authenticate") ? "JIRA_AUTH_FAILED" :
+                errorCode = ex.Message.Contains("integrationId is required") ? "INTEGRATION_ID_REQUIRED" :
+                           ex.Message.Contains("No active integration found for the supplied ID") ? "INTEGRATION_NOT_FOUND" :
+                           ex.Message.Contains("authenticate") ? "JIRA_AUTH_FAILED" :
                            ex.Message.Contains("permission") ? "JIRA_FORBIDDEN" :
                            ex.Message.Contains("not found") ? "JIRA_NOT_FOUND" :
-                           ex.Message.Contains("not active") ? "INTEGRATION_INACTIVE" :
-                           ex.Message.Contains("not a JIRA provider") ? "INTEGRATION_WRONG_PROVIDER" :
+                           ex.Message.Contains("not a Jira integration") ? "INTEGRATION_WRONG_PROVIDER" :
                            "INVALID_OPERATION"
             };
         }
@@ -578,7 +584,7 @@ public class JiraToolService : IJiraToolService
         }
     }
 
-    public async Task<object> GetIssueAsync(string workspaceId, string issueKey)
+    public async Task<object> GetIssueAsync(string workspaceId, string integrationId, string issueKey)
     {
         try
         {
@@ -598,7 +604,7 @@ public class JiraToolService : IJiraToolService
             }
 
             // Step 1: Load and validate integration
-            var integration = await GetAndValidateIntegrationAsync(workspaceGuid);
+            var integration = await _integrationResolver.ResolveAsync(workspaceGuid, integrationId, ProviderType.JIRA);
 
             // Step 2: Create API client
             var apiClient = _apiClientFactory.CreateClient(integration);
@@ -685,12 +691,13 @@ public class JiraToolService : IJiraToolService
             {
                 success = false,
                 error = ex.Message,
-                errorCode = ex.Message.Contains("authenticate") ? "JIRA_AUTH_FAILED" :
+                errorCode = ex.Message.Contains("integrationId is required") ? "INTEGRATION_ID_REQUIRED" :
+                           ex.Message.Contains("No active integration found for the supplied ID") ? "INTEGRATION_NOT_FOUND" :
+                           ex.Message.Contains("authenticate") ? "JIRA_AUTH_FAILED" :
                            ex.Message.Contains("permission") ? "JIRA_FORBIDDEN" :
                            ex.Message.Contains("not found") ? "JIRA_NOT_FOUND" :
                            ex.Message.Contains("parse") ? "JIRA_PARSE_ERROR" :
-                           ex.Message.Contains("not active") ? "INTEGRATION_INACTIVE" :
-                           ex.Message.Contains("not a JIRA provider") ? "INTEGRATION_WRONG_PROVIDER" :
+                           ex.Message.Contains("not a Jira integration") ? "INTEGRATION_WRONG_PROVIDER" :
                            "INVALID_OPERATION"
             };
         }
@@ -782,6 +789,7 @@ public class JiraToolService : IJiraToolService
 
     public async Task<object> CreateEpicAsync(
         string workspaceId,
+        string integrationId,
         string epicTitle,
         string epicDescription,
         List<StoryRequest> stories,
@@ -807,7 +815,7 @@ public class JiraToolService : IJiraToolService
             }
 
             // Step 1: Load and validate integration
-            var integration = await GetAndValidateIntegrationAsync(workspaceGuid);
+            var integration = await _integrationResolver.ResolveAsync(workspaceGuid, integrationId, ProviderType.JIRA);
 
             // Step 2: Create API client
             var apiClient = _apiClientFactory.CreateClient(integration);
@@ -915,11 +923,12 @@ public class JiraToolService : IJiraToolService
             {
                 success = false,
                 error = ex.Message,
-                errorCode = ex.Message.Contains("authenticate") ? "JIRA_AUTH_FAILED" :
+                errorCode = ex.Message.Contains("integrationId is required") ? "INTEGRATION_ID_REQUIRED" :
+                           ex.Message.Contains("No active integration found for the supplied ID") ? "INTEGRATION_NOT_FOUND" :
+                           ex.Message.Contains("authenticate") ? "JIRA_AUTH_FAILED" :
                            ex.Message.Contains("permission") ? "JIRA_FORBIDDEN" :
                            ex.Message.Contains("parse") ? "JIRA_PARSE_ERROR" :
-                           ex.Message.Contains("not active") ? "INTEGRATION_INACTIVE" :
-                           ex.Message.Contains("not a JIRA provider") ? "INTEGRATION_WRONG_PROVIDER" :
+                           ex.Message.Contains("not a Jira integration") ? "INTEGRATION_WRONG_PROVIDER" :
                            "INVALID_OPERATION"
             };
         }
@@ -1004,34 +1013,6 @@ public class JiraToolService : IJiraToolService
                 error = $"Unexpected error: {ex.Message}"
             };
         }
-    }
-
-    private async Task<Integration> GetAndValidateIntegrationAsync(
-        Guid workspaceId, 
-        CancellationToken cancellationToken = default)
-    {
-        var integrations = await _integrationDataAccess.GetByWorkspaceIdAsync(workspaceId, cancellationToken);
-        var integration = integrations.FirstOrDefault(i => i.Provider == ProviderType.JIRA);
-        
-        if (integration == null)
-        {
-            _logger.LogError(
-                "No active JIRA integration found for workspace {WorkspaceId}", 
-                workspaceId);
-            throw new InvalidOperationException(
-                $"No active JIRA integration found for workspace {workspaceId}");
-        }
-
-        if (!integration.IsActive)
-        {
-            _logger.LogError(
-                "JIRA integration {IntegrationId} for workspace {WorkspaceId} is not active", 
-                integration.Id, workspaceId);
-            throw new InvalidOperationException(
-                $"JIRA integration for workspace {workspaceId} is not active");
-        }
-
-        return integration;
     }
 
     private async Task<string> GetProjectIdAsync(
