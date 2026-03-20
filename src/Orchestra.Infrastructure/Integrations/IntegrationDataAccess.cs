@@ -51,6 +51,30 @@ public class IntegrationDataAccess : IIntegrationDataAccess
         return await query.AnyAsync(cancellationToken);
     }
 
+    public async Task<bool> ExistsByProviderInWorkspaceAsync(
+        ProviderType provider,
+        Guid workspaceId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.Integrations
+            .Where(i => i.Provider == provider && i.WorkspaceId == workspaceId && i.IsActive)
+            .AnyAsync(cancellationToken);
+    }
+
+    public async Task<bool> ExistsByProviderInWorkspaceExcludingSelf(
+        ProviderType provider,
+        Guid workspaceId,
+        Guid excludeIntegrationId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.Integrations
+            .Where(i => i.Provider == provider
+                     && i.WorkspaceId == workspaceId
+                     && i.IsActive
+                     && i.Id != excludeIntegrationId)
+            .AnyAsync(cancellationToken);
+    }
+
     public async Task AddAsync(Integration integration, CancellationToken cancellationToken = default)
     {
         await _context.Integrations.AddAsync(integration, cancellationToken);

@@ -100,6 +100,10 @@ public class IntegrationController : ControllerBase
                 new { id = integration.Id }, 
                 integration);
         }
+        catch (DuplicateProviderIntegrationException ex)
+        {
+            return Conflict(new ErrorResponse(ex.Message));
+        }
         catch (DuplicateIntegrationException ex)
         {
             return Conflict(new ErrorResponse(ex.Message));
@@ -163,6 +167,10 @@ public class IntegrationController : ControllerBase
         catch (IntegrationNotFoundException ex)
         {
             return NotFound(new ErrorResponse(ex.Message));
+        }
+        catch (DuplicateProviderIntegrationException ex)
+        {
+            return Conflict(new ErrorResponse(ex.Message));
         }
         catch (DuplicateIntegrationException ex)
         {

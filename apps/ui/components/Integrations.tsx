@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Layers, GitBranch, Gitlab, Database, Globe, X, Save, Check, Loader2, Trash2, AlertTriangle, RefreshCw, Key, Filter, Zap, User, Link as LinkIcon, Search, ChevronDown, Wifi } from 'lucide-react';
 import { Integration, IntegrationType } from '../types';
 import { getIntegrations, createIntegration, updateIntegration, deleteIntegration, testIntegrationConnection } from '../services/integrationService';
@@ -26,6 +26,11 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [typesError, setTypesError] = useState<string | null>(null);
+
+  const usedProviders = useMemo(
+    () => new Set(integrations.map(i => i.provider?.toLowerCase()).filter(Boolean) as string[]),
+    [integrations]
+  );
 
   const fetchAll = async () => {
     setIsLoading(true);
@@ -414,7 +419,14 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
                     }}
                     className="w-full bg-background border border-border rounded-lg pl-3 pr-10 py-2.5 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary appearance-none transition-all shadow-sm"
                   >
-                    {providers.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                    {providers.map(p => {
+                      const isUsed = !editingId && usedProviders.has(p.value);
+                      return (
+                        <option key={p.value} value={p.value} disabled={isUsed}>
+                          {isUsed ? `${p.label} — Already connected` : p.label}
+                        </option>
+                      );
+                    })}
                   </select>
                   <Globe className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-textMuted pointer-events-none" />
                 </div>

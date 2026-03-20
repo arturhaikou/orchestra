@@ -63,6 +63,38 @@ public interface IIntegrationDataAccess
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Checks if an active (non-deleted) integration for the specified provider already exists
+    /// in the workspace. Soft-deleted integrations are excluded from this check.
+    /// </summary>
+    /// <param name="provider">The provider type to check.</param>
+    /// <param name="workspaceId">The workspace ID to scope the check.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>True if an active integration for the provider exists, false otherwise.</returns>
+    Task<bool> ExistsByProviderInWorkspaceAsync(
+        ProviderType provider,
+        Guid workspaceId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Checks if another active (non-deleted) integration for the specified provider already
+    /// exists in the workspace, excluding the integration identified by
+    /// <paramref name="excludeIntegrationId"/>. Used on the update path to enforce the
+    /// one-per-provider rule while allowing the integration being edited to keep its
+    /// current provider without triggering a false conflict.
+    /// Soft-deleted integrations are excluded from this check.
+    /// </summary>
+    /// <param name="provider">The provider type to check.</param>
+    /// <param name="workspaceId">The workspace ID to scope the check.</param>
+    /// <param name="excludeIntegrationId">The ID of the integration being updated (self-exclusion).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>True if another active integration for the provider exists, false otherwise.</returns>
+    Task<bool> ExistsByProviderInWorkspaceExcludingSelf(
+        ProviderType provider,
+        Guid workspaceId,
+        Guid excludeIntegrationId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Adds a new integration to the database.
     /// </summary>
     /// <param name="integration">The integration entity to add.</param>
