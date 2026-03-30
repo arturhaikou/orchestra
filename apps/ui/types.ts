@@ -92,6 +92,7 @@ export interface Agent {
   toolCategories: string[]; // Unique category names for display
   avatarUrl: string;
   customInstructions?: string;
+  projectPrinciples?: string; // Non-null only for agents with a review tool assigned
   model?: string | null; // LLM model override; null means system default
 }
 

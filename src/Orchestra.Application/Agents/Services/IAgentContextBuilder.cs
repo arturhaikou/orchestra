@@ -18,22 +18,20 @@ public interface IAgentContextBuilder
 
     /// <summary>
     /// Builds a fully enriched execution context prompt for agent execution.
-    /// Combines ticket context with integration metadata scoped to the agent's external tool provider types.
+    /// Combines ticket context with integration metadata and, for review agents, project principles.
     /// </summary>
     /// <remarks>
-    /// This method:
-    /// 1. Loads the agent's external tool provider types
-    /// 2. Fetches active integrations scoped to the workspace and those provider types
-    /// 3. Builds ticket context (internal or external)
-    /// 4. Appends a structured integration context block listing available integrations
-    /// 
-    /// The integration context block allows the LLM to autonomously resolve the correct integrationId
-    /// when invoking external tools. Only non-sensitive metadata (ID, Name, Provider) is included.
-    /// If the agent has no external tools, no integration context block is appended.
+    /// Phase 1: Builds base ticket context (internal comment history or live external ticket data).
+    /// Phase 2: Appends a structured [Available Integrations] block when the agent has external tools.
+    /// Phase 3: Appends a structured [Project Principles] block when <paramref name="agent"/>
+    ///          has a non-null <c>ProjectPrinciples</c> value. No-op for non-review agents.
     /// </remarks>
-    /// <param name="ticket">The ticket entity.</param>
-    /// <param name="agentId">The agent's unique identifier, used to load its external tool provider types.</param>
+    /// <param name="ticket">The ticket being executed.</param>
+    /// <param name="agent">The agent entity (used for tool lookups and ProjectPrinciples injection).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>Fully enriched context prompt for agent execution (ticket + integrations).</returns>
-    Task<string> BuildAgentContextWithIntegrationsAsync(Ticket ticket, Guid agentId, CancellationToken cancellationToken = default);
+    /// <returns>The fully enriched context prompt string.</returns>
+    Task<string> BuildAgentContextWithIntegrationsAsync(
+        Ticket ticket,
+        Agent agent,
+        CancellationToken cancellationToken = default);
 }

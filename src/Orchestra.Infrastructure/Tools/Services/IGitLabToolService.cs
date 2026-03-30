@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Threading.Tasks;
+using Orchestra.Application.CodeReview.Models;
 using Orchestra.Domain.Enums;
 using Orchestra.Infrastructure.Tools.Attributes;
 
@@ -97,4 +98,13 @@ public interface IGitLabToolService
         [Description("The GitLab issue IID (project-scoped ID)")] string issueIid,
         [Description("New title (optional; if null or empty, omit from update)")] string? title,
         [Description("New description (optional; if null or empty, omit from update)")] string? description);
+
+    [ToolAction("review_merge_request", "Review Merge Request", DangerLevel.Moderate)]
+    [Description("Performs an automated code review of a GitLab merge request, analysing the diff and submitting structured findings.")]
+    Task<ReviewToolResult> ReviewMergeRequestAsync(
+        [Description("The workspace ID (GUID)")] string workspaceId,
+        [Description("The ID of the specific GitLab integration instance to use. Required when the workspace has multiple GitLab integrations configured.")] string integrationId,
+        [Description("The GitLab merge request IID (project-scoped ID)")] string mrIid,
+        string? modelIdentifier = null,
+        string? projectPrinciples = null);
 }

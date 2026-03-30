@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Orchestra.Domain.Entities;
@@ -307,6 +308,165 @@ public class GitHubApiClient : IGitHubApiClient
         catch (HttpRequestException ex)
         {
             _logger.LogError(ex, "HTTP error searching GitHub issues");
+            throw;
+        }
+    }
+
+    public async Task<string> GetPullRequestDiffAsync(int prNumber, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var files = await GetPullRequestFilesAsync(prNumber, cancellationToken);
+            var sb = new StringBuilder();
+            foreach (var file in files.Where(f => f.Patch != null))
+            {
+                sb.AppendLine($"diff --git a/{file.Filename} b/{file.Filename}");
+                sb.AppendLine($"--- a/{file.Filename}");
+                sb.AppendLine($"+++ b/{file.Filename}");
+                sb.AppendLine(file.Patch);
+            }
+            return sb.ToString();
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Error retrieving diff for pull request {PrNumber} in {Owner}/{Repo}", prNumber, _owner, _repo);
+            throw;
+        }
+    }
+
+    public async Task<List<GitHubPullRequestFile>> GetPullRequestFilesAsync(int prNumber, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var url = $"/repos/{_owner}/{_repo}/pulls/{prNumber}/files?per_page=300";
+            var response = await _httpClient.GetAsync(url, cancellationToken);
+            await ThrowForGitHubStatusAsync(response, cancellationToken);
+
+            var content = await response.Content.ReadAsStringAsync(cancellationToken);
+            return JsonSerializer.Deserialize<List<GitHubPullRequestFile>>(content, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            }) ?? new List<GitHubPullRequestFile>();
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Error retrieving files for pull request {PrNumber} in {Owner}/{Repo}", prNumber, _owner, _repo);
+            throw;
+        }
+    }
+
+    public async Task<List<GitHubReviewComment>> GetPullRequestReviewCommentsAsync(int prNumber, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var url = $"/repos/{_owner}/{_repo}/pulls/{prNumber}/comments?per_page=100";
+            var response = await _httpClient.GetAsync(url, cancellationToken);
+            await ThrowForGitHubStatusAsync(response, cancellationToken);
+
+            var content = await response.Content.ReadAsStringAsync(cancellationToken);
+            return JsonSerializer.Deserialize<List<GitHubReviewComment>>(content, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            }) ?? new List<GitHubReviewComment>();
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Error retrieving review comments for pull request {PrNumber} in {Owner}/{Repo}", prNumber, _owner, _repo);
+            throw;
+        }
+    }
+
+    public async Task<GitHubReviewSubmissionResult> SubmitPullRequestReviewAsync(int prNumber, string reviewEvent, string body, IReadOnlyList<GitHubInlineReviewComment>? comments = null, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var url = $"/repos/{_owner}/{_repo}/pulls/{prNumber}/reviews";
+
+            var response = await _httpClient.PostAsync(
+                url,
+                BuildReviewRequestContent(reviewEvent, body, comments),
+                cancellationToken);
+            var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            // GitHub rejects REQUEST_CHANGES when the token owner is the PR author.
+            // Fall back to COMMENT so the review body and inline findings are still posted.
+            if (response.StatusCode == System.Net.HttpStatusCode.UnprocessableEntity
+                && string.Equals(reviewEvent, "REQUEST_CHANGES", StringComparison.OrdinalIgnoreCase)
+                && responseContent.Contains("own pull request", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning(
+                    "GitHub rejected REQUEST_CHANGES on own pull request {PrNumber}; retrying as COMMENT.",
+                    prNumber);
+                response = await _httpClient.PostAsync(
+                    url,
+                    BuildReviewRequestContent("COMMENT", body, comments),
+                    cancellationToken);
+                responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+            }
+
+            await ThrowForGitHubStatusAsync(response, cancellationToken);
+
+            return JsonSerializer.Deserialize<GitHubReviewSubmissionResult>(responseContent, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            }) ?? throw new InvalidOperationException("Failed to parse review submission response from GitHub");
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Error submitting review for pull request {PrNumber} in {Owner}/{Repo}", prNumber, _owner, _repo);
+            throw;
+        }
+    }
+
+    private StringContent BuildReviewRequestContent(string reviewEvent, string body, IReadOnlyList<GitHubInlineReviewComment>? comments)
+    {
+        string json;
+        if (comments is { Count: > 0 })
+        {
+            var payload = new
+            {
+                @event = reviewEvent,
+                body,
+                comments = comments.Select(c => new { path = c.Path, line = c.Line, side = c.Side, body = c.Body })
+            };
+            json = JsonSerializer.Serialize(payload);
+        }
+        else
+        {
+            var payload = new { @event = reviewEvent, body };
+            json = JsonSerializer.Serialize(payload);
+        }
+        return new StringContent(json, Encoding.UTF8, "application/json");
+    }
+
+    public async Task<string> GetFileContentAsync(string path, string? gitRef, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var url = $"/repos/{_owner}/{_repo}/contents/{Uri.EscapeDataString(path)}";
+            if (!string.IsNullOrEmpty(gitRef))
+                url += $"?ref={Uri.EscapeDataString(gitRef)}";
+
+            var response = await _httpClient.GetAsync(url, cancellationToken);
+            await ThrowForGitHubStatusAsync(response, cancellationToken);
+
+            var content = await response.Content.ReadAsStringAsync(cancellationToken);
+            var fileContent = JsonSerializer.Deserialize<GitHubFileContent>(content, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            }) ?? throw new InvalidOperationException("Failed to parse file content response from GitHub");
+
+            if (fileContent.Encoding == "base64")
+            {
+                var decoded = Convert.FromBase64String(fileContent.Content.Replace("\n", ""));
+                return Encoding.UTF8.GetString(decoded);
+            }
+
+            return fileContent.Content;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Error retrieving file content for path {Path} in {Owner}/{Repo}", path, _owner, _repo);
             throw;
         }
     }

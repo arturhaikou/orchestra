@@ -20,11 +20,17 @@ public interface IAgentRuntimeService
     /// no model override. When null, the implementation must fall back to the
     /// system-configured deployment name from application settings.
     /// </param>
+    /// <param name="projectPrinciples">
+    /// The parent agent's Project Principles text (nullable). Forwarded to
+    /// <c>IToolRetrieverService</c> for capture in the review-action closure.
+    /// Must NOT be logged at any verbosity level.
+    /// </param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The text response from the agent execution.</returns>
     Task<string> ExecuteAgentAsync(
         Guid agentId,
         string contextPrompt,
         string? agentModel = null,
+        string? projectPrinciples = null,
         CancellationToken cancellationToken = default);
 }

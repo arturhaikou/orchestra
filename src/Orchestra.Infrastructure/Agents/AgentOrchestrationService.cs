@@ -96,10 +96,10 @@ public class AgentOrchestrationService : IAgentOrchestrationService
             ticket.UpdateStatus(InProgressStatusId);
             await _ticketDataAccess.UpdateTicketAsync(ticket, cancellationToken);
 
-            // 5. Build context prompt with integrations
+            // 5. Build context prompt with integrations (Phase 1: ticket, Phase 2: integrations, Phase 3: project principles)
             var contextPrompt = await _agentContextBuilder.BuildAgentContextWithIntegrationsAsync(
                 ticket,
-                agentEntity.Id,
+                agentEntity,
                 cancellationToken);
 
             _logger.LogDebug(
@@ -119,6 +119,7 @@ public class AgentOrchestrationService : IAgentOrchestrationService
                 agentEntity.Id,
                 contextPrompt,
                 agentEntity.Model,
+                agentEntity.ProjectPrinciples,
                 cancellationToken);
 
             _logger.LogInformation(
@@ -129,13 +130,11 @@ public class AgentOrchestrationService : IAgentOrchestrationService
             ticket.UpdateStatus(CompletedStatusId);
             await _ticketDataAccess.UpdateTicketAsync(ticket, cancellationToken);
 
-            // 8. Add result comment
-            var comment = TicketComment.Create(
-                ticketId,
+            // 8. Log completion
+            _logger.LogInformation(
+                "Agent {AgentName} completed execution on ticket {TicketId}",
                 agentEntity.Name,
-                responseText);
-
-            await _ticketDataAccess.AddCommentAsync(comment, cancellationToken);
+                ticketId);
 
             return AgentExecutionResult.Success(responseText);
         }
@@ -146,17 +145,15 @@ public class AgentOrchestrationService : IAgentOrchestrationService
                 "Error executing agent for ticket {TicketId}",
                 ticketId);
 
-            // Error handling - Add error comment
+            // Error handling - Log and revert status
             if (ticket != null && agentEntity != null)
             {
                 try
                 {
-                    var errorComment = TicketComment.Create(
-                        ticketId,
+                    _logger.LogInformation(
+                        "Agent {AgentName} execution failed on ticket {TicketId}. Reverting to To Do status.",
                         agentEntity.Name,
-                        $"❌ Execution failed: {ex.Message}");
-
-                    await _ticketDataAccess.AddCommentAsync(errorComment, cancellationToken);
+                        ticketId);
 
                     // Revert status to To Do for retry
                     ticket.UpdateStatus(ToDoStatusId);
@@ -166,7 +163,7 @@ public class AgentOrchestrationService : IAgentOrchestrationService
                 {
                     _logger.LogError(
                         innerEx,
-                        "Failed to add error comment for ticket {TicketId}",
+                        "Failed to revert ticket status for {TicketId}",
                         ticketId);
                 }
             }

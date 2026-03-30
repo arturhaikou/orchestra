@@ -37,7 +37,11 @@ public class AgentConfiguration : IEntityTypeConfiguration<Agent>
             .HasMaxLength(500);
 
         builder.Property(a => a.CustomInstructions)
-            .IsRequired()
+            .IsRequired(false)
+            .HasMaxLength(5000);
+
+        builder.Property(a => a.ProjectPrinciples)
+            .IsRequired(false)
             .HasMaxLength(5000);
 
         builder.Property(a => a.Capabilities)

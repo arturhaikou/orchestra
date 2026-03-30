@@ -19,4 +19,20 @@ public interface IGitHubApiClient
 
     /// <summary>Throws InvalidOperationException for 401/403/429. Throws HttpRequestException(SocketException) for network failures.</summary>
     Task<GitHubSearchResult> SearchIssuesAsync(string query, int limit, CancellationToken cancellationToken = default);
+
+    // ── Review sub-agent methods ──────────────────────────────────────────────
+    // These methods carry no [ToolAction] attribute. They are never discovered
+    // by ToolScanningService and are therefore structurally absent from the
+    // tool catalogue. They exist solely for use by the Code Review Orchestration
+    // Service when constructing sub-agent AIFunction instances at runtime.
+
+    Task<string> GetPullRequestDiffAsync(int prNumber, CancellationToken cancellationToken = default);
+
+    Task<List<GitHubPullRequestFile>> GetPullRequestFilesAsync(int prNumber, CancellationToken cancellationToken = default);
+
+    Task<List<GitHubReviewComment>> GetPullRequestReviewCommentsAsync(int prNumber, CancellationToken cancellationToken = default);
+
+    Task<GitHubReviewSubmissionResult> SubmitPullRequestReviewAsync(int prNumber, string reviewEvent, string body, IReadOnlyList<GitHubInlineReviewComment>? comments = null, CancellationToken cancellationToken = default);
+
+    Task<string> GetFileContentAsync(string path, string? gitRef, CancellationToken cancellationToken = default);
 }

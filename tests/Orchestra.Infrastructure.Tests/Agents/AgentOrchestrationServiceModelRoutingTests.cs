@@ -39,6 +39,7 @@ public class AgentOrchestrationServiceModelRoutingTests
                 Arg.Any<Guid>(),
                 Arg.Any<string>(),
                 Arg.Any<string?>(),
+                Arg.Any<string?>(),
                 Arg.Any<CancellationToken>())
             .Returns("Agent response");
 
@@ -46,7 +47,7 @@ public class AgentOrchestrationServiceModelRoutingTests
         contextBuilder
             .BuildAgentContextWithIntegrationsAsync(
                 Arg.Any<Ticket>(),
-                Arg.Any<Guid>(),
+                Arg.Any<Agent>(),
                 Arg.Any<CancellationToken>())
             .Returns("Enriched context prompt");
 
@@ -101,6 +102,7 @@ public class AgentOrchestrationServiceModelRoutingTests
             agent.Id,
             Arg.Any<string>(),
             agentModel,
+            Arg.Any<string?>(),
             Arg.Any<CancellationToken>());
     }
 
@@ -142,6 +144,7 @@ public class AgentOrchestrationServiceModelRoutingTests
             agent.Id,
             Arg.Any<string>(),
             null,
+            Arg.Any<string?>(),
             Arg.Any<CancellationToken>());
     }
 }

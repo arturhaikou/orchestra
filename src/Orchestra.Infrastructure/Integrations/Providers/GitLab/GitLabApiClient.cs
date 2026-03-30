@@ -262,4 +262,200 @@ public class GitLabApiClient : IGitLabApiClient
             throw;
         }
     }
+
+    public async Task<GitLabMrChangesResult> GetMergeRequestChangesAsync(int mrIid, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // Fetch the latest MR version to obtain SHA values required for
+            // inline discussion position objects (CreateMergeRequestDiscussionAsync).
+            var versionsUrl = $"/api/v4/projects/{EncodedProjectPath}/merge_requests/{mrIid}/versions?per_page=1";
+            var versionsResponse = await _httpClient.GetAsync(versionsUrl, cancellationToken);
+            versionsResponse.EnsureSuccessStatusCode();
+
+            var versionsContent = await versionsResponse.Content.ReadAsStringAsync(cancellationToken);
+            var versions = JsonSerializer.Deserialize<List<GitLabMrVersion>>(versionsContent, _jsonOptions) ?? new();
+            var latestVersion = versions.FirstOrDefault();
+
+            // Fetch the per-file diff changes.
+            var diffsUrl = $"/api/v4/projects/{EncodedProjectPath}/merge_requests/{mrIid}/diffs";
+            var diffsResponse = await _httpClient.GetAsync(diffsUrl, cancellationToken);
+            diffsResponse.EnsureSuccessStatusCode();
+
+            var diffsContent = await diffsResponse.Content.ReadAsStringAsync(cancellationToken);
+            var changes = JsonSerializer.Deserialize<List<GitLabMergeRequestChange>>(diffsContent, _jsonOptions) ?? new();
+
+            return new GitLabMrChangesResult
+            {
+                BaseSha  = latestVersion?.BaseCommitSha  ?? string.Empty,
+                StartSha = latestVersion?.StartCommitSha ?? string.Empty,
+                HeadSha  = latestVersion?.HeadCommitSha  ?? string.Empty,
+                Changes  = changes,
+            };
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Error retrieving changes for merge request {MrIid} in project {Project}", mrIid, _projectPath);
+            throw;
+        }
+    }
+
+    public async Task<string> GetMergeRequestDiffAsync(int mrIid, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var changesResult = await GetMergeRequestChangesAsync(mrIid, cancellationToken);
+            var sb = new StringBuilder();
+            foreach (var change in changesResult.Changes.Where(c => !string.IsNullOrEmpty(c.Diff)))
+            {
+                sb.AppendLine($"diff --git a/{change.OldPath} b/{change.NewPath}");
+                sb.AppendLine($"--- a/{change.OldPath}");
+                sb.AppendLine($"+++ b/{change.NewPath}");
+                sb.AppendLine(change.Diff);
+            }
+            return sb.ToString();
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Error retrieving diff for merge request {MrIid} in project {Project}", mrIid, _projectPath);
+            throw;
+        }
+    }
+
+    public async Task<GitLabNote> SubmitMergeRequestNoteAsync(int mrIid, string body, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var url = $"/api/v4/projects/{EncodedProjectPath}/merge_requests/{mrIid}/notes";
+            var payload = new { body };
+            var json = JsonSerializer.Serialize(payload);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.PostAsync(url, content, cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+            return JsonSerializer.Deserialize<GitLabNote>(responseContent, _jsonOptions)
+                ?? throw new InvalidOperationException("Failed to parse note response from GitLab");
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Error submitting note for merge request {MrIid} in project {Project}", mrIid, _projectPath);
+            throw;
+        }
+    }
+
+    public async Task<GitLabApproval> ApproveMergeRequestAsync(int mrIid, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var url = $"/api/v4/projects/{EncodedProjectPath}/merge_requests/{mrIid}/approve";
+            var response = await _httpClient.PostAsync(url, new StringContent(string.Empty), cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+            return JsonSerializer.Deserialize<GitLabApproval>(responseContent, _jsonOptions)
+                ?? throw new InvalidOperationException("Failed to parse approval response from GitLab");
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Error approving merge request {MrIid} in project {Project}", mrIid, _projectPath);
+            throw;
+        }
+    }
+
+    public async Task<GitLabDiscussionResult> CreateMergeRequestDiscussionAsync(
+        int mrIid,
+        string body,
+        string baseSha,
+        string startSha,
+        string headSha,
+        string oldPath,
+        string newPath,
+        int? oldLine,
+        int? newLine,
+        CancellationToken cancellationToken = default)
+    {
+        // Security: all three SHA fields must be non-empty strings sourced from the
+        // MR version data. Reject any call where these fields were not properly
+        // propagated from GetMergeRequestChangesAsync.
+        if (string.IsNullOrWhiteSpace(baseSha) || string.IsNullOrWhiteSpace(startSha) || string.IsNullOrWhiteSpace(headSha))
+        {
+            _logger.LogWarning(
+                "CreateMergeRequestDiscussionAsync rejected for merge request {MrIid}: one or more SHA fields are empty.",
+                mrIid);
+            return new GitLabDiscussionResult
+            {
+                Success = false,
+                Error   = "Invalid position: base_sha, start_sha, and head_sha must all be non-empty strings sourced from the MR version data.",
+            };
+        }
+
+        try
+        {
+            var url = $"/api/v4/projects/{EncodedProjectPath}/merge_requests/{mrIid}/discussions";
+
+            var payload = new
+            {
+                body,
+                position = new
+                {
+                    position_type = "text",
+                    base_sha      = baseSha,
+                    start_sha     = startSha,
+                    head_sha      = headSha,
+                    old_path      = oldPath,
+                    new_path      = newPath,
+                    old_line      = oldLine,
+                    new_line      = newLine,
+                },
+            };
+
+            var json    = JsonSerializer.Serialize(payload);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.PostAsync(url, content, cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                _logger.LogWarning(
+                    "Failed to create inline discussion on merge request {MrIid}: HTTP {StatusCode} — {Error}",
+                    mrIid, (int)response.StatusCode, errorBody);
+                return new GitLabDiscussionResult
+                {
+                    Success = false,
+                    Error   = $"GitLab API returned {(int)response.StatusCode}: {errorBody}",
+                };
+            }
+
+            var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+            var discussion = JsonSerializer.Deserialize<GitLabDiscussion>(responseContent, _jsonOptions);
+
+            return new GitLabDiscussionResult
+            {
+                Success      = true,
+                DiscussionId = discussion?.Id,
+                NoteId       = discussion?.Notes?.FirstOrDefault()?.Id,
+            };
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex,
+                "HTTP error creating inline discussion on merge request {MrIid} in project {Project}",
+                mrIid, _projectPath);
+            return new GitLabDiscussionResult { Success = false, Error = ex.Message };
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex,
+                "JSON deserialization error for discussion response on merge request {MrIid}",
+                mrIid);
+            return new GitLabDiscussionResult
+            {
+                Success = false,
+                Error   = $"Failed to parse discussion response: {ex.Message}",
+            };
+        }
+    }
 }

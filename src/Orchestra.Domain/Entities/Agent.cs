@@ -40,8 +40,16 @@ public class Agent
 
     /// <summary>
     /// Gets the custom instructions for the agent.
+    /// Null when the agent is configured with a review tool (ProjectPrinciples is used instead).
     /// </summary>
-    public string CustomInstructions { get; private set; } = string.Empty;
+    public string? CustomInstructions { get; private set; }
+
+    /// <summary>
+    /// Gets the project principles for code review agents.
+    /// Null when the agent is not configured with a review tool (CustomInstructions is used instead).
+    /// At most one of CustomInstructions and ProjectPrinciples is non-null for any agent.
+    /// </summary>
+    public string? ProjectPrinciples { get; private set; }
 
     /// <summary>
     /// Gets the collection of capability tags for the agent.
@@ -71,20 +79,26 @@ public class Agent
 
     /// <summary>
     /// Creates a new agent instance with validated parameters.
+    /// Exactly one of <paramref name="customInstructions"/> or <paramref name="projectPrinciples"/>
+    /// must be non-null; mutual exclusivity is enforced by the Application service layer before
+    /// this factory is called. The factory validates field-level constraints only.
     /// </summary>
     /// <param name="workspaceId">The workspace identifier.</param>
     /// <param name="name">The agent name (required, max 200 characters).</param>
     /// <param name="role">The agent role (required, max 200 characters).</param>
     /// <param name="capabilities">The agent capabilities (optional).</param>
-    /// <param name="customInstructions">The custom instructions (required, max 5000 characters).</param>
+    /// <param name="customInstructions">The custom instructions (nullable; max 5000 characters).</param>
+    /// <param name="projectPrinciples">The project principles for review agents (nullable; max 5000 characters).</param>
+    /// <param name="model">Optional LLM model override.</param>
     /// <returns>A new Agent instance.</returns>
-    /// <exception cref="ArgumentException">Thrown when validation fails.</exception>
+    /// <exception cref="ArgumentException">Thrown when field-level validation fails.</exception>
     public static Agent Create(
         Guid workspaceId,
         string name,
         string role,
         IEnumerable<string>? capabilities,
-        string customInstructions,
+        string? customInstructions,
+        string? projectPrinciples = null,
         string? model = null)
     {
         if (workspaceId == Guid.Empty)
@@ -102,11 +116,21 @@ public class Agent
         if (role.Length > 200)
             throw new ArgumentException("Role cannot exceed 200 characters.", nameof(role));
 
-        if (string.IsNullOrWhiteSpace(customInstructions))
-            throw new ArgumentException("CustomInstructions cannot be null or empty.", nameof(customInstructions));
+        if (customInstructions != null)
+        {
+            if (customInstructions.Trim().Length == 0)
+                throw new ArgumentException("CustomInstructions cannot be whitespace.", nameof(customInstructions));
+            if (customInstructions.Length > 5000)
+                throw new ArgumentException("CustomInstructions cannot exceed 5000 characters.", nameof(customInstructions));
+        }
 
-        if (customInstructions.Length > 5000)
-            throw new ArgumentException("CustomInstructions cannot exceed 5000 characters.", nameof(customInstructions));
+        if (projectPrinciples != null)
+        {
+            if (projectPrinciples.Trim().Length == 0)
+                throw new ArgumentException("ProjectPrinciples cannot be whitespace.", nameof(projectPrinciples));
+            if (projectPrinciples.Length > 5000)
+                throw new ArgumentException("ProjectPrinciples cannot exceed 5000 characters.", nameof(projectPrinciples));
+        }
 
         var agent = new Agent
         {
@@ -115,7 +139,8 @@ public class Agent
             Name = name.Trim(),
             Role = role.Trim(),
             Status = AgentStatus.Offline,
-            CustomInstructions = customInstructions.Trim(),
+            CustomInstructions = customInstructions?.Trim(),
+            ProjectPrinciples = projectPrinciples?.Trim(),
             Capabilities = capabilities?.ToList() ?? new List<string>(),
             CreatedAt = DateTime.UtcNow,
             Model = model
@@ -128,17 +153,21 @@ public class Agent
 
     /// <summary>
     /// Updates the agent's profile information.
+    /// Exactly one of <paramref name="customInstructions"/> or <paramref name="projectPrinciples"/>
+    /// must be non-null; mutual exclusivity is enforced by the Application service layer.
     /// </summary>
     /// <param name="name">The new name (required, max 200 characters).</param>
     /// <param name="role">The new role (required, max 200 characters).</param>
     /// <param name="capabilities">The new capabilities.</param>
-    /// <param name="customInstructions">The new custom instructions (required, max 5000 characters).</param>
-    /// <exception cref="ArgumentException">Thrown when validation fails.</exception>
+    /// <param name="customInstructions">The new custom instructions (nullable; max 5000 characters).</param>
+    /// <param name="projectPrinciples">The new project principles for review agents (nullable; max 5000 characters).</param>
+    /// <exception cref="ArgumentException">Thrown when field-level validation fails.</exception>
     public void UpdateProfile(
         string name,
         string role,
         IEnumerable<string>? capabilities,
-        string customInstructions)
+        string? customInstructions,
+        string? projectPrinciples = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Name cannot be null or empty.", nameof(name));
@@ -152,16 +181,27 @@ public class Agent
         if (role.Length > 200)
             throw new ArgumentException("Role cannot exceed 200 characters.", nameof(role));
 
-        if (string.IsNullOrWhiteSpace(customInstructions))
-            throw new ArgumentException("CustomInstructions cannot be null or empty.", nameof(customInstructions));
+        if (customInstructions != null)
+        {
+            if (customInstructions.Trim().Length == 0)
+                throw new ArgumentException("CustomInstructions cannot be whitespace.", nameof(customInstructions));
+            if (customInstructions.Length > 5000)
+                throw new ArgumentException("CustomInstructions cannot exceed 5000 characters.", nameof(customInstructions));
+        }
 
-        if (customInstructions.Length > 5000)
-            throw new ArgumentException("CustomInstructions cannot exceed 5000 characters.", nameof(customInstructions));
+        if (projectPrinciples != null)
+        {
+            if (projectPrinciples.Trim().Length == 0)
+                throw new ArgumentException("ProjectPrinciples cannot be whitespace.", nameof(projectPrinciples));
+            if (projectPrinciples.Length > 5000)
+                throw new ArgumentException("ProjectPrinciples cannot exceed 5000 characters.", nameof(projectPrinciples));
+        }
 
         Name = name.Trim();
         Role = role.Trim();
         Capabilities = capabilities?.ToList() ?? new List<string>();
-        CustomInstructions = customInstructions.Trim();
+        CustomInstructions = customInstructions?.Trim();
+        ProjectPrinciples = projectPrinciples?.Trim();
         UpdatedAt = DateTime.UtcNow;
     }
 

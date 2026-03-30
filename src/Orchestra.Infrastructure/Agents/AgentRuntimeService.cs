@@ -28,6 +28,7 @@ public class AgentRuntimeService : IAgentRuntimeService
         Guid agentId,
         string contextPrompt,
         string? agentModel = null,
+        string? projectPrinciples = null,
         CancellationToken cancellationToken = default)
     {
         // Load agent entity from database
@@ -41,9 +42,13 @@ public class AgentRuntimeService : IAgentRuntimeService
         // or falls back to the system-configured default when null.
         var chatClient = await _chatClientResolver.ResolveChatClientAsync(agentModel, cancellationToken);
 
-        // Get AIFunction instances for the agent's tools
+        // Get AIFunction instances for the agent's tools.
+        // agentModel and projectPrinciples are captured in the review-action closure
+        // inside ToolRetrieverService so the LLM never sees them as parameters.
         var aiFunctions = await _toolRetrieverService.GetAgentToolsAsync(
             agentId,
+            agentModel,
+            projectPrinciples,
             cancellationToken);
 
         // Create AIAgent using Microsoft Agent Framework with the resolved IChatClient.

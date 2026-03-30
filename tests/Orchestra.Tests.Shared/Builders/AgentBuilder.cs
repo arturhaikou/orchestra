@@ -16,6 +16,7 @@ public class AgentBuilder
     private string _customInstructions = new Faker().Lorem.Sentence(10);
     private List<string> _capabilities = new() { "code_execution", "document_analysis" };
     private string? _model = null;
+    private string? _projectPrinciples = null;
 
     /// <summary>
     /// Sets the agent ID.
@@ -90,17 +91,28 @@ public class AgentBuilder
     }
 
     /// <summary>
+    /// Sets the project principles for a review-configured agent.
+    /// Pass null (default) for non-review agents.
+    /// </summary>
+    public AgentBuilder WithProjectPrinciples(string? projectPrinciples)
+    {
+        _projectPrinciples = projectPrinciples;
+        return this;
+    }
+
+    /// <summary>
     /// Builds the Agent entity.
     /// </summary>
     public Agent Build()
     {
         return Agent.Create(
-            _workspaceId,
-            _name,
-            _role,
-            _capabilities,
-            _customInstructions,
-            _model);
+            workspaceId: _workspaceId,
+            name: _name,
+            role: _role,
+            capabilities: _capabilities,
+            customInstructions: _projectPrinciples == null ? _customInstructions : null,
+            projectPrinciples: _projectPrinciples,
+            model: _model);
     }
 
     /// <summary>

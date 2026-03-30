@@ -3,6 +3,8 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orchestra.Application.CodeReview;
+using Orchestra.Application.CodeReview.Models;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
@@ -14,15 +16,18 @@ public class GitLabToolService : IGitLabToolService
 {
     private readonly IGitLabApiClientFactory _apiClientFactory;
     private readonly IIntegrationResolver _integrationResolver;
+    private readonly ICodeReviewPipeline _codeReviewPipeline;
     private readonly ILogger<GitLabToolService> _logger;
 
     public GitLabToolService(
         IGitLabApiClientFactory apiClientFactory,
         IIntegrationResolver integrationResolver,
+        ICodeReviewPipeline codeReviewPipeline,
         ILogger<GitLabToolService> logger)
     {
         _apiClientFactory = apiClientFactory;
         _integrationResolver = integrationResolver;
+        _codeReviewPipeline = codeReviewPipeline;
         _logger = logger;
     }
 
@@ -262,6 +267,55 @@ public class GitLabToolService : IGitLabToolService
         {
             _logger.LogError(ex, "GitLab API error in UpdateIssueAsync for workspace {WorkspaceId}", workspaceId);
             return new GitLabUpdateIssueResult { Success = false, Error = $"Unexpected error: {ex.Message}" };
+        }
+    }
+
+    public async Task<ReviewToolResult> ReviewMergeRequestAsync(
+        string workspaceId,
+        string integrationId,
+        string mrIid,
+        string? modelIdentifier = null,
+        string? projectPrinciples = null)
+    {
+        _logger.LogInformation(
+            "GitLab review_merge_request: workspaceId={WorkspaceId} mrIid={MrIid}",
+            workspaceId, mrIid);
+
+        if (!Guid.TryParse(workspaceId, out var workspaceGuid))
+            return new ReviewToolResult { Success = false, Error = $"Invalid workspace ID format: {workspaceId}" };
+
+        if (!int.TryParse(mrIid, out _))
+            return new ReviewToolResult { Success = false, Error = $"Invalid merge request IID: {mrIid}" };
+
+        try
+        {
+            return await _codeReviewPipeline.ExecuteAsync(
+                new ReviewRequest
+                {
+                    WorkspaceId = workspaceGuid,
+                    IntegrationId = integrationId,
+                    PrOrMrNumber = mrIid,
+                    ProviderType = ProviderType.GITLAB,
+                    ModelIdentifier = modelIdentifier,
+                    ProjectPrinciples = projectPrinciples,
+                });
+        }
+        catch (InvalidOperationException ex) when (
+            ex.Message.Contains("integrationId is required") ||
+            ex.Message.Contains("No active integration found for the supplied ID"))
+        {
+            _logger.LogWarning(ex, "Integration resolution failed for workspace {WorkspaceId}", workspaceId);
+            return new ReviewToolResult { Success = false, Error = ex.Message };
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("No active GitLab integration"))
+        {
+            _logger.LogWarning(ex, "No GitLab integration for workspace {WorkspaceId}", workspaceId);
+            return new ReviewToolResult { Success = false, Error = ex.Message };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error in ReviewMergeRequestAsync for workspace {WorkspaceId}", workspaceId);
+            return new ReviewToolResult { Success = false, Error = ex.Message };
         }
     }
 }

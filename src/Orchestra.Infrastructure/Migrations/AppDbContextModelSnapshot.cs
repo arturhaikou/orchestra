@@ -41,7 +41,6 @@ namespace Orchestra.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("CustomInstructions")
-                        .IsRequired()
                         .HasMaxLength(5000)
                         .HasColumnType("character varying(5000)");
 
@@ -53,6 +52,10 @@ namespace Orchestra.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ProjectPrinciples")
+                        .HasMaxLength(5000)
+                        .HasColumnType("character varying(5000)");
 
                     b.Property<string>("Role")
                         .IsRequired()

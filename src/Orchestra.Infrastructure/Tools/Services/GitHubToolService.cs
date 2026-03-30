@@ -1,5 +1,7 @@
 using System.ComponentModel;
 using Microsoft.Extensions.Logging;
+using Orchestra.Application.CodeReview;
+using Orchestra.Application.CodeReview.Models;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
@@ -11,15 +13,18 @@ public class GitHubToolService : IGitHubToolService
 {
     private readonly IGitHubApiClientFactory _apiClientFactory;
     private readonly IIntegrationResolver _integrationResolver;
+    private readonly ICodeReviewPipeline _codeReviewPipeline;
     private readonly ILogger<GitHubToolService> _logger;
 
     public GitHubToolService(
         IGitHubApiClientFactory apiClientFactory,
         IIntegrationResolver integrationResolver,
+        ICodeReviewPipeline codeReviewPipeline,
         ILogger<GitHubToolService> logger)
     {
         _apiClientFactory = apiClientFactory;
         _integrationResolver = integrationResolver;
+        _codeReviewPipeline = codeReviewPipeline;
         _logger = logger;
     }
 
@@ -441,6 +446,55 @@ public class GitHubToolService : IGitHubToolService
                 Success = false,
                 Error = "An unexpected error occurred. Please try again."
             };
+        }
+    }
+
+    public async Task<ReviewToolResult> ReviewPullRequestAsync(
+        string workspaceId,
+        string integrationId,
+        string pullNumber,
+        string? modelIdentifier = null,
+        string? projectPrinciples = null)
+    {
+        _logger.LogInformation(
+            "GitHub review_pull_request: workspaceId={WorkspaceId} pullNumber={PullNumber}",
+            workspaceId, pullNumber);
+
+        if (!Guid.TryParse(workspaceId, out var workspaceGuid))
+            return new ReviewToolResult { Success = false, Error = $"Invalid workspace ID format: {workspaceId}" };
+
+        if (!int.TryParse(pullNumber, out _))
+            return new ReviewToolResult { Success = false, Error = $"Invalid pull request number: {pullNumber}" };
+
+        try
+        {
+            return await _codeReviewPipeline.ExecuteAsync(
+                new ReviewRequest
+                {
+                    WorkspaceId = workspaceGuid,
+                    IntegrationId = integrationId,
+                    PrOrMrNumber = pullNumber,
+                    ProviderType = ProviderType.GITHUB,
+                    ModelIdentifier = modelIdentifier,
+                    ProjectPrinciples = projectPrinciples,
+                });
+        }
+        catch (InvalidOperationException ex) when (
+            ex.Message.Contains("integrationId is required") ||
+            ex.Message.Contains("No active integration found for the supplied ID"))
+        {
+            _logger.LogWarning(ex, "Integration resolution failed for workspace {WorkspaceId}", workspaceId);
+            return new ReviewToolResult { Success = false, Error = ex.Message };
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("No active GitHub integration"))
+        {
+            _logger.LogWarning(ex, "No GitHub integration for workspace {WorkspaceId}", workspaceId);
+            return new ReviewToolResult { Success = false, Error = ex.Message };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error in ReviewPullRequestAsync for workspace {WorkspaceId}", workspaceId);
+            return new ReviewToolResult { Success = false, Error = ex.Message };
         }
     }
 

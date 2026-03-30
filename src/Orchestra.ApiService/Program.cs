@@ -11,29 +11,29 @@ var builder = WebApplication.CreateBuilder(args);
 // Add service defaults & Aspire components.
 builder.AddServiceDefaults();
 
-builder.Services.AddRateLimiter(options =>
-{
-    options.AddFixedWindowLimiter("auth", opt =>
-    {
-        opt.PermitLimit = 5;
-        opt.Window = TimeSpan.FromMinutes(1);
-        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        opt.QueueLimit = 0; // No queuing - immediate rejection
-    });
+//builder.Services.AddRateLimiter(options =>
+//{
+//    options.AddFixedWindowLimiter("auth", opt =>
+//    {
+//        opt.PermitLimit = 5;
+//        opt.Window = TimeSpan.FromMinutes(1);
+//        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+//        opt.QueueLimit = 0; // No queuing - immediate rejection
+//    });
     
-    options.OnRejected = async (context, cancellationToken) =>
-    {
-        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
-        {
-            context.HttpContext.Response.Headers.RetryAfter = retryAfter.TotalSeconds.ToString();
-        }
+//    options.OnRejected = async (context, cancellationToken) =>
+//    {
+//        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+//        {
+//            context.HttpContext.Response.Headers.RetryAfter = retryAfter.TotalSeconds.ToString();
+//        }
         
-        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-        await context.HttpContext.Response.WriteAsJsonAsync(
-            new { error = "Too many requests. Please try again later." },
-            cancellationToken: cancellationToken);
-    };
-});
+//        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+//        await context.HttpContext.Response.WriteAsJsonAsync(
+//            new { error = "Too many requests. Please try again later." },
+//            cancellationToken: cancellationToken);
+//    };
+//});
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -109,7 +109,7 @@ if (app.Environment.IsDevelopment())
 app.UseCors("AllowAspireUI");
 
 // Rate limiting MUST come before authentication/authorization
-app.UseRateLimiter();
+//app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();

@@ -32,42 +32,71 @@ public class AgentService : IAgentService
             request.WorkspaceId, 
             cancellationToken);
 
-        // 2. Create agent entity using domain factory
+        // 2. Resolve tool action GUIDs and detect review tool presence
+        List<Guid> toolActionGuids = new();
+        if (request.ToolActionIds != null && request.ToolActionIds.Length > 0)
+        {
+            toolActionGuids = request.ToolActionIds
+                .Select(id => Guid.TryParse(id, out var guid) ? guid : Guid.Empty)
+                .Where(guid => guid != Guid.Empty)
+                .ToList();
+        }
+
+        bool hasReviewTool = toolActionGuids.Count > 0
+            && await _agentToolActionDataAccess.ContainsReviewToolActionAsync(toolActionGuids, cancellationToken);
+
+        // 3. Enforce mutual exclusivity (service-layer rule per FR-03 design)
+        string? customInstructionsForEntity;
+        string? projectPrinciplesForEntity;
+
+        if (hasReviewTool)
+        {
+            if (string.IsNullOrWhiteSpace(request.ProjectPrinciples))
+                throw new ArgumentException("Project principles are required when a code review tool is assigned.");
+
+            if (!string.IsNullOrWhiteSpace(request.CustomInstructions))
+                throw new ArgumentException("Custom instructions and project principles cannot both be provided.");
+
+            customInstructionsForEntity = null;
+            projectPrinciplesForEntity = request.ProjectPrinciples;
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(request.CustomInstructions))
+                throw new ArgumentException("CustomInstructions cannot be null or empty.", nameof(request.CustomInstructions));
+
+            customInstructionsForEntity = request.CustomInstructions;
+            projectPrinciplesForEntity = null; // silently discard if supplied without a review tool
+        }
+
+        // 4. Create agent entity using domain factory
         var agent = Agent.Create(
             request.WorkspaceId,
             request.Name,
             request.Role,
             request.Capabilities?.ToList() ?? new List<string>(),
-            request.CustomInstructions,
-            request.Model);
+            customInstructions: customInstructionsForEntity,
+            projectPrinciples: projectPrinciplesForEntity,
+            model: request.Model);
 
-        // 3. Persist using data access layer
+        // 5. Persist using data access layer
         await _agentDataAccess.AddAsync(agent, cancellationToken);
 
-        // 4. Assign tool actions if provided
-        if (request.ToolActionIds != null && request.ToolActionIds.Length > 0)
+        // 6. Validate and assign tool actions if provided
+        if (toolActionGuids.Count > 0)
         {
-            var toolActionGuids = request.ToolActionIds
-                .Select(id => Guid.TryParse(id, out var guid) ? guid : Guid.Empty)
-                .Where(guid => guid != Guid.Empty)
-                .ToList();
+            await _toolValidationService.ValidateToolActionsForWorkspaceAsync(
+                request.WorkspaceId,
+                toolActionGuids,
+                cancellationToken);
 
-            if (toolActionGuids.Count > 0)
-            {
-                // Validate tools are appropriate for workspace
-                await _toolValidationService.ValidateToolActionsForWorkspaceAsync(
-                    request.WorkspaceId,
-                    toolActionGuids,
-                    cancellationToken);
-
-                await _agentToolActionDataAccess.AssignToolActionsAsync(
-                    agent.Id,
-                    toolActionGuids,
-                    cancellationToken);
-            }
+            await _agentToolActionDataAccess.AssignToolActionsAsync(
+                agent.Id,
+                toolActionGuids,
+                cancellationToken);
         }
 
-        // 5. Map to DTO and return
+        // 7. Map to DTO and return
         return await MapToDtoAsync(agent, cancellationToken);
     }
 
@@ -132,28 +161,86 @@ public class AgentService : IAgentService
             agent.WorkspaceId, 
             cancellationToken);
 
-        // 4. Update agent profile with provided values (partial update)
+        // 4. Determine instructions mode for updated profile
         var updatedName = request.Name ?? agent.Name;
         var updatedRole = request.Role ?? agent.Role;
         var updatedCapabilities = request.Capabilities ?? agent.Capabilities;
-        var updatedCustomInstructions = request.CustomInstructions ?? agent.CustomInstructions;
 
+        string? customInstructionsForEntity;
+        string? projectPrinciplesForEntity;
+
+        if (request.ToolActionIds != null)
+        {
+            // Tool assignments are explicitly changing — re-evaluate instructions mode
+            var toolActionGuids = request.ToolActionIds
+                .Select(id => Guid.TryParse(id, out var guid) ? guid : Guid.Empty)
+                .Where(guid => guid != Guid.Empty)
+                .ToList();
+
+            bool hasReviewTool = toolActionGuids.Count > 0
+                && await _agentToolActionDataAccess.ContainsReviewToolActionAsync(toolActionGuids, cancellationToken);
+
+            if (hasReviewTool)
+            {
+                // Switching to / staying in review mode
+                var newProjectPrinciples = request.ProjectPrinciples ?? agent.ProjectPrinciples;
+                if (string.IsNullOrWhiteSpace(newProjectPrinciples))
+                    throw new ArgumentException("Project principles are required when a code review tool is assigned.");
+
+                customInstructionsForEntity = null;
+                projectPrinciplesForEntity = newProjectPrinciples;
+            }
+            else
+            {
+                // Switching to / staying in non-review mode
+                var newCustomInstructions = request.CustomInstructions ?? agent.CustomInstructions;
+                if (string.IsNullOrWhiteSpace(newCustomInstructions))
+                    throw new ArgumentException("CustomInstructions cannot be null or empty.", nameof(request.CustomInstructions));
+
+                customInstructionsForEntity = newCustomInstructions;
+                projectPrinciplesForEntity = null; // clear ProjectPrinciples when review tool removed
+            }
+        }
+        else
+        {
+            // Tool assignments not changing — preserve current instructions mode
+            if (agent.ProjectPrinciples != null)
+            {
+                // Agent is currently a review agent — preserve/update ProjectPrinciples
+                var newProjectPrinciples = request.ProjectPrinciples ?? agent.ProjectPrinciples;
+                customInstructionsForEntity = null;
+                projectPrinciplesForEntity = newProjectPrinciples;
+            }
+            else
+            {
+                // Agent is currently a non-review agent — preserve/update CustomInstructions
+                var newCustomInstructions = request.CustomInstructions ?? agent.CustomInstructions;
+                if (string.IsNullOrWhiteSpace(newCustomInstructions))
+                    throw new ArgumentException("CustomInstructions cannot be null or empty.", nameof(request.CustomInstructions));
+
+                customInstructionsForEntity = newCustomInstructions;
+                projectPrinciplesForEntity = null;
+            }
+        }
+
+        // 5. Apply profile update with named parameters
         agent.UpdateProfile(
             updatedName,
             updatedRole,
             updatedCapabilities,
-            updatedCustomInstructions);
+            customInstructions: customInstructionsForEntity,
+            projectPrinciples: projectPrinciplesForEntity);
 
-        // 4b. Apply model update if the field was explicitly included in the request
+        // 5b. Apply model update if the field was explicitly included in the request
         if (request.Model.HasValue)
         {
             agent.SetModel(request.Model.Value);
         }
 
-        // 5. Persist changes using data access layer
+        // 6. Persist changes using data access layer
         await _agentDataAccess.UpdateAsync(agent, cancellationToken);
 
-        // 6. Update tool action assignments if provided
+        // 7. Update tool action assignments if provided
         if (request.ToolActionIds != null)
         {
             // Remove all existing tool actions
@@ -169,7 +256,6 @@ public class AgentService : IAgentService
 
                 if (toolActionGuids.Count > 0)
                 {
-                    // Validate tools are appropriate for workspace
                     await _toolValidationService.ValidateToolActionsForWorkspaceAsync(
                         agent.WorkspaceId,
                         toolActionGuids,
@@ -183,7 +269,7 @@ public class AgentService : IAgentService
             }
         }
 
-        // 7. Map to DTO and return
+        // 8. Map to DTO and return
         return await MapToDtoAsync(agent, cancellationToken);
     }
 
@@ -237,6 +323,7 @@ public class AgentService : IAgentService
             ToolCategories: toolCategories.ToArray(),
             AvatarUrl: agent.AvatarUrl,
             CustomInstructions: agent.CustomInstructions,
+            ProjectPrinciples: agent.ProjectPrinciples,
             Model: agent.Model
         );
     }

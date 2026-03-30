@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Reflection;
 using Microsoft.Extensions.Logging;
 using NSubstitute.ExceptionExtensions;
+using Orchestra.Application.CodeReview;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Infrastructure.Integrations.Providers.GitHub;
 using Orchestra.Infrastructure.Integrations.Providers.GitHub.Models;
@@ -21,12 +22,13 @@ public class GitHubToolServiceTests : ServiceTestFixture<GitHubToolService>
     private readonly IGitHubApiClientFactory _apiClientFactory = Substitute.For<IGitHubApiClientFactory>();
     private readonly IGitHubApiClient _apiClient = Substitute.For<IGitHubApiClient>();
     private readonly IIntegrationResolver _integrationResolver = Substitute.For<IIntegrationResolver>();
+    private readonly ICodeReviewPipeline _codeReviewPipeline = Substitute.For<ICodeReviewPipeline>();
     private readonly GitHubToolService _sut;
 
     public GitHubToolServiceTests()
     {
         _apiClientFactory.CreateClient(Arg.Any<Integration>()).Returns(_apiClient);
-        _sut = new GitHubToolService(_apiClientFactory, _integrationResolver, Logger);
+        _sut = new GitHubToolService(_apiClientFactory, _integrationResolver, _codeReviewPipeline, Logger);
     }
 
     [Fact]
@@ -302,6 +304,18 @@ public class GitHubToolServiceTests : ServiceTestFixture<GitHubToolService>
         Assert.NotNull(attribute);
         Assert.Equal("search_issues", attribute!.Name);
         Assert.Equal(DangerLevel.Safe, attribute.DangerLevel);
+    }
+
+    [Fact]
+    public void IGitHubToolService_HasToolActionAttributeForReviewPullRequest_WithModerateDangerLevel()
+    {
+        var method = typeof(IGitHubToolService).GetMethod("ReviewPullRequestAsync");
+        var attribute = method?.GetCustomAttribute<ToolActionAttribute>();
+
+        Assert.NotNull(attribute);
+        Assert.Equal("review_pull_request", attribute!.Name);
+        Assert.Equal(DangerLevel.Moderate, attribute.DangerLevel);
+        Assert.NotEmpty(attribute.Description);
     }
 
     [Fact]

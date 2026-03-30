@@ -68,4 +68,19 @@ public interface IAgentToolActionDataAccess
     Task RemoveAllToolActionsAsync(
         Guid agentId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns <c>true</c> if any of the provided tool action IDs correspond to a code review
+    /// tool action — specifically those with the identifier <c>review_pull_request</c> (GitHub)
+    /// or <c>review_merge_request</c> (GitLab).
+    /// </summary>
+    /// <param name="toolActionIds">The candidate tool action IDs to inspect.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>
+    /// <c>true</c> when at least one ID maps to a review tool action; otherwise <c>false</c>.
+    /// Returns <c>false</c> for an empty collection.
+    /// </returns>
+    Task<bool> ContainsReviewToolActionAsync(
+        IEnumerable<Guid> toolActionIds,
+        CancellationToken cancellationToken = default);
 }

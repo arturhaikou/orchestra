@@ -57,6 +57,7 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
       capabilities: [] as string[],
       toolActionIds: [] as string[],
       customInstructions: '',
+      projectPrinciples: '',
       selectedModel: 'Default'
   });
   const [initialModel, setInitialModel] = useState<string>('Default');
@@ -106,6 +107,7 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
         capabilities: [],
         toolActionIds: [],
         customInstructions: '',
+        projectPrinciples: '',
         selectedModel: 'Default'
     });
     setToolSearch('');
@@ -123,6 +125,7 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
         capabilities: [...agent.capabilities],
         toolActionIds: [...(agent.toolActionIds || [])],
         customInstructions: agent.customInstructions || '',
+        projectPrinciples: agent.projectPrinciples || '',
         selectedModel: modelValue
     });
     setToolSearch('');
@@ -180,6 +183,8 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
   const handleSave = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!formState.name || !formState.role) return;
+      if (isReviewAgent && !formState.projectPrinciples.trim()) return;
+      if (!isReviewAgent && !formState.customInstructions.trim()) return;
 
       setIsSaving(true);
       try {
@@ -190,7 +195,8 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
                   role: formState.role,
                   capabilities: formState.capabilities,
                   toolActionIds: formState.toolActionIds,
-                  customInstructions: formState.customInstructions,
+                  customInstructions: isReviewAgent ? undefined : formState.customInstructions,
+                  projectPrinciples: isReviewAgent ? formState.projectPrinciples : undefined,
                   ...(modelChanged && { model: formState.selectedModel === 'Default' ? null : formState.selectedModel })
               });
               setAgents(prev => prev.map(a => a.id === editingId ? { ...a, ...updated } : a));
@@ -200,7 +206,8 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
                   role: formState.role,
                   capabilities: formState.capabilities,
                   toolActionIds: formState.toolActionIds,
-                  customInstructions: formState.customInstructions,
+                  customInstructions: isReviewAgent ? undefined : formState.customInstructions,
+                  projectPrinciples: isReviewAgent ? formState.projectPrinciples : undefined,
                   model: formState.selectedModel === 'Default' ? null : formState.selectedModel
               });
               setAgents(prev => [...prev, newAgent]);
@@ -233,6 +240,15 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
     setConfiguringToolId(null);
     setSelectedActionIds([]);
   };
+
+  // Derived: true when the current tool selection contains a code review action.
+  // Drives the conditional rendering of Project Principles vs Custom Instructions.
+  const REVIEW_ACTION_NAMES = ['review_pull_request', 'review_merge_request'];
+  const isReviewAgent = availableTools.some(tool =>
+    tool.actions?.some(action =>
+      formState.toolActionIds.includes(action.id) && REVIEW_ACTION_NAMES.includes(action.name)
+    ) ?? false
+  );
 
   const filteredTools = availableTools.filter(tool => 
     tool.name.toLowerCase().includes(toolSearch.toLowerCase()) ||
@@ -579,26 +595,42 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
                     <div className="space-y-4">
                         <div className="flex items-center justify-between">
                             <h4 className="text-[10px] font-bold text-textMuted uppercase tracking-widest flex items-center gap-2">
-                                <Bot className="w-3.5 h-3.5" /> Custom Instructions
+                                <Bot className="w-3.5 h-3.5" /> {isReviewAgent ? 'Project Principles' : 'Custom Instructions'}
                             </h4>
-                            <button
-                              type="button"
-                              onClick={() => setIsPreviewModalOpen(true)}
-                              className="text-xs px-2 py-1 rounded flex items-center gap-1.5 transition-colors bg-surfaceHighlight text-textMuted hover:text-text hover:bg-surface"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              Show Preview
-                            </button>
+                            {!isReviewAgent && (
+                              <button
+                                type="button"
+                                onClick={() => setIsPreviewModalOpen(true)}
+                                className="text-xs px-2 py-1 rounded flex items-center gap-1.5 transition-colors bg-surfaceHighlight text-textMuted hover:text-text hover:bg-surface"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                Show Preview
+                              </button>
+                            )}
                         </div>
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-semibold text-textMuted uppercase">Core Behavior & System Prompts</label>
-                            <textarea 
-                              value={formState.customInstructions}
-                              onChange={(e) => setFormState({...formState, customInstructions: e.target.value})}
-                              placeholder="Define how the agent should think, reason, and interact with tools... (Markdown supported)"
-                              className="w-full bg-surface border border-border rounded-md px-4 py-3 text-sm text-text focus:outline-none focus:border-primary h-full min-h-[300px] resize-none font-mono text-[12px] shadow-sm leading-relaxed"
-                            />
-                        </div>
+                        {isReviewAgent ? (
+                          <div className="space-y-1.5">
+                              <label className="text-[10px] font-semibold text-textMuted uppercase">Project Principles</label>
+                              <p className="text-[10px] text-textMuted">These standards will be enforced by the code review agent.</p>
+                              <textarea
+                                value={formState.projectPrinciples}
+                                onChange={(e) => setFormState({...formState, projectPrinciples: e.target.value})}
+                                placeholder="We follow SOLID principles; all public methods must be documented; no magic numbers; avoid nested ternaries…"
+                                className="w-full bg-surface border border-border rounded-md px-4 py-3 text-sm text-text focus:outline-none focus:border-primary h-full min-h-[300px] resize-none font-mono text-[12px] shadow-sm leading-relaxed"
+                                required
+                              />
+                          </div>
+                        ) : (
+                          <div className="space-y-1.5">
+                              <label className="text-[10px] font-semibold text-textMuted uppercase">Core Behavior & System Prompts</label>
+                              <textarea
+                                value={formState.customInstructions}
+                                onChange={(e) => setFormState({...formState, customInstructions: e.target.value})}
+                                placeholder="Define how the agent should think, reason, and interact with tools... (Markdown supported)"
+                                className="w-full bg-surface border border-border rounded-md px-4 py-3 text-sm text-text focus:outline-none focus:border-primary h-full min-h-[300px] resize-none font-mono text-[12px] shadow-sm leading-relaxed"
+                              />
+                          </div>
+                        )}
                     </div>
                 </div>
               </div>
@@ -620,7 +652,12 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
                     </button>
                     <button 
                         onClick={handleSave}
-                        disabled={!formState.name || !formState.role || isSaving}
+                        disabled={
+                          !formState.name ||
+                          !formState.role ||
+                          (isReviewAgent ? !formState.projectPrinciples.trim() : !formState.customInstructions.trim()) ||
+                          isSaving
+                        }
                         className="flex-1 sm:flex-none px-6 py-2.5 bg-primary hover:bg-primaryHover text-white rounded-md text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-primary/20 active:scale-95"
                     >
                         {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : (editingId ? 'Save Changes' : 'Authorize & Deploy')}

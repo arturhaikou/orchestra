@@ -1,6 +1,7 @@
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.Reflection;
+using Orchestra.Application.CodeReview.Models;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Domain.Entities;
 using Orchestra.Infrastructure.Tools.Services;
@@ -18,6 +19,9 @@ public class ToolRetrieverService : IToolRetrieverService
     private readonly IToolCategoryDataAccess _toolCategoryDataAccess;
     private readonly IAgentToolActionDataAccess _agentToolActionDataAccess;
     private readonly ILogger<ToolRetrieverService> _logger;
+
+    private const string ReviewPullRequestActionName = "review_pull_request";
+    private const string ReviewMergeRequestActionName = "review_merge_request";
 
     /// <summary>
     /// Maps ServiceClassName values from the database to their corresponding DI interface types.
@@ -47,7 +51,9 @@ public class ToolRetrieverService : IToolRetrieverService
     }
 
     public async Task<IEnumerable<AIFunction>> GetAgentToolsAsync(
-        Guid agentId, 
+        Guid agentId,
+        string? modelIdentifier = null,
+        string? projectPrinciples = null,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Retrieving tools for agent {AgentId}", agentId);
@@ -109,7 +115,17 @@ public class ToolRetrieverService : IToolRetrieverService
 
             try
             {
-                var aiFunction = CreateAIFunction(category, toolAction);
+                AIFunction? aiFunction;
+
+                if (toolAction.Name is ReviewPullRequestActionName or ReviewMergeRequestActionName)
+                {
+                    aiFunction = CreateReviewAIFunction(category, toolAction, modelIdentifier, projectPrinciples);
+                }
+                else
+                {
+                    aiFunction = CreateAIFunction(category, toolAction);
+                }
+
                 if (aiFunction != null)
                 {
                     aiFunctions.Add(aiFunction);
@@ -179,5 +195,69 @@ public class ToolRetrieverService : IToolRetrieverService
                 toolAction.MethodName, serviceInterfaceType.Name);
             return null;
         }
+    }
+
+    private AIFunction? CreateReviewAIFunction(
+        ToolCategory category,
+        ToolAction toolAction,
+        string? modelIdentifier,
+        string? projectPrinciples)
+    {
+        if (!ServiceTypeMap.TryGetValue(category.ServiceClassName, out var serviceInterfaceType))
+        {
+            _logger.LogWarning(
+                "Unknown service class name for review action: {ServiceClassName}.",
+                category.ServiceClassName);
+            return null;
+        }
+
+        var serviceInstance = _serviceProvider.GetService(serviceInterfaceType);
+        if (serviceInstance == null)
+        {
+            _logger.LogWarning(
+                "Failed to resolve service for type: {ServiceType}.",
+                serviceInterfaceType.Name);
+            return null;
+        }
+
+        // Capture values in local variables so the closure does not capture the
+        // mutable parameters by reference.
+        var capturedModel = modelIdentifier;
+        var capturedPrinciples = projectPrinciples;
+
+        if (serviceInterfaceType == typeof(IGitHubToolService))
+        {
+            var service = (IGitHubToolService)serviceInstance;
+
+            Func<string, string, string, Task<ReviewToolResult>> closure =
+                (workspaceId, integrationId, pullNumber) =>
+                    service.ReviewPullRequestAsync(
+                        workspaceId, integrationId, pullNumber, capturedModel, capturedPrinciples);
+
+            return AIFunctionFactory.Create(
+                closure,
+                "review_pull_request",
+                "Performs an automated code review of a GitHub pull request, analysing the diff and submitting structured findings.");
+        }
+
+        if (serviceInterfaceType == typeof(IGitLabToolService))
+        {
+            var service = (IGitLabToolService)serviceInstance;
+
+            Func<string, string, string, Task<ReviewToolResult>> closure =
+                (workspaceId, integrationId, mrIid) =>
+                    service.ReviewMergeRequestAsync(
+                        workspaceId, integrationId, mrIid, capturedModel, capturedPrinciples);
+
+            return AIFunctionFactory.Create(
+                closure,
+                "review_merge_request",
+                "Performs an automated code review of a GitLab merge request, analysing the diff and submitting structured findings.");
+        }
+
+        _logger.LogWarning(
+            "Review action {ActionName} encountered for unsupported service type: {ServiceType}.",
+            toolAction.Name, serviceInterfaceType.Name);
+        return null;
     }
 }

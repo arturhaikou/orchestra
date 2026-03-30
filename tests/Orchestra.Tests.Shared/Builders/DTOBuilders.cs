@@ -176,7 +176,8 @@ public class CreateAgentRequestBuilder
     private string _role = new Faker().Lorem.Word();
     private string[] _capabilities = new[] { "code_execution", "document_analysis" };
     private string[]? _toolActionIds;
-    private string _customInstructions = new Faker().Lorem.Sentence(10);
+    private string? _customInstructions = new Faker().Lorem.Sentence(10);
+    private string? _projectPrinciples;
     private string? _model = "gpt-4";
 
     /// <summary>
@@ -227,9 +228,18 @@ public class CreateAgentRequestBuilder
     /// <summary>
     /// Sets the custom instructions.
     /// </summary>
-    public CreateAgentRequestBuilder WithCustomInstructions(string instructions)
+    public CreateAgentRequestBuilder WithCustomInstructions(string? instructions)
     {
         _customInstructions = instructions;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the project principles.
+    /// </summary>
+    public CreateAgentRequestBuilder WithProjectPrinciples(string? principles)
+    {
+        _projectPrinciples = principles;
         return this;
     }
 
@@ -247,7 +257,7 @@ public class CreateAgentRequestBuilder
     /// </summary>
     public CreateAgentRequest Build()
     {
-        return new CreateAgentRequest(_workspaceId, _name, _role, _capabilities, _toolActionIds, _customInstructions, _model);
+        return new CreateAgentRequest(_workspaceId, _name, _role, _capabilities, _toolActionIds, _customInstructions, _projectPrinciples, _model);
     }
 }
 
@@ -261,7 +271,8 @@ public class UpdateAgentRequestBuilder
     private string _role = new Faker().Lorem.Word();
     private string[] _capabilities = new[] { "code_execution" };
     private string[]? _toolActionIds;
-    private string _customInstructions = new Faker().Lorem.Sentence(10);
+    private string? _customInstructions = new Faker().Lorem.Sentence(10);
+    private string? _projectPrinciples;
     private Optional<string?> _model = Optional<string?>.None;
 
     /// <summary>
@@ -312,9 +323,18 @@ public class UpdateAgentRequestBuilder
     /// <summary>
     /// Sets the custom instructions.
     /// </summary>
-    public UpdateAgentRequestBuilder WithCustomInstructions(string instructions)
+    public UpdateAgentRequestBuilder WithCustomInstructions(string? instructions)
     {
         _customInstructions = instructions;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the project principles.
+    /// </summary>
+    public UpdateAgentRequestBuilder WithProjectPrinciples(string? principles)
+    {
+        _projectPrinciples = principles;
         return this;
     }
 
@@ -333,7 +353,7 @@ public class UpdateAgentRequestBuilder
     /// </summary>
     public UpdateAgentRequest Build()
     {
-        return new UpdateAgentRequest(_name, _role, _capabilities, _toolActionIds, _customInstructions, _model);
+        return new UpdateAgentRequest(_name, _role, _capabilities, _toolActionIds, _customInstructions, _projectPrinciples, _model);
     }
 }
 

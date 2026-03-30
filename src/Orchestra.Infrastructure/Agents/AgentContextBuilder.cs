@@ -144,33 +144,42 @@ public class AgentContextBuilder : IAgentContextBuilder
     /// <inheritdoc/>
     public async Task<string> BuildAgentContextWithIntegrationsAsync(
         Ticket ticket,
-        Guid agentId,
+        Agent agent,
         CancellationToken cancellationToken = default)
     {
-        // 1. Build base ticket context
+        // Phase 1: Build base ticket context
         var contextPrompt = await BuildContextPromptAsync(ticket, cancellationToken);
 
-        // 2. Determine which external provider types the agent's tools require.
+        // Phase 2: Determine which external provider types the agent's tools require.
         // INTERNAL tools are excluded — they never need an integrationId.
         var externalProviderTypes = await _agentToolActionDataAccess
-            .GetExternalProviderTypesByAgentIdAsync(agentId, cancellationToken);
+            .GetExternalProviderTypesByAgentIdAsync(agent.Id, cancellationToken);
 
-        // 3. Load active integration summaries scoped to this workspace + provider types.
-        // Credential-safe projection: only Id, Name, Provider are fetched.
-        // If no external tools are assigned, the list is empty and no context block is injected.
-        if (externalProviderTypes.Count == 0)
+        if (externalProviderTypes.Count > 0)
         {
-            return contextPrompt;
+            // Load active integration summaries scoped to this workspace + provider types.
+            // Credential-safe projection: only Id, Name, Provider are fetched.
+            var integrationSummaries = await _integrationDataAccess
+                .GetActiveByWorkspaceAndProvidersAsync(
+                    ticket.WorkspaceId,
+                    externalProviderTypes,
+                    cancellationToken);
+
+            contextPrompt = EnrichContextWithIntegrations(contextPrompt, integrationSummaries);
         }
 
-        var integrationSummaries = await _integrationDataAccess
-            .GetActiveByWorkspaceAndProvidersAsync(
-                ticket.WorkspaceId,
-                externalProviderTypes,
-                cancellationToken);
+        // Phase 3: Append [Project Principles] block for review agents.
+        // No-op for non-review agents (ProjectPrinciples is null).
+        if (!string.IsNullOrWhiteSpace(agent.ProjectPrinciples))
+        {
+            var sb = new StringBuilder(contextPrompt);
+            sb.AppendLine();
+            sb.AppendLine("[Project Principles]");
+            sb.Append(agent.ProjectPrinciples);
+            contextPrompt = sb.ToString();
+        }
 
-        // 4. Enrich context with integrations
-        return EnrichContextWithIntegrations(contextPrompt, integrationSummaries);
+        return contextPrompt;
     }
 
     /// <summary>

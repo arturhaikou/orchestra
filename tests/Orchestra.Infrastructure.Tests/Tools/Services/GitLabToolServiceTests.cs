@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using Xunit;
+using Orchestra.Application.CodeReview;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Domain.Enums;
 using Orchestra.Infrastructure.Integrations.Providers.GitLab;
@@ -25,12 +26,13 @@ public class GitLabToolServiceTests : ServiceTestFixture<GitLabToolService>
     private readonly IGitLabApiClientFactory _apiClientFactory = Substitute.For<IGitLabApiClientFactory>();
     private readonly IGitLabApiClient _apiClient = Substitute.For<IGitLabApiClient>();
     private readonly IIntegrationResolver _integrationResolver = Substitute.For<IIntegrationResolver>();
+    private readonly ICodeReviewPipeline _codeReviewPipeline = Substitute.For<ICodeReviewPipeline>();
     private readonly GitLabToolService _sut;
 
     public GitLabToolServiceTests()
     {
         _apiClientFactory.CreateClient(Arg.Any<Integration>()).Returns(_apiClient);
-        _sut = new GitLabToolService(_apiClientFactory, _integrationResolver, Logger);
+        _sut = new GitLabToolService(_apiClientFactory, _integrationResolver, _codeReviewPipeline, Logger);
     }
 
     #region Attribute Verification Tests
@@ -102,6 +104,18 @@ public class GitLabToolServiceTests : ServiceTestFixture<GitLabToolService>
 
         Assert.NotNull(attr);
         Assert.Equal("update_issue", attr!.Name);
+        Assert.Equal(DangerLevel.Moderate, attr.DangerLevel);
+        Assert.NotEmpty(attr.Description);
+    }
+
+    [Fact]
+    public void IGitLabToolService_HasToolActionAttribute_ForReviewMergeRequest_WithModerateDangerLevel()
+    {
+        var method = typeof(IGitLabToolService).GetMethod("ReviewMergeRequestAsync");
+        var attr = method?.GetCustomAttribute<ToolActionAttribute>();
+
+        Assert.NotNull(attr);
+        Assert.Equal("review_merge_request", attr!.Name);
         Assert.Equal(DangerLevel.Moderate, attr.DangerLevel);
         Assert.NotEmpty(attr.Description);
     }

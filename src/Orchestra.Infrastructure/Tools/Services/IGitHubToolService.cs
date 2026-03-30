@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using Orchestra.Application.CodeReview.Models;
 using Orchestra.Domain.Enums;
 using Orchestra.Infrastructure.Tools.Attributes;
 
@@ -99,4 +100,13 @@ public interface IGitHubToolService
         [Description("The GitHub issue number")] string issueNumber,
         [Description("New title (optional; if null or empty, omit from patch)")] string? title,
         [Description("New body (optional; if null or empty, omit from patch)")] string? body);
+
+    [ToolAction("review_pull_request", "Review Pull Request", DangerLevel.Moderate)]
+    [Description("Performs an automated code review of a GitHub pull request, analysing the diff and submitting structured findings.")]
+    Task<ReviewToolResult> ReviewPullRequestAsync(
+        [Description("The workspace ID (GUID)")] string workspaceId,
+        [Description("The ID of the specific GitHub integration instance to use. Required when the workspace has multiple GitHub integrations configured.")] string integrationId,
+        [Description("The GitHub pull request number")] string pullNumber,
+        string? modelIdentifier = null,
+        string? projectPrinciples = null);
 }

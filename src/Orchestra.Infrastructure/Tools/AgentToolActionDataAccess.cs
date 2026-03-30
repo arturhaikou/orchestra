@@ -148,4 +148,20 @@ public class AgentToolActionDataAccess : IAgentToolActionDataAccess
         _context.AgentToolActions.RemoveRange(assignmentsToRemove);
         await _context.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task<bool> ContainsReviewToolActionAsync(
+        IEnumerable<Guid> toolActionIds,
+        CancellationToken cancellationToken = default)
+    {
+        var ids = toolActionIds.ToList();
+        if (ids.Count == 0)
+            return false;
+
+        var reviewActionNames = new[] { "review_pull_request", "review_merge_request" };
+
+        return await _context.ToolActions
+            .AsNoTracking()
+            .Where(ta => ids.Contains(ta.Id) && reviewActionNames.Contains(ta.Name))
+            .AnyAsync(cancellationToken);
+    }
 }
