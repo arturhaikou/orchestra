@@ -115,6 +115,17 @@ public class IntegrationService : IIntegrationService
             throw new DuplicateIntegrationException(request.Name, request.WorkspaceId);
         }
 
+        // 3d. Validate duplicate provider
+        var isProviderDuplicate = await _integrationDataAccess.ExistsByProviderInWorkspaceAsync(
+            providerType,
+            request.WorkspaceId,
+            cancellationToken);
+
+        if (isProviderDuplicate)
+        {
+            throw new DuplicateProviderIntegrationException(providerType.ToString(), request.WorkspaceId);
+        }
+
         // 4. Encrypt API key
         var encryptedApiKey = string.IsNullOrEmpty(request.ApiKey) 
             ? null 
@@ -237,6 +248,23 @@ public class IntegrationService : IIntegrationService
         if (isDuplicate)
         {
             throw new DuplicateIntegrationException(request.Name, integration.WorkspaceId);
+        }
+
+        // [FR-02] Conditional provider uniqueness check.
+        // Only performed when the submitted provider value differs from the stored provider.
+        // Self-exclusion ensures the integration being updated is never counted as its own conflict.
+        if (providerType.HasValue && providerType.Value != integration.Provider)
+        {
+            var isProviderDuplicate = await _integrationDataAccess.ExistsByProviderInWorkspaceExcludingSelf(
+                providerType.Value,
+                integration.WorkspaceId,
+                integrationId,
+                cancellationToken);
+
+            if (isProviderDuplicate)
+            {
+                throw new DuplicateProviderIntegrationException(providerType.Value.ToString(), integration.WorkspaceId);
+            }
         }
 
         // 5. Handle API key: preserve existing if masked, otherwise encrypt new value

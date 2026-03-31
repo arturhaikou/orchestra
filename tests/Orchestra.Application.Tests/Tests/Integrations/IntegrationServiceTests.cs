@@ -32,6 +32,14 @@ public class IntegrationServiceTests
             .ReturnsAsync(false);
 
         _integrationDataAccessMock
+            .Setup(s => s.ExistsByProviderInWorkspaceAsync(It.IsAny<Orchestra.Domain.Enums.ProviderType>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        _integrationDataAccessMock
+            .Setup(s => s.ExistsByProviderInWorkspaceExcludingSelf(It.IsAny<Orchestra.Domain.Enums.ProviderType>(), It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        _integrationDataAccessMock
             .Setup(s => s.AddAsync(It.IsAny<Integration>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
@@ -515,5 +523,306 @@ public class IntegrationServiceTests
         Assert.Contains("TRACKER", result.Types);
         Assert.Contains("KNOWLEDGE_BASE", result.Types);
         Assert.Contains("CODE_SOURCE", result.Types);
+    }
+
+    // -------------------------------------------------------------------------
+    // CreateIntegrationAsync — FR-01: One-Per-Provider Guard on Create Integration
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task CreateIntegrationAsync_WhenNoActiveProviderExistsInWorkspace_CreatesAndReturnsDto()
+    {
+        // Arrange — ExistsByProviderInWorkspaceAsync returns false (default stub; no active provider)
+        var workspaceId = Guid.NewGuid();
+        var request = new CreateIntegrationRequestBuilder()
+            .WithWorkspaceId(workspaceId)
+            .WithProvider("JIRA")
+            .WithType("TRACKER")
+            .WithUrl("https://example.atlassian.net")
+            .WithFilterQuery("project = WEB")
+            .Build();
+
+        // Act
+        var result = await _sut.CreateIntegrationAsync(Guid.NewGuid(), request);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("JIRA", result.Provider);
+        _integrationDataAccessMock.Verify(
+            s => s.AddAsync(It.IsAny<Integration>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateIntegrationAsync_WhenActiveProviderAlreadyExistsInWorkspace_ThrowsDuplicateProviderException()
+    {
+        // Arrange — ExistsByProviderInWorkspaceAsync returns true (provider collision)
+        var workspaceId = Guid.NewGuid();
+
+        _integrationDataAccessMock
+            .Setup(s => s.ExistsByProviderInWorkspaceAsync(
+                Orchestra.Domain.Enums.ProviderType.JIRA,
+                workspaceId,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        var request = new CreateIntegrationRequestBuilder()
+            .WithWorkspaceId(workspaceId)
+            .WithProvider("JIRA")
+            .WithType("TRACKER")
+            .WithUrl("https://example.atlassian.net")
+            .WithFilterQuery("project = WEB")
+            .Build();
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<DuplicateProviderIntegrationException>(
+            () => _sut.CreateIntegrationAsync(Guid.NewGuid(), request));
+
+        Assert.Contains("JIRA", exception.Message);
+        Assert.Contains("already exists in this workspace", exception.Message);
+        _integrationDataAccessMock.Verify(
+            s => s.AddAsync(It.IsAny<Integration>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateIntegrationAsync_WhenPreviousProviderIntegrationWasSoftDeleted_CreatesSuccessfully()
+    {
+        // Arrange — ExistsByProviderInWorkspaceAsync returns false because soft-deleted records
+        // are excluded from the query (IsActive filter); the default stub already returns false.
+        var workspaceId = Guid.NewGuid();
+        var request = new CreateIntegrationRequestBuilder()
+            .WithWorkspaceId(workspaceId)
+            .WithProvider("JIRA")
+            .WithType("TRACKER")
+            .WithUrl("https://example.atlassian.net")
+            .WithFilterQuery("project = WEB")
+            .Build();
+
+        // Act
+        var result = await _sut.CreateIntegrationAsync(Guid.NewGuid(), request);
+
+        // Assert — integration is created; the soft-deleted record did not block creation
+        Assert.NotNull(result);
+        _integrationDataAccessMock.Verify(
+            s => s.AddAsync(It.IsAny<Integration>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateIntegrationAsync_WhenDifferentProviderActiveInWorkspace_CreatesSuccessfully()
+    {
+        // Arrange — Jira is active, but we are creating a GitHub integration.
+        // ExistsByProviderInWorkspaceAsync returns false for GITHUB (only Jira would return true).
+        var workspaceId = Guid.NewGuid();
+
+        _integrationDataAccessMock
+            .Setup(s => s.ExistsByProviderInWorkspaceAsync(
+                Orchestra.Domain.Enums.ProviderType.JIRA,
+                workspaceId,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        // GitHub check remains false (default stub)
+        var request = new CreateIntegrationRequestBuilder()
+            .WithWorkspaceId(workspaceId)
+            .WithProvider("GITHUB")
+            .WithTypes("TRACKER", "CODE_SOURCE")
+            .WithUrl("https://github.com/owner/repo")
+            .Build();
+
+        // Act
+        var result = await _sut.CreateIntegrationAsync(Guid.NewGuid(), request);
+
+        // Assert — GitHub integration is created despite the existing Jira integration
+        Assert.NotNull(result);
+        Assert.Equal("GITHUB", result.Provider);
+        _integrationDataAccessMock.Verify(
+            s => s.AddAsync(It.IsAny<Integration>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    // -------------------------------------------------------------------------
+    // UpdateIntegrationAsync — FR-02: One-Per-Provider Guard on Update Integration
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task UpdateIntegrationAsync_WhenProviderChangesToAvailableProvider_UpdatesSuccessfully()
+    {
+        // Arrange — Scenario 1: existing is Jira, changing to GitHub which has no active integration.
+        // ExistsByProviderInWorkspaceExcludingSelf returns false (default stub — no conflict).
+        var integrationId = Guid.NewGuid();
+        var workspaceId = Guid.NewGuid();
+        var existingIntegration = new IntegrationBuilder()
+            .WithId(integrationId)
+            .WithWorkspaceId(workspaceId)
+            .WithProvider(ProviderType.JIRA)
+            .WithType(IntegrationType.TRACKER)
+            .WithUrl("https://example.atlassian.net")
+            .WithFilterQuery("project = WEB")
+            .Build();
+
+        _integrationDataAccessMock
+            .Setup(s => s.GetByIdAsync(integrationId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingIntegration);
+
+        _integrationDataAccessMock
+            .Setup(s => s.UpdateAsync(It.IsAny<Integration>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var request = new UpdateIntegrationRequestBuilder()
+            .WithType("TRACKER")
+            .WithProvider("GITHUB")
+            .WithUrl("https://github.com/owner/repo")
+            .Build();
+
+        // Act
+        var result = await _sut.UpdateIntegrationAsync(Guid.NewGuid(), integrationId, request);
+
+        // Assert — update persisted, ExistsByProviderInWorkspaceExcludingSelf was called once
+        Assert.NotNull(result);
+        Assert.Equal("GITHUB", result.Provider);
+        _integrationDataAccessMock.Verify(
+            s => s.UpdateAsync(It.IsAny<Integration>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+        _integrationDataAccessMock.Verify(
+            s => s.ExistsByProviderInWorkspaceExcludingSelf(
+                ProviderType.GITHUB,
+                workspaceId,
+                integrationId,
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateIntegrationAsync_WhenProviderChangesToAlreadyActiveProvider_ThrowsDuplicateProviderException()
+    {
+        // Arrange — Scenario 2: existing is Jira, changing to GitHub which already has an active integration.
+        var integrationId = Guid.NewGuid();
+        var workspaceId = Guid.NewGuid();
+        var existingIntegration = new IntegrationBuilder()
+            .WithId(integrationId)
+            .WithWorkspaceId(workspaceId)
+            .WithProvider(ProviderType.JIRA)
+            .WithType(IntegrationType.TRACKER)
+            .WithUrl("https://example.atlassian.net")
+            .WithFilterQuery("project = WEB")
+            .Build();
+
+        _integrationDataAccessMock
+            .Setup(s => s.GetByIdAsync(integrationId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingIntegration);
+
+        // GitHub already has an active integration in this workspace → conflict
+        _integrationDataAccessMock
+            .Setup(s => s.ExistsByProviderInWorkspaceExcludingSelf(
+                ProviderType.GITHUB,
+                workspaceId,
+                integrationId,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        var request = new UpdateIntegrationRequestBuilder()
+            .WithType("TRACKER")
+            .WithProvider("GITHUB")
+            .WithUrl("https://github.com/owner/repo")
+            .Build();
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<DuplicateProviderIntegrationException>(
+            () => _sut.UpdateIntegrationAsync(Guid.NewGuid(), integrationId, request));
+
+        Assert.Contains("GITHUB", exception.Message);
+        Assert.Contains("already exists in this workspace", exception.Message);
+        _integrationDataAccessMock.Verify(
+            s => s.UpdateAsync(It.IsAny<Integration>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateIntegrationAsync_WhenProviderIsUnchanged_DoesNotCallProviderDuplicateCheck()
+    {
+        // Arrange — Scenario 3: only name/filter is changing; provider remains Jira.
+        // The provider duplicate check must NOT be invoked for this rule.
+        var integrationId = Guid.NewGuid();
+        var existingIntegration = new IntegrationBuilder()
+            .WithId(integrationId)
+            .WithProvider(ProviderType.JIRA)
+            .WithType(IntegrationType.TRACKER)
+            .WithUrl("https://example.atlassian.net")
+            .WithFilterQuery("project = WEB")
+            .Build();
+
+        _integrationDataAccessMock
+            .Setup(s => s.GetByIdAsync(integrationId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingIntegration);
+
+        _integrationDataAccessMock
+            .Setup(s => s.UpdateAsync(It.IsAny<Integration>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Submitting the same provider — check must be skipped entirely
+        var request = new UpdateIntegrationRequestBuilder()
+            .WithType("TRACKER")
+            .WithProvider("JIRA")
+            .WithUrl("https://example.atlassian.net")
+            .WithFilterQuery("project = UPDATED")
+            .Build();
+
+        // Act
+        var result = await _sut.UpdateIntegrationAsync(Guid.NewGuid(), integrationId, request);
+
+        // Assert — update succeeded and ExistsByProviderInWorkspaceExcludingSelf was NEVER called
+        Assert.NotNull(result);
+        _integrationDataAccessMock.Verify(
+            s => s.ExistsByProviderInWorkspaceExcludingSelf(
+                It.IsAny<ProviderType>(),
+                It.IsAny<Guid>(),
+                It.IsAny<Guid>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateIntegrationAsync_WhenProviderChangesToSoftDeletedProviderSlot_UpdatesSuccessfully()
+    {
+        // Arrange — Scenario 4: existing is Confluence, changing to GitHub whose previous
+        // integration was soft-deleted. ExistsByProviderInWorkspaceExcludingSelf filters on
+        // IsActive = true, so it returns false (default stub — soft-deleted record excluded).
+        var integrationId = Guid.NewGuid();
+        var workspaceId = Guid.NewGuid();
+        var existingIntegration = new IntegrationBuilder()
+            .WithId(integrationId)
+            .WithWorkspaceId(workspaceId)
+            .WithProvider(ProviderType.CONFLUENCE)
+            .WithType(IntegrationType.KNOWLEDGE_BASE)
+            .WithUrl("https://example.atlassian.net")
+            .WithFilterQuery("space = DEV")
+            .Build();
+
+        _integrationDataAccessMock
+            .Setup(s => s.GetByIdAsync(integrationId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingIntegration);
+
+        _integrationDataAccessMock
+            .Setup(s => s.UpdateAsync(It.IsAny<Integration>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Soft-deleted GitHub record is excluded by the IsActive filter → returns false (default stub)
+        var request = new UpdateIntegrationRequestBuilder()
+            .WithType("CODE_SOURCE")
+            .WithProvider("GITHUB")
+            .WithUrl("https://github.com/owner/repo")
+            .Build();
+
+        // Act
+        var result = await _sut.UpdateIntegrationAsync(Guid.NewGuid(), integrationId, request);
+
+        // Assert — update persisted; the soft-deleted record did not block the provider change
+        Assert.NotNull(result);
+        Assert.Equal("GITHUB", result.Provider);
+        _integrationDataAccessMock.Verify(
+            s => s.UpdateAsync(It.IsAny<Integration>(), It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 }
