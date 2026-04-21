@@ -128,23 +128,24 @@ public class TicketMappingService : ITicketMappingService
     public TicketDto MapInternalTicketToDto(
         Ticket ticket,
         Dictionary<Guid, TicketStatus> statusLookup,
-        Dictionary<Guid, TicketPriority> priorityLookup)
+        Dictionary<Guid, TicketPriority> priorityLookup,
+        IEnumerable<TicketComment> comments)
     {
         var status = ticket.StatusId.HasValue && statusLookup.ContainsKey(ticket.StatusId.Value)
             ? statusLookup[ticket.StatusId.Value]
             : null;
-        
+
         var priority = ticket.PriorityId.HasValue && priorityLookup.ContainsKey(ticket.PriorityId.Value)
             ? priorityLookup[ticket.PriorityId.Value]
             : null;
-        
+
         // For materialized external tickets, use composite ID format instead of GUID
         var ticketId = (ticket.IntegrationId.HasValue && !string.IsNullOrEmpty(ticket.ExternalTicketId))
             ? $"{ticket.IntegrationId.Value}:{ticket.ExternalTicketId}"
             : ticket.Id.ToString();
-        
-        // Map comments with timestamp for internal tickets
-        var commentDtos = ticket.Comments
+
+        // Map pre-fetched comments (navigation property removed — comments passed explicitly)
+        var commentDtos = comments
             .OrderBy(c => c.CreatedAt)
             .Select(c => new CommentDto(
                 c.Id.ToString(),
@@ -182,41 +183,42 @@ public class TicketMappingService : ITicketMappingService
         ExternalTicketDto externalTicket,
         Ticket? materializedTicket,
         Dictionary<Guid, TicketStatus> statusLookup,
-        Dictionary<Guid, TicketPriority> priorityLookup)
+        Dictionary<Guid, TicketPriority> priorityLookup,
+        IEnumerable<TicketComment>? materializedComments = null)
     {
         var compositeId = $"{integration.Id}:{externalTicket.ExternalTicketId}";
-        
+
         // Merge assignments and status/priority if materialized
         Guid? assignedAgentId = null;
         Guid? assignedWorkflowId = null;
         TicketStatusDto? status = null;
         TicketPriorityDto? priority = null;
         List<CommentDto> mergedComments = externalTicket.Comments;
-        
+
         if (materializedTicket != null)
         {
             assignedAgentId = materializedTicket.AssignedAgentId;
             assignedWorkflowId = materializedTicket.AssignedWorkflowId;
-            
+
             // Use internal status/priority for materialized tickets if set
             if (materializedTicket.StatusId.HasValue && statusLookup.ContainsKey(materializedTicket.StatusId.Value))
             {
                 var internalStatus = statusLookup[materializedTicket.StatusId.Value];
                 status = new TicketStatusDto(internalStatus.Id, internalStatus.Name, internalStatus.Color);
             }
-            
+
             if (materializedTicket.PriorityId.HasValue && priorityLookup.ContainsKey(materializedTicket.PriorityId.Value))
             {
                 var internalPriority = priorityLookup[materializedTicket.PriorityId.Value];
                 priority = new TicketPriorityDto(
-                    internalPriority.Id, 
-                    internalPriority.Name, 
-                    internalPriority.Color, 
+                    internalPriority.Id,
+                    internalPriority.Name,
+                    internalPriority.Color,
                     internalPriority.Value);
             }
 
-            // Merge comments: combine external and internal comments, sort by timestamp descending
-            var internalCommentDtos = materializedTicket.Comments
+            // Explicitly fetch internal comments for materialized ticket (navigation property removed)
+            var internalCommentDtos = (materializedComments ?? [])
                 .OrderBy(c => c.CreatedAt)
                 .Select(c => new CommentDto(
                     c.Id.ToString(),

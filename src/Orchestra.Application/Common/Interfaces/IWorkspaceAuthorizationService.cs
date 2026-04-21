@@ -33,4 +33,16 @@ public interface IWorkspaceAuthorizationService
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>True if the user is a member, false otherwise.</returns>
     Task<bool> IsMemberAsync(Guid userId, Guid workspaceId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Ensures that a user is the owner of the specified workspace.
+    /// Performs a two-stage check: non-members throw <see cref="UnauthorizedWorkspaceAccessException"/>
+    /// (→ 404); members who are not the owner throw <see cref="WorkspaceForbiddenException"/> (→ 403).
+    /// </summary>
+    /// <param name="userId">The user ID to check.</param>
+    /// <param name="workspaceId">The workspace ID to check.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <exception cref="UnauthorizedWorkspaceAccessException">Thrown when the user is not a member.</exception>
+    /// <exception cref="WorkspaceForbiddenException">Thrown when the user is a member but not the owner.</exception>
+    Task EnsureUserIsOwnerAsync(Guid userId, Guid workspaceId, CancellationToken cancellationToken = default);
 }

@@ -38,9 +38,15 @@ public class AgentRuntimeService : IAgentRuntimeService
             throw new InvalidOperationException($"Agent {agentId} not found");
         }
 
-        // Resolve the LLM client: uses the agent's configured model when non-null,
-        // or falls back to the system-configured default when null.
-        var chatClient = await _chatClientResolver.ResolveChatClientAsync(agentModel, cancellationToken);
+        // Resolve the LLM client for the workspace that owns this agent.
+        // agentEntity.Model is the agent-configured model (non-null for configured agents).
+        // The caller (AgentOrchestrationService) already validates agentEntity.Model
+        // before reaching ExecuteAgentAsync, so null here is a programming error.
+        var chatClient = await _chatClientResolver.ResolveAsync(
+            agentEntity.WorkspaceId,
+            agentEntity.Model ?? throw new InvalidOperationException(
+                $"Agent {agentEntity.Id} has no model configured. Set Agent.Model before executing."),
+            cancellationToken);
 
         // Get AIFunction instances for the agent's tools.
         // agentModel and projectPrinciples are captured in the review-action closure

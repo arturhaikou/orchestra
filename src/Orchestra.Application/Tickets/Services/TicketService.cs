@@ -20,6 +20,7 @@ public class TicketService : ITicketService
     private readonly ILogger<TicketService> _logger;
     private readonly ITicketEnrichmentService _enrichmentService;
     private readonly IWorkspaceDataAccess _workspaceDataAccess;
+    private readonly IWorkspaceAIProviderRepository _aiProviderRepository;
 
     public TicketService(
         ITicketQueryService queryService,
@@ -27,6 +28,7 @@ public class TicketService : ITicketService
         ITicketCommentService commentService,
         ITicketEnrichmentService enrichmentService,
         IWorkspaceDataAccess workspaceDataAccess,
+        IWorkspaceAIProviderRepository aiProviderRepository,
         ILogger<TicketService> logger)
     {
         _queryService = queryService;
@@ -34,6 +36,7 @@ public class TicketService : ITicketService
         _commentService = commentService;
         _enrichmentService = enrichmentService;
         _workspaceDataAccess = workspaceDataAccess;
+        _aiProviderRepository = aiProviderRepository;
         _logger = logger;
     }
 
@@ -124,18 +127,20 @@ public class TicketService : ITicketService
                 "Summarization is not enabled for this workspace. Go to workspace settings to enable it.");
         }
 
-        // 4. Feature is enabled; proceed with summarization
-        // Extract the workspace-configured model ID to forward to the enrichment service.
-        // The workspace GUID was already valid when we fetched the workspace record, so
-        // AiSummarizationModelId is guaranteed to be accessible (nullable, but present).
-        var workspaceModelId = workspace.AiSummarizationModelId;
+        // 4a. Resolve effective model: feature-specific model → provider default → fail fast.
+        // AiSummarizationModelId is the workspace-level override; when absent, fall back to the
+        // DefaultModelId stored on AIProviderConfiguration (the sole authoritative source).
+        var aiConfig = await _aiProviderRepository.GetByWorkspaceIdAsync(workspace.Id, cancellationToken);
+        var effectiveModelId = workspace.AiSummarizationModelId ?? aiConfig?.DefaultModelId
+            ?? throw new InvalidOperationException(
+                $"No AI summarization model configured for workspace {workspace.Id}. "
+                + "Set AiSummarizationModelId or configure a default model in the AI provider settings.");
 
         var content = _enrichmentService.BuildSummaryContent(ticketDto);
 
-        // 5. Generate summary using enrichment service, forwarding the workspace model ID.
-        // If modelId is null, the service will use the startup-configured default.
-        // If modelId is set but unavailable (stale), the service will silently fall back to the default.
-        string summary = await _enrichmentService.GenerateSummaryAsync(content, workspaceModelId, cancellationToken);
+        // 5. Generate summary — modelId is baked into the chat client at construction.
+        string summary = await _enrichmentService.GenerateSummaryAsync(
+            content, ticketDto.WorkspaceId, effectiveModelId, cancellationToken);
 
         // 6. Return success response with summary populated
         var summarizedTicket = ticketDto with { Summary = summary };

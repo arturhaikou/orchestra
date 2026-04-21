@@ -46,9 +46,6 @@ public class Integration
     public DateTime? UpdatedAt { get; private set; }
     public bool IsActive { get; private set; }
 
-    // Navigation property
-    public Workspace Workspace { get; private set; } = null!;
-
     /// <summary>
     /// Factory method to create a new Integration with validation.
     /// </summary>

@@ -1,7 +1,8 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
-using Orchestra.ApiService.Hubs;
+using System.Text.Json.Serialization;
+using Orchestra.Infrastructure.Hubs;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
 using Orchestra.Application.Common;
@@ -44,8 +45,11 @@ builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
         options.JsonSerializerOptions.Converters.Add(new OptionalJsonConverterFactory());
     });
+builder.Services.AddExceptionHandler<Orchestra.ApiService.Middleware.NotImplementedExceptionHandler>();
+builder.Services.AddProblemDetails();
 builder.AddInfrastructureServices();
 
 // Configure JWT Authentication
@@ -75,20 +79,50 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                     context.Response.Headers.Append("Token-Expired", "true");
                 }
                 return Task.CompletedTask;
+            },
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"].ToString();
+                var path = context.HttpContext.Request.Path;
+
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                {
+                    context.Token = accessToken;
+                }
+
+                return Task.CompletedTask;
             }
         };
     });
 
 builder.Services.AddAuthorization();
 
+builder.Services.AddSignalR();
+
 // Configure CORS for Aspire UI integration
 builder.Services.AddCors(options =>
 {
+    var allowedOrigins = builder.Configuration
+        .GetSection("Cors:AllowedOrigins")
+        .Get<string[]>() ?? [];
+
     options.AddPolicy("AllowAspireUI", policy =>
     {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
+        if (allowedOrigins.Length > 0)
+        {
+            // Use specific origins when configured (Aspire dynamic ports, or Development fallback)
+            policy.WithOrigins(allowedOrigins)
+                  .AllowCredentials()
+                  .AllowAnyMethod()
+                  .AllowAnyHeader();
+        }
+        else
+        {
+            // Fallback for non-Aspire environments: allow any origin without credentials
+            policy.AllowAnyOrigin()
+                  .AllowAnyMethod()
+                  .AllowAnyHeader();
+        }
     });
 });
 
@@ -96,6 +130,8 @@ var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 app.MapDefaultEndpoints();
+
+app.UseExceptionHandler();
 
 app.UseSwagger();
 app.UseSwaggerUI();
@@ -113,6 +149,8 @@ app.UseCors("AllowAspireUI");
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.MapHub<NotificationHub>("/hubs/notifications");
 
 app.MapControllers();
 

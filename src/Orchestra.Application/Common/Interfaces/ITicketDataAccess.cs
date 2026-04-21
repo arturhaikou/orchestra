@@ -1,4 +1,5 @@
 using Orchestra.Domain.Entities;
+using Orchestra.Application.Tickets.DTOs;
 
 namespace Orchestra.Application.Common.Interfaces;
 
@@ -18,27 +19,49 @@ public interface ITicketDataAccess
     /// <param name="cancellationToken">Cancellation token</param>
     Task UpdateTicketAsync(Ticket ticket, CancellationToken cancellationToken = default);
     /// <summary>
-    /// Retrieves all tickets for a workspace including both internal and materialized external tickets.
-    /// Includes related entities: Integration, Comments.
+    /// Retrieves a page of tickets for a workspace (both internal and materialized external).
+    /// Uses an explicit LEFT JOIN against Integrations — no .Include() calls.
+    /// Results are ordered by CreatedAt descending. Skip/Take are applied server-side.
     /// </summary>
     /// <param name="workspaceId">The workspace ID to filter by</param>
+    /// <param name="offset">Zero-based number of rows to skip (≥ 0)</param>
+    /// <param name="limit">Maximum number of rows to return (1–100)</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>List of tickets ordered by creation date descending</returns>
-    Task<List<Ticket>> GetTicketsByWorkspaceAsync(
+    /// <returns>Flat projection DTOs for the requested page</returns>
+    Task<List<TicketWithIntegrationDto>> GetTicketsByWorkspaceAsync(
+        Guid workspaceId,
+        int offset,
+        int limit,
+        CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Returns the total number of tickets (all types) for a workspace.
+    /// Issued as a lightweight COUNT(*) query scoped by WorkspaceId.
+    /// </summary>
+    /// <param name="workspaceId">The workspace ID to count tickets for</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Total ticket count (used to populate TotalCount in paginated responses)</returns>
+    Task<int> CountTicketsByWorkspaceAsync(
         Guid workspaceId,
         CancellationToken cancellationToken = default);
     /// <summary>
     /// Retrieves internal tickets for a workspace with pagination support.
-    /// Returns pure internal tickets (IsInternal=true) and materialized external tickets (IntegrationId != null).
-    /// Results are ordered by priority descending, then updated date descending.
-    /// Includes related entities: Status, Priority, Comments.
+    /// Returns only pure internal tickets (IsInternal=true).
+    /// Results are ordered by priority value descending, then UpdatedAt descending.
+    /// Uses a single explicit join query:
+    ///   - LEFT OUTER JOIN on TicketPriorities (sort key + priority name/value/color)
+    ///   - LEFT OUTER JOIN on Integrations (integration name)
+    ///   - Correlated scalar sub-query COUNT(*) on TicketComments (comment count)
+    /// No .Include() calls. No cartesian product expansion.
     /// </summary>
     /// <param name="workspaceId">The workspace ID to filter by</param>
     /// <param name="offset">Number of tickets to skip (0-based)</param>
     /// <param name="limit">Maximum number of tickets to return</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Paginated list of internal tickets</returns>
-    Task<List<Ticket>> GetInternalTicketsByWorkspaceAsync(
+    /// <returns>
+    /// Flat projection DTOs for the requested page — at most <paramref name="limit"/> rows,
+    /// one per ticket regardless of comment count.
+    /// </returns>
+    Task<List<InternalTicketListDto>> GetInternalTicketsByWorkspaceAsync(
         Guid workspaceId,
         int offset,
         int limit,
@@ -89,5 +112,16 @@ public interface ITicketDataAccess
     /// <returns>List of comments ordered by CreatedAt ascending</returns>
     Task<List<TicketComment>> GetCommentsByTicketIdAsync(
         Guid ticketId,
+        CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Retrieves all comments for the provided ticket IDs in a single batch query,
+    /// keyed by TicketId. Returns an empty dictionary when <paramref name="ticketIds"/> is empty.
+    /// Results within each group are ordered by <c>CreatedAt</c> ascending.
+    /// </summary>
+    /// <param name="ticketIds">Collection of ticket GUIDs to fetch comments for.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Dictionary mapping each TicketId to its ordered list of comments.</returns>
+    Task<Dictionary<Guid, List<TicketComment>>> GetCommentsByTicketIdsAsync(
+        IEnumerable<Guid> ticketIds,
         CancellationToken cancellationToken = default);
 }

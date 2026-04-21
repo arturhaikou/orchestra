@@ -82,6 +82,7 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [nextPageToken, setNextPageToken] = useState<string | undefined>(undefined);
   const [isLastPage, setIsLastPage] = useState(false);
+  const TICKET_PAGE_SIZE = 50;
 
   const [summary, setSummary] = useState<string>('');
   const [loadingSummary, setLoadingSummary] = useState(false);
@@ -169,7 +170,7 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
   const loadInitialTickets = async () => {
     setIsLoading(true);
     try {
-      const response = await getTickets(workspaceId, undefined, 10); 
+      const response = await getTickets(workspaceId, undefined, TICKET_PAGE_SIZE);
       const sortedItems = [...response.items].sort((a, b) => getPriorityWeight(b.priority) - getPriorityWeight(a.priority));
       setTickets(sortedItems);
       setNextPageToken(response.nextPageToken);
@@ -178,9 +179,9 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
       // Initialize read counts
       const reads: Record<string, number> = {};
       sortedItems.forEach(t => {
-          const key = `nexus_read_count_${t.id}`;
-          const stored = localStorage.getItem(key);
-          reads[t.id] = stored ? parseInt(stored, 10) : (t.comments?.length || 0);
+        const key = `nexus_read_count_${t.id}`;
+        const stored = localStorage.getItem(key);
+        reads[t.id] = stored ? parseInt(stored, 10) : (t.comments?.length || 0);
       });
       setLastReadCounts(reads);
     } catch (err) {
@@ -191,27 +192,24 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
   };
 
   const handleLoadMore = async () => {
-    if (isLastPage || isLoadingMore) return;
-    
+    if (isLoadingMore) return;
+
     setIsLoadingMore(true);
     try {
-      const response = await getTickets(workspaceId, nextPageToken, 10);
-      // Deduplicate tickets by ID before adding to list
-      const combinedTickets = [...tickets, ...response.items];
-      const uniqueTickets = combinedTickets.filter((ticket, index, arr) => 
-        arr.findIndex(t => t.id === ticket.id) === index
-      );
-      const sortedTickets = [...uniqueTickets].sort((a, b) => getPriorityWeight(b.priority) - getPriorityWeight(a.priority));
-      
-      setTickets(sortedTickets);
+      const response = await getTickets(workspaceId, nextPageToken, TICKET_PAGE_SIZE);
+      const combined = [...tickets, ...response.items];
+      const unique = combined.filter((t, i, arr) => arr.findIndex(x => x.id === t.id) === i);
+      const sorted = [...unique].sort((a, b) => getPriorityWeight(b.priority) - getPriorityWeight(a.priority));
+
+      setTickets(sorted);
       setNextPageToken(response.nextPageToken);
       setIsLastPage(response.isLast);
 
       const reads = { ...lastReadCounts };
       response.items.forEach(t => {
-          const key = `nexus_read_count_${t.id}`;
-          const stored = localStorage.getItem(key);
-          reads[t.id] = stored ? parseInt(stored, 10) : (t.comments?.length || 0);
+        const key = `nexus_read_count_${t.id}`;
+        const stored = localStorage.getItem(key);
+        reads[t.id] = stored ? parseInt(stored, 10) : (t.comments?.length || 0);
       });
       setLastReadCounts(reads);
     } catch (err) {
@@ -710,7 +708,7 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
           )}
         </div>
 
-        {!isLastPage && tickets.length > 0 && !isLoading && (
+        {!isLastPage && !isLoading && (
           <div className="p-4 border-t border-border flex justify-center bg-surfaceHighlight/5">
              <button 
               onClick={handleLoadMore}

@@ -25,6 +25,10 @@ export interface Workspace {
   isCustomerSatisfactionAnalysisEnabled: boolean;
   aiSummarizationModelId?: string;
   customerSatisfactionAnalysisModelId?: string;
+  /** The workspace's configured default AI model identifier. Set when a provider is configured. */
+  defaultModelId?: string;
+  /** The user ID of the workspace owner. Used to gate interactive AI feature toggles (owner-only). */
+  ownerId: string;
 }
 
 export interface Comment {
@@ -146,4 +150,112 @@ export interface User {
   id: string;
   email: string;
   name: string;
+}
+
+export interface ModelPullProgressPayload {
+  model: string;
+  status: string;
+  percent: number;
+}
+
+export interface ModelPullCompletedPayload {
+  model: string;
+}
+
+export interface ModelPullFailedPayload {
+  model: string;
+  error: string;
+}
+
+export interface ModelPullProgressEvent {
+  workspaceId: string;
+  model: string;
+  status: string;
+  percent: number;
+}
+
+export interface ModelPullCompletedEvent {
+  workspaceId: string;
+  model: string;
+}
+
+export interface ModelPullFailedEvent {
+  workspaceId: string;
+  model: string;
+  error: string;
+}
+
+export interface WorkspaceModel {
+  /** Ollama model name identifier (e.g., "llama3.2" or "llama3:8b"). */
+  modelName: string;
+  /** Current lifecycle status of the model on the Ollama server. */
+  status: 'Pulling' | 'Available' | 'Failed' | 'Removing';
+  /** Pull progress percentage 0–100. Null when not in a Pulling state. */
+  pullProgress: number | null;
+  /** Error message populated when status is 'Failed'. Null otherwise. */
+  errorMessage: string | null;
+  /** ISO 8601 timestamp string recording when the model was added to the workspace. */
+  addedAt: string;
+}
+
+/** Status payload returned by GET /v1/provider/ollama/models/pull/{pullId}. */
+export interface OllamaPullStatus {
+  pullId: string;
+  status: 'Pulling' | 'Available' | 'Failed';
+  progress: number;
+  errorMessage: string | null;
+}
+
+/**
+ * Provider configuration snapshot returned by `getWorkspaceProviderConfig()`.
+ * Mirrors the `ProviderValidationResult` backend DTO from
+ * `POST /v1/workspaces/{id}/provider/validate`.
+ *
+ * Security note: Azure credentials (`endpoint`, `apiKey`) are encrypted at rest
+ * and are intentionally absent from this response per Phase 2 FR-06 constraints.
+ * The Ollama server URL (`ollamaBaseUrl`) is stored as plaintext and is safe to
+ * surface; it is populated for Ollama workspaces and `undefined` for Azure ones.
+ */
+export interface WorkspaceProviderConfig {
+  /** The workspace's currently configured AI provider type. */
+  providerType: 'AzureOpenAI' | 'Ollama';
+  /** Live list of model deployment / tag names for the configured provider. */
+  models: string[];
+  /**
+   * Azure OpenAI resource endpoint URL.
+   * `undefined` — the backend intentionally omits encrypted Azure credentials.
+   */
+  endpoint?: string;
+  /**
+   * Stored Ollama server base URL (e.g., `http://localhost:11434`).
+   * Populated for Ollama workspaces; `undefined` for Azure OpenAI workspaces.
+   * Must not be logged.
+   */
+  ollamaBaseUrl?: string;
+  /**
+   * `true` when the currently stored provider credentials passed a live
+   * connectivity probe on load. `false` when the probe failed (e.g., expired
+   * API key, Ollama server offline).
+   */
+  isValid: boolean;
+}
+
+/**
+ * Payload sent to `updateWorkspaceProvider()` via `PUT /v1/workspaces/{id}/provider`.
+ * Mirrors the `ReconfigureProviderRequest` backend DTO from Phase 4 FR-03.
+ *
+ * Security note: `apiKey` is transmitted only over HTTPS and must never be
+ * written to localStorage, sessionStorage, or any client-side log.
+ * When omitting `apiKey` (i.e., keeping the stored credentials unchanged),
+ * leave the field `undefined` — do NOT send an empty string.
+ */
+export interface WorkspaceProviderUpdateRequest {
+  /** The provider type to configure. */
+  providerType: 'AzureOpenAI' | 'Ollama';
+  /** Azure OpenAI resource endpoint URL. Required when `providerType` is `'AzureOpenAI'` and sending new credentials. */
+  endpoint?: string;
+  /** Azure OpenAI API key. Omit entirely (undefined) to preserve the currently stored key. */
+  apiKey?: string;
+  /** The model identifier to use as the workspace default. Must appear in the validated model list. */
+  defaultModelId: string;
 }

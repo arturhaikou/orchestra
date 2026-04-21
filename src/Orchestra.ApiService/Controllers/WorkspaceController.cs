@@ -1,12 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Logging;
 using Orchestra.Application.Workspaces.DTOs;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Auth.DTOs;
 using Orchestra.Application.Common.Exceptions;
-using Orchestra.Application.Common.Configuration;
+using Orchestra.Domain.Enums;
 using System.Security.Claims;
-using Microsoft.Extensions.Options;
 
 namespace Orchestra.ApiService.Controllers;
 
@@ -19,23 +19,27 @@ namespace Orchestra.ApiService.Controllers;
 public class WorkspaceController : ControllerBase
 {
     private readonly IWorkspaceService _workspaceService;
+    private readonly IWorkspaceProviderService _workspaceProviderService;
     private readonly IWorkspaceAuthorizationService _workspaceAuthorizationService;
-    private readonly IAIModelListService _aiModelListService;
+    private readonly ILogger<WorkspaceController> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="WorkspaceController"/> class.
     /// </summary>
     /// <param name="workspaceService">The workspace service.</param>
+    /// <param name="workspaceProviderService">The workspace provider service.</param>
     /// <param name="workspaceAuthorizationService">The workspace authorization service.</param>
-    /// <param name="aiModelListService">The AI model list service.</param>
+    /// <param name="logger">The logger.</param>
     public WorkspaceController(
         IWorkspaceService workspaceService,
+        IWorkspaceProviderService workspaceProviderService,
         IWorkspaceAuthorizationService workspaceAuthorizationService,
-        IAIModelListService aiModelListService)
+        ILogger<WorkspaceController> logger)
     {
         _workspaceService = workspaceService;
+        _workspaceProviderService = workspaceProviderService;
         _workspaceAuthorizationService = workspaceAuthorizationService;
-        _aiModelListService = aiModelListService;
+        _logger = logger;
     }
 
     /// <summary>
@@ -48,6 +52,7 @@ public class WorkspaceController : ControllerBase
     [ProducesResponseType(typeof(WorkspaceDto), 201)]
     [ProducesResponseType(typeof(ErrorResponse), 400)]
     [ProducesResponseType(typeof(ErrorResponse), 401)]
+    [ProducesResponseType(StatusCodes.Status501NotImplemented)]
     [ProducesResponseType(typeof(ErrorResponse), 500)]
     public async Task<IActionResult> CreateWorkspace([FromBody] CreateWorkspaceRequest request, CancellationToken cancellationToken)
     {
@@ -225,115 +230,230 @@ public class WorkspaceController : ControllerBase
     }
 
     /// <summary>
-    /// Retrieves the list of available AI models for a workspace.
-    /// The authenticated user must be a member of the workspace to access this endpoint.
+    /// Returns the AI model names currently available from the workspace's configured provider.
     /// </summary>
     /// <param name="workspaceId">The workspace ID.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>A list of available model names from the currently-configured AI provider.</returns>
-    /// <response code="200">Returns the list of available AI models.</response>
-    /// <response code="401">If the user is not authenticated.</response>
-    /// <response code="403">If the user is not a member of the workspace.</response>
-    /// <response code="500">If an unexpected error occurs while fetching models.</response>
-    [HttpGet("{workspaceId}/ai/models")]
+    /// <returns>A flat list of model name strings.</returns>
+    /// <response code="200">Returns the list of available model names.</response>
+    /// <response code="401">The request is unauthenticated.</response>
+    /// <response code="404">The workspace does not exist or the authenticated user is not a member.</response>
+    /// <response code="409">The workspace has no AI provider configured.</response>
+    /// <response code="502">The configured AI provider could not be reached or returned an error.</response>
+    [HttpGet("{workspaceId}/provider/models")]
     [ProducesResponseType(typeof(AIModelsResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> GetWorkspaceAIModels(
-        Guid workspaceId,
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status502BadGateway)]
+    public async Task<IActionResult> GetProviderModels(
+        [FromRoute] Guid workspaceId,
         CancellationToken cancellationToken)
     {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized();
+        }
+
         try
         {
-            // Extract user ID from JWT claims
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+            // Membership check: non-members receive 404 (not 403) to prevent
+            // workspace-existence disclosure — consistent with the workspace module policy.
+            await _workspaceAuthorizationService.EnsureUserIsMemberAsync(
+                userId, workspaceId, cancellationToken);
+
+            var models = await _workspaceProviderService.GetAvailableModelsAsync(
+                workspaceId, cancellationToken);
+
+            return Ok(new AIModelsResponse(models));
+        }
+        catch (UnauthorizedWorkspaceAccessException)
+        {
+            // Return 404 — not 403 — to prevent workspace-existence disclosure.
+            return NotFound();
+        }
+        catch (InvalidOperationException)
+        {
+            // Workspace exists and user is a member, but no provider is configured.
+            return Conflict(new { error = "This workspace has no AI provider configured." });
+        }
+        catch (AIProviderCommunicationException)
+        {
+            // Provider unreachable, auth failure, TLS error, or non-success response.
+            // The raw exception message (which could contain diagnostic detail) must NOT
+            // be forwarded to the caller — use only the generic sanitised message below.
+            return StatusCode(
+                StatusCodes.Status502BadGateway,
+                new { error = "The configured AI provider could not be reached or returned an error. Verify your workspace provider configuration." });
+        }
+    }
+
+    /// <summary>
+    /// Probes the workspace's stored AI provider credentials and returns a structured validation result.
+    /// </summary>
+    /// <param name="workspaceId">The workspace whose provider configuration should be validated.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>
+    /// <c>200 OK</c> with a <see cref="ProviderValidationResult"/> payload on both connectivity
+    /// success and connectivity failure. The <c>isValid</c> field distinguishes the two cases.
+    /// </returns>
+    /// <response code="200">
+    /// Validation probe completed. Check <c>isValid</c> in the response body to determine
+    /// whether the provider is reachable.
+    /// </response>
+    /// <response code="401">The request is unauthenticated.</response>
+    /// <response code="404">
+    /// The workspace does not exist, the authenticated user is not a member,
+    /// or the workspace has no stored AI provider configuration.
+    /// </response>
+    [HttpPost("{workspaceId}/provider/validate")]
+    [ProducesResponseType(typeof(ProviderValidationResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ValidateProvider(
+        [FromRoute] Guid workspaceId,
+        CancellationToken cancellationToken)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            // Membership check: non-members receive 404 — not 403 — to prevent
+            // workspace-existence disclosure, consistent with all workspace-scoped endpoints.
+            await _workspaceAuthorizationService.EnsureUserIsMemberAsync(
+                userId, workspaceId, cancellationToken);
+
+            var result = await _workspaceProviderService.ValidateProviderAsync(
+                workspaceId, cancellationToken);
+
+            // null signals "no AIProviderConfiguration stored" — map to 404 Not Found.
+            if (result is null)
             {
-                return Unauthorized(new ErrorResponse("Invalid user token"));
+                return NotFound();
             }
 
-            // Validate that the user is a member of the workspace
-            await _workspaceAuthorizationService.EnsureUserIsMemberAsync(userId, workspaceId, cancellationToken);
-
-            // Fetch the available models from the AI provider
-            var models = await _aiModelListService.GetAvailableModelsAsync(cancellationToken);
-
-            return Ok(new AIModelsResponse(models));
+            // Return 200 OK for both isValid: true and isValid: false.
+            // A non-200 would indicate the probe itself failed; here the probe completed.
+            return Ok(result);
         }
-        catch (UnauthorizedWorkspaceAccessException ex)
+        catch (UnauthorizedWorkspaceAccessException)
         {
-            return StatusCode(403, new ErrorResponse(ex.Message));
-        }
-        catch (InvalidOperationException ex)
-        {
-            return StatusCode(500, new ErrorResponse($"AI provider configuration error: {ex.Message}"));
-        }
-        catch (HttpRequestException ex)
-        {
-            return StatusCode(500, new ErrorResponse($"Failed to fetch models from AI provider: {ex.Message}"));
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, new ErrorResponse("An unexpected error occurred while fetching models"));
+            // Return 404 — not 403 — to prevent workspace-existence disclosure.
+            return NotFound();
         }
     }
 
     /// <summary>
-    /// Retrieves the list of available AI models from the platform's configured provider.
-    /// No workspace context required — returns the same model list available to all users.
+    /// Replaces the AI provider configuration for the specified workspace.
+    /// Validates the incoming credentials against the live provider before any data is persisted.
     /// </summary>
+    /// <param name="id">The workspace ID.</param>
+    /// <param name="request">The reconfiguration request body.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>A list of available model names from the currently-configured AI provider.</returns>
-    /// <response code="200">Returns the list of available AI models.</response>
-    /// <response code="401">If the user is not authenticated.</response>
-    /// <response code="500">If an unexpected error occurs while fetching models.</response>
-    [HttpGet("ai/models")]
-    [ProducesResponseType(typeof(AIModelsResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> GetPlatformAIModels(CancellationToken cancellationToken)
+    /// <returns><c>204 No Content</c> on success.</returns>
+    /// <response code="204">Provider reconfigured successfully.</response>
+    /// <response code="400">Request body is missing required fields or contains contradictory fields.</response>
+    /// <response code="401">The request is unauthenticated.</response>
+    /// <response code="403">The authenticated user is a workspace member but not the owner.</response>
+    /// <response code="404">The workspace does not exist or the authenticated user is not a member.</response>
+    /// <response code="422">
+    /// The live credential probe failed, or the supplied defaultModelId is not in the model list.
+    /// </response>
+    [HttpPut("{id}/provider")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status422UnprocessableEntity)]
+    public async Task<IActionResult> ReconfigureProvider(
+        [FromRoute] Guid id,
+        [FromBody] ReconfigureProviderRequest request,
+        CancellationToken cancellationToken)
     {
+        // ── 1. Extract user ID from JWT ───────────────────────────────────────
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized();
+        }
+
+        // ── 2. Validate request body ──────────────────────────────────────────
+        // ProviderType must be present and parseable.
+        if (string.IsNullOrWhiteSpace(request.ProviderType) ||
+            !Enum.TryParse<AIProviderType>(request.ProviderType, ignoreCase: true, out var providerType))
+        {
+            return BadRequest(new ErrorResponse(
+                "providerType is required. Accepted values: 'AzureOpenAI', 'Ollama'."));
+        }
+
+        // defaultModelId is always required.
+        if (string.IsNullOrWhiteSpace(request.DefaultModelId))
+        {
+            return BadRequest(new ErrorResponse("defaultModelId is required."));
+        }
+
+        // Provider-type-specific field consistency checks.
+        if (providerType == AIProviderType.AzureOpenAI)
+        {
+            if (string.IsNullOrWhiteSpace(request.Endpoint))
+                return BadRequest(new ErrorResponse("endpoint is required for AzureOpenAI provider."));
+
+            if (string.IsNullOrWhiteSpace(request.ApiKey))
+                return BadRequest(new ErrorResponse("apiKey is required for AzureOpenAI provider."));
+        }
+        else if (providerType == AIProviderType.Ollama)
+        {
+            if (string.IsNullOrWhiteSpace(request.Endpoint))
+                return BadRequest(new ErrorResponse("endpoint is required for Ollama provider."));
+
+            if (!string.IsNullOrWhiteSpace(request.ApiKey))
+                return BadRequest(new ErrorResponse(
+                    "apiKey must be absent or null when providerType is Ollama."));
+        }
+
         try
         {
-            // No workspace-specific authorization required; authenticated user can always fetch the model list
-            var models = await _aiModelListService.GetAvailableModelsAsync(cancellationToken);
-            return Ok(new AIModelsResponse(models));
-        }
-        catch (InvalidOperationException ex)
-        {
-            return StatusCode(500, new ErrorResponse($"AI provider configuration error: {ex.Message}"));
-        }
-        catch (HttpRequestException ex)
-        {
-            return StatusCode(500, new ErrorResponse($"Failed to fetch models from AI provider: {ex.Message}"));
-        }
-        catch (Exception)
-        {
-            return StatusCode(500, new ErrorResponse("An unexpected error occurred while fetching models"));
-        }
-    }
+            // ── 3. Two-stage authorization ────────────────────────────────────
+            // Stage 1: non-members → 404 (workspace existence not disclosed).
+            // Stage 2: members who are not owners → 403.
+            await _workspaceAuthorizationService.EnsureUserIsOwnerAsync(
+                userId, id, cancellationToken);
 
-    /// <summary>
-    /// Retrieves the system startup-configured default AI model identifier.
-    /// Used by the Create Workspace modal to pre-select the default model.
-    /// </summary>
-    /// <returns>An object containing the default model identifier.</returns>
-    /// <response code="200">Returns the default model identifier.</response>
-    /// <response code="401">If the user is not authenticated.</response>
-    [HttpGet("default-model")]
-    [ProducesResponseType(typeof(DefaultModelResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    public IActionResult GetDefaultModel()
-    {
-        // IConfiguration is available via dependency injection in the controller
-        // The model name is bound from AgentExecutionSettings during DI setup
-        var modelName = HttpContext.RequestServices
-            .GetRequiredService<IOptions<AgentExecutionSettings>>()
-            .Value
-            .ModelDeploymentName;
+            // ── 4. Delegate to service ────────────────────────────────────────
+            await _workspaceProviderService.ReconfigureProviderAsync(
+                id,
+                providerType,
+                request.Endpoint,
+                request.ApiKey,
+                request.DefaultModelId!,
+                cancellationToken);
 
-        return Ok(new DefaultModelResponse(modelName));
+            // ── 5. Success ────────────────────────────────────────────────────
+            return NoContent();
+        }
+        catch (UnauthorizedWorkspaceAccessException)
+        {
+            // Non-member — return 404 to prevent workspace-existence disclosure.
+            return NotFound();
+        }
+        catch (WorkspaceForbiddenException)
+        {
+            // Member but not owner.
+            return StatusCode(StatusCodes.Status403Forbidden,
+                new ErrorResponse("You do not have permission to reconfigure the provider for this workspace."));
+        }
+        catch (ProviderReconfigurationException ex)
+        {
+            // Credential probe failed or defaultModelId not in model list.
+            // ex.Message is already sanitised — it contains no credential values.
+            return UnprocessableEntity(new ErrorResponse(ex.Message));
+        }
     }
 
     private Guid GetUserIdFromClaims()

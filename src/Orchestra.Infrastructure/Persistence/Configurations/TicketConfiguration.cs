@@ -8,6 +8,8 @@ public class TicketConfiguration : IEntityTypeConfiguration<Ticket>
 {
     public void Configure(EntityTypeBuilder<Ticket> builder)
     {
+        builder.ToTable("Tickets");
+
         builder.HasKey(t => t.Id);
 
         builder.Property(t => t.Title)
@@ -55,8 +57,8 @@ public class TicketConfiguration : IEntityTypeConfiguration<Ticket>
             .OnDelete(DeleteBehavior.Restrict)
             .IsRequired(false);
 
-        // Foreign Key to Integration with cascade delete
-        builder.HasOne(t => t.Integration)
+        // Foreign Key to Integration with cascade delete — no navigation property on Ticket
+        builder.HasOne<Integration>()
             .WithMany()
             .HasForeignKey(t => t.IntegrationId)
             .OnDelete(DeleteBehavior.Cascade)
@@ -67,13 +69,30 @@ public class TicketConfiguration : IEntityTypeConfiguration<Ticket>
             .IsUnique()
             .HasFilter("\"IntegrationId\" IS NOT NULL AND \"ExternalTicketId\" IS NOT NULL");
 
-        // Comments navigation property
-        builder.HasMany(t => t.Comments)
-            .WithOne(c => c.Ticket)
+        // Comments relationship — no navigation properties on Ticket or TicketComment
+        builder.HasMany<TicketComment>()
+            .WithOne()
             .HasForeignKey(c => c.TicketId)
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasIndex(t => t.WorkspaceId);
+
+        // Composite index for efficient filtering on WorkspaceId + IsInternal (Audit finding B-1)
+        builder.HasIndex(t => new { t.WorkspaceId, t.IsInternal })
+            .HasDatabaseName("IX_Tickets_WorkspaceId_IsInternal");
+
+        // Partial composite index for agent execution polling (Audit finding B-2)
+        builder.HasIndex(t => new { t.AssignedAgentId, t.StatusId })
+            .HasFilter("\"AssignedAgentId\" IS NOT NULL")
+            .HasDatabaseName("IX_Tickets_AssignedAgentId_StatusId_Partial");
+
+        // Single-column index on StatusId for join/filter efficiency (Audit finding B-3)
+        builder.HasIndex(t => t.StatusId)
+            .HasDatabaseName("IX_Tickets_StatusId");
+
+        // Single-column index on PriorityId for join/filter efficiency (Audit finding B-3)
+        builder.HasIndex(t => t.PriorityId)
+            .HasDatabaseName("IX_Tickets_PriorityId");
 
         builder.HasOne<Agent>()
             .WithMany()

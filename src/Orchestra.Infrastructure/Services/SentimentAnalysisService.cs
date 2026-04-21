@@ -15,18 +15,15 @@ namespace Orchestra.Infrastructure.Services;
 /// </summary>
 public sealed class SentimentAnalysisService : ISentimentAnalysisService
 {
-    private readonly IChatClient _defaultChatClient;
     private readonly IChatClientResolver _chatClientResolver;
     private readonly ILogger<SentimentAnalysisService> _logger;
     // In-memory cache: key is workspaceId|ticketId|commentHash, value is sentiment score
     private static readonly ConcurrentDictionary<string, int> _sentimentCache = new();
 
     public SentimentAnalysisService(
-        IChatClient defaultChatClient,
         IChatClientResolver chatClientResolver,
         ILogger<SentimentAnalysisService> logger)
     {
-        _defaultChatClient = defaultChatClient;
         _chatClientResolver = chatClientResolver;
         _logger = logger;
     }
@@ -38,7 +35,7 @@ public sealed class SentimentAnalysisService : ISentimentAnalysisService
     /// </summary>
     public async Task<List<TicketSentimentResult>> AnalyzeBatchSentimentAsync(
         List<TicketSentimentRequest> requests,
-        string? modelId = null,
+        string modelId,
         CancellationToken cancellationToken = default)
     {
         if (requests == null || requests.Count == 0)
@@ -46,8 +43,9 @@ public sealed class SentimentAnalysisService : ISentimentAnalysisService
             return new List<TicketSentimentResult>();
         }
 
-        // Resolve the appropriate chat client based on workspace-configured model ID
-        var chatClient = await _chatClientResolver.ResolveChatClientAsync(modelId, cancellationToken);
+        // All requests in a batch share the same workspace; use the first request's workspace ID.
+        // modelId is baked into the chat client at construction — no ChatOptions needed.
+        var chatClient = await _chatClientResolver.ResolveAsync(requests[0].WorkspaceId, modelId, cancellationToken);
 
         int cacheHits = 0, aiCalls = 0;
         var results = new List<TicketSentimentResult>();

@@ -31,9 +31,13 @@ namespace Orchestra.Infrastructure.Persistence
 
         public DbSet<ToolAction> ToolActions { get; set; } = null!;
 
+        public DbSet<AIProviderConfiguration> AIProviderConfigurations { get; set; } = null!;
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            modelBuilder.HasPostgresExtension("citext");
 
             modelBuilder.ApplyConfiguration(new Configurations.UserConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.WorkspaceConfiguration());
@@ -47,6 +51,7 @@ namespace Orchestra.Infrastructure.Persistence
             modelBuilder.ApplyConfiguration(new Configurations.TicketCommentConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.ToolCategoryConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.ToolActionConfiguration());
+            modelBuilder.ApplyConfiguration(new Configurations.AIProviderConfigurationConfiguration());
         }
     }
 }

@@ -20,7 +20,46 @@ namespace Orchestra.Infrastructure.Migrations
                 .HasAnnotation("ProductVersion", "10.0.2")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
+            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "citext");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+
+            modelBuilder.Entity("Orchestra.Domain.Entities.AIProviderConfiguration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ApiKey")
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DefaultModelId")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Endpoint")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<int>("ProviderType")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkspaceId")
+                        .IsUnique();
+
+                    b.ToTable("AIProviderConfigurations", (string)null);
+                });
 
             modelBuilder.Entity("Orchestra.Domain.Entities.Agent", b =>
                 {
@@ -76,7 +115,7 @@ namespace Orchestra.Infrastructure.Migrations
 
                     b.HasIndex("WorkspaceId");
 
-                    b.ToTable("agents", (string)null);
+                    b.ToTable("Agents", (string)null);
                 });
 
             modelBuilder.Entity("Orchestra.Domain.Entities.AgentToolAction", b =>
@@ -91,7 +130,7 @@ namespace Orchestra.Infrastructure.Migrations
 
                     b.HasIndex("ToolActionId");
 
-                    b.ToTable("agent_tool_actions", (string)null);
+                    b.ToTable("AgentToolActions", (string)null);
                 });
 
             modelBuilder.Entity("Orchestra.Domain.Entities.Integration", b =>
@@ -108,8 +147,8 @@ namespace Orchestra.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("EncryptedApiKey")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)");
 
                     b.Property<string>("FilterQuery")
                         .HasMaxLength(500)
@@ -223,19 +262,26 @@ namespace Orchestra.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AssignedAgentId");
+                    b.HasIndex("PriorityId")
+                        .HasDatabaseName("IX_Tickets_PriorityId");
 
-                    b.HasIndex("PriorityId");
-
-                    b.HasIndex("StatusId");
+                    b.HasIndex("StatusId")
+                        .HasDatabaseName("IX_Tickets_StatusId");
 
                     b.HasIndex("WorkspaceId");
+
+                    b.HasIndex("AssignedAgentId", "StatusId")
+                        .HasDatabaseName("IX_Tickets_AssignedAgentId_StatusId_Partial")
+                        .HasFilter("\"AssignedAgentId\" IS NOT NULL");
 
                     b.HasIndex("IntegrationId", "ExternalTicketId")
                         .IsUnique()
                         .HasFilter("\"IntegrationId\" IS NOT NULL AND \"ExternalTicketId\" IS NOT NULL");
 
-                    b.ToTable("Tickets");
+                    b.HasIndex("WorkspaceId", "IsInternal")
+                        .HasDatabaseName("IX_Tickets_WorkspaceId_IsInternal");
+
+                    b.ToTable("Tickets", (string)null);
                 });
 
             modelBuilder.Entity("Orchestra.Domain.Entities.TicketComment", b =>
@@ -261,9 +307,8 @@ namespace Orchestra.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CreatedAt");
-
-                    b.HasIndex("TicketId");
+                    b.HasIndex("TicketId", "CreatedAt")
+                        .HasDatabaseName("IX_TicketComments_TicketId_CreatedAt");
 
                     b.ToTable("TicketComments", (string)null);
                 });
@@ -292,7 +337,7 @@ namespace Orchestra.Infrastructure.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("TicketPriorities");
+                    b.ToTable("TicketPriorities", (string)null);
 
                     b.HasData(
                         new
@@ -346,7 +391,7 @@ namespace Orchestra.Infrastructure.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("TicketStatuses");
+                    b.ToTable("TicketStatuses", (string)null);
 
                     b.HasData(
                         new
@@ -410,7 +455,7 @@ namespace Orchestra.Infrastructure.Migrations
                     b.HasIndex("ToolCategoryId", "Name")
                         .IsUnique();
 
-                    b.ToTable("tool_actions", (string)null);
+                    b.ToTable("ToolActions", (string)null);
                 });
 
             modelBuilder.Entity("Orchestra.Domain.Entities.ToolCategory", b =>
@@ -451,7 +496,7 @@ namespace Orchestra.Infrastructure.Migrations
 
                     b.HasIndex("ProviderType");
 
-                    b.ToTable("tool_categories", (string)null);
+                    b.ToTable("ToolCategories", (string)null);
                 });
 
             modelBuilder.Entity("Orchestra.Domain.Entities.User", b =>
@@ -466,7 +511,7 @@ namespace Orchestra.Infrastructure.Migrations
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("character varying(255)");
+                        .HasColumnType("citext");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
@@ -523,6 +568,9 @@ namespace Orchestra.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<int?>("AIProviderType")
+                        .HasColumnType("integer");
+
                     b.Property<string>("AiSummarizationModelId")
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
@@ -569,6 +617,15 @@ namespace Orchestra.Infrastructure.Migrations
                     b.ToTable("Workspaces", (string)null);
                 });
 
+            modelBuilder.Entity("Orchestra.Domain.Entities.AIProviderConfiguration", b =>
+                {
+                    b.HasOne("Orchestra.Domain.Entities.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Orchestra.Domain.Entities.Agent", b =>
                 {
                     b.HasOne("Orchestra.Domain.Entities.Workspace", null)
@@ -595,13 +652,11 @@ namespace Orchestra.Infrastructure.Migrations
 
             modelBuilder.Entity("Orchestra.Domain.Entities.Integration", b =>
                 {
-                    b.HasOne("Orchestra.Domain.Entities.Workspace", "Workspace")
+                    b.HasOne("Orchestra.Domain.Entities.Workspace", null)
                         .WithMany()
                         .HasForeignKey("WorkspaceId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Workspace");
                 });
 
             modelBuilder.Entity("Orchestra.Domain.Entities.Ticket", b =>
@@ -611,7 +666,7 @@ namespace Orchestra.Infrastructure.Migrations
                         .HasForeignKey("AssignedAgentId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("Orchestra.Domain.Entities.Integration", "Integration")
+                    b.HasOne("Orchestra.Domain.Entities.Integration", null)
                         .WithMany()
                         .HasForeignKey("IntegrationId")
                         .OnDelete(DeleteBehavior.Cascade);
@@ -631,19 +686,15 @@ namespace Orchestra.Infrastructure.Migrations
                         .HasForeignKey("WorkspaceId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Integration");
                 });
 
             modelBuilder.Entity("Orchestra.Domain.Entities.TicketComment", b =>
                 {
-                    b.HasOne("Orchestra.Domain.Entities.Ticket", "Ticket")
-                        .WithMany("Comments")
+                    b.HasOne("Orchestra.Domain.Entities.Ticket", null)
+                        .WithMany()
                         .HasForeignKey("TicketId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Ticket");
                 });
 
             modelBuilder.Entity("Orchestra.Domain.Entities.ToolAction", b =>
@@ -657,21 +708,17 @@ namespace Orchestra.Infrastructure.Migrations
 
             modelBuilder.Entity("Orchestra.Domain.Entities.UserWorkspace", b =>
                 {
-                    b.HasOne("Orchestra.Domain.Entities.User", "User")
+                    b.HasOne("Orchestra.Domain.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Orchestra.Domain.Entities.Workspace", "Workspace")
+                    b.HasOne("Orchestra.Domain.Entities.Workspace", null)
                         .WithMany()
                         .HasForeignKey("WorkspaceId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("User");
-
-                    b.Navigation("Workspace");
                 });
 
             modelBuilder.Entity("Orchestra.Domain.Entities.Workspace", b =>
@@ -681,11 +728,6 @@ namespace Orchestra.Infrastructure.Migrations
                         .HasForeignKey("OwnerId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("Orchestra.Domain.Entities.Ticket", b =>
-                {
-                    b.Navigation("Comments");
                 });
 #pragma warning restore 612, 618
         }

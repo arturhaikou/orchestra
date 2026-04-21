@@ -21,6 +21,7 @@ public class TicketServiceTests
     private readonly ITicketCommentService _commentServiceMock = Substitute.For<ITicketCommentService>();
     private readonly ITicketEnrichmentService _enrichmentServiceMock = Substitute.For<ITicketEnrichmentService>();
     private readonly IWorkspaceDataAccess _workspaceDataAccessMock = Substitute.For<IWorkspaceDataAccess>();
+    private readonly IWorkspaceAIProviderRepository _aiProviderRepositoryMock = Substitute.For<IWorkspaceAIProviderRepository>();
     private readonly ILogger<TicketService> _loggerMock = Substitute.For<ILogger<TicketService>>();
     private readonly TicketService _sut;
 
@@ -32,6 +33,7 @@ public class TicketServiceTests
             _commentServiceMock,
             _enrichmentServiceMock,
             _workspaceDataAccessMock,
+            _aiProviderRepositoryMock,
             _loggerMock);
     }
 
@@ -69,7 +71,7 @@ public class TicketServiceTests
         Assert.Equal("Summarization is not enabled for this workspace. Go to workspace settings to enable it.", response.Message);
         
         // Verify AI enrichment service was never called
-        await _enrichmentServiceMock.DidNotReceive().GenerateSummaryAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        await _enrichmentServiceMock.DidNotReceive().GenerateSummaryAsync(Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -80,6 +82,7 @@ public class TicketServiceTests
         var userId = Guid.NewGuid();
         var ticketId = Guid.NewGuid().ToString();
         var generatedSummary = "This is an AI-generated summary.";
+        var modelId = "gpt-4o";
 
         var ticket = new TicketDtoBuilder()
             .WithId(ticketId)
@@ -92,6 +95,7 @@ public class TicketServiceTests
         var workspace = new WorkspaceBuilder()
             .WithId(workspaceId)
             .WithIsAiSummarizationEnabled(true)
+            .WithAiSummarizationModelId(modelId)
             .Build();
 
         _queryServiceMock.GetTicketByIdAsync(ticketId, userId, Arg.Any<CancellationToken>())
@@ -103,7 +107,7 @@ public class TicketServiceTests
         _enrichmentServiceMock.BuildSummaryContent(Arg.Any<TicketDto>())
             .Returns("content");
 
-        _enrichmentServiceMock.GenerateSummaryAsync("content", Arg.Any<string?>(), Arg.Any<CancellationToken>())
+        _enrichmentServiceMock.GenerateSummaryAsync("content", Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(generatedSummary));
 
         // Act
@@ -116,7 +120,7 @@ public class TicketServiceTests
         Assert.Equal(generatedSummary, response.Ticket.Summary);
         
         // Verify AI enrichment service was called
-        await _enrichmentServiceMock.Received(1).GenerateSummaryAsync("content", Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        await _enrichmentServiceMock.Received(1).GenerateSummaryAsync("content", Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -147,7 +151,7 @@ public class TicketServiceTests
         Assert.Equal("Summarization is not enabled for this workspace. Go to workspace settings to enable it.", response.Message);
         
         // Verify AI enrichment service was not called
-        await _enrichmentServiceMock.DidNotReceive().GenerateSummaryAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        await _enrichmentServiceMock.DidNotReceive().GenerateSummaryAsync(Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -193,6 +197,7 @@ public class TicketServiceTests
         var workspaceId = Guid.NewGuid();
         var userId = Guid.NewGuid();
         var ticketId = Guid.NewGuid().ToString();
+        var modelId = "gpt-4o";
 
         var ticket = new TicketDtoBuilder()
             .WithId(ticketId)
@@ -202,6 +207,7 @@ public class TicketServiceTests
         var workspace = new WorkspaceBuilder()
             .WithId(workspaceId)
             .WithIsAiSummarizationEnabled(true)
+            .WithAiSummarizationModelId(modelId)
             .Build();
 
         _queryServiceMock.GetTicketByIdAsync(ticketId, userId, Arg.Any<CancellationToken>())
@@ -213,7 +219,7 @@ public class TicketServiceTests
         _enrichmentServiceMock.BuildSummaryContent(Arg.Any<TicketDto>())
             .Returns("content");
 
-        _enrichmentServiceMock.GenerateSummaryAsync("content", Arg.Any<string?>(), Arg.Any<CancellationToken>())
+        _enrichmentServiceMock.GenerateSummaryAsync("content", Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<string>(new SummarizationException("AI service unavailable")));
 
         // Act & Assert

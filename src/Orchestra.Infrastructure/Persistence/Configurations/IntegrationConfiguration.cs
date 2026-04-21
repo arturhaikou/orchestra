@@ -52,7 +52,7 @@ public class IntegrationConfiguration : IEntityTypeConfiguration<Integration>
             .HasMaxLength(255);
         
         builder.Property(i => i.EncryptedApiKey)
-            .HasMaxLength(1000); // Encrypted data is larger than plain text
+            .HasMaxLength(4096); // Encrypted data is larger than plain text; aligned with AIProviderConfiguration.ApiKey
         
         builder.Property(i => i.FilterQuery)
             .HasMaxLength(500);
@@ -86,10 +86,10 @@ public class IntegrationConfiguration : IEntityTypeConfiguration<Integration>
         builder.HasIndex(i => new { i.WorkspaceId, i.Name })
             .HasDatabaseName("IX_Integrations_WorkspaceId_Name");
         
-        // Foreign key relationship
-        builder.HasOne(i => i.Workspace)
+        // Foreign key relationship — no navigation property on Integration
+        builder.HasOne<Workspace>()
             .WithMany()
             .HasForeignKey(i => i.WorkspaceId)
-            .OnDelete(DeleteBehavior.Cascade); // Delete integrations when workspace is deleted
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

@@ -33,7 +33,14 @@ public record TicketDto(
     // Additional fields
     int? Satisfaction,              // CSAT score (0-100)
     string? Summary                // AI-generated summary
-);
+)
+{
+    /// <summary>
+    /// Scalar comment count for list view responses. Defaults to 0 for detail-view
+    /// responses where the full <see cref="Comments"/> collection is populated instead.
+    /// </summary>
+    public int CommentCount { get; init; } = 0;
+}
 
 public record TicketStatusDto(Guid Id, string Name, string Color);
 

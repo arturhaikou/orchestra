@@ -8,6 +8,8 @@ public class TicketPriorityConfiguration : IEntityTypeConfiguration<TicketPriori
 {
     public void Configure(EntityTypeBuilder<TicketPriority> builder)
     {
+        builder.ToTable("TicketPriorities");
+
         builder.HasKey(tp => tp.Id);
 
         builder.Property(tp => tp.Name)

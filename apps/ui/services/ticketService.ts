@@ -49,12 +49,12 @@ export const getTicketPriorities = async (): Promise<TicketPriority[]> => {
   }
 };
 
-export const getTickets = async (workspaceId: string, pageToken?: string, pageSize: number = 2): Promise<PaginatedResponse<Ticket>> => {
+export const getTickets = async (workspaceId: string, pageToken?: string, pageSize: number = 50): Promise<PaginatedResponse<Ticket>> => {
   try {
     const url = new URL(API_BASE_URL);
     url.searchParams.append('workspaceId', workspaceId);
-    if (pageToken) url.searchParams.append('pageToken', pageToken);
     url.searchParams.append('pageSize', pageSize.toString());
+    if (pageToken) url.searchParams.append('pageToken', pageToken);
 
     const response = await fetch(url.toString(), {
       headers: getAuthHeaders()

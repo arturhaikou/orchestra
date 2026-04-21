@@ -30,7 +30,7 @@ public class AgentExecutionWorker : BackgroundService
         _logger.LogInformation(
             "AgentExecutionWorker starting. Polling interval: {IntervalSeconds}s, Model: {Model}",
             _settings.PollingIntervalSeconds,
-            _settings.ModelDeploymentName);
+            "N/A");
 
         // Wait briefly for DatabaseMigrationWorker to complete
         await Task.Delay(TimeSpan.FromSeconds(25), stoppingToken);

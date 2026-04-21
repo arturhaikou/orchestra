@@ -6,9 +6,6 @@ public class UserWorkspace
     public Guid WorkspaceId { get; private set; }
     public DateTime JoinedAt { get; private set; }
 
-    public User? User { get; private set; }
-    public Workspace? Workspace { get; private set; }
-
     private UserWorkspace() { } // For EF Core
 
     public static UserWorkspace Create(Guid userId, Guid workspaceId)

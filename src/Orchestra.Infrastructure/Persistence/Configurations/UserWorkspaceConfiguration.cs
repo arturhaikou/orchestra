@@ -17,12 +17,12 @@ public class UserWorkspaceConfiguration : IEntityTypeConfiguration<UserWorkspace
 
         builder.HasKey(uw => new { uw.UserId, uw.WorkspaceId });
 
-        builder.HasOne(uw => uw.User)
+        builder.HasOne<User>()
             .WithMany()
             .HasForeignKey(uw => uw.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasOne(uw => uw.Workspace)
+        builder.HasOne<Workspace>()
             .WithMany()
             .HasForeignKey(uw => uw.WorkspaceId)
             .OnDelete(DeleteBehavior.Cascade);

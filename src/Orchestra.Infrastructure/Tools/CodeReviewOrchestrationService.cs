@@ -217,8 +217,14 @@ public class CodeReviewOrchestrationService : ICodeReviewOrchestrationService
                 subAgentFunctions = CreateAIFunctions(typeof(IGitLabApiClient), apiClient, GitLabReviewMethodNames);
             }
 
-            // Step 3 — Resolve LLM client (null → system default via ChatClientResolver).
-            var chatClient = await _chatClientResolver.ResolveChatClientAsync(modelIdentifier, cancellationToken);
+            // Step 3 — Resolve LLM client scoped to the workspace and model.
+            // modelIdentifier comes from the caller (usually workspace DefaultModelId);
+            // if null, use a system fallback to allow the AI provider to apply workspace defaults.
+            var effectiveModelId = modelIdentifier ?? "default";
+            var chatClient = await _chatClientResolver.ResolveAsync(
+                workspaceId,
+                effectiveModelId,
+                cancellationToken);
 
             // Step 4 — Build sub-agent context prompt.
             var subAgentContext = BuildSubAgentContextPrompt(

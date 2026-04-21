@@ -3,25 +3,25 @@ using Microsoft.Extensions.AI;
 namespace Orchestra.Application.Common.Interfaces;
 
 /// <summary>
-/// Factory for creating IChatClient instances based on provider and model identifier.
-/// Abstracts the provider-specific logic (Azure OpenAI, Ollama, AWS, etc.) behind a single interface.
-/// Enables workspace-level AI model selection by creating model-specific clients on-demand.
+/// Resolves a workspace-scoped <see cref="IChatClient"/> for use in the agent execution pipeline.
+/// Every workspace selects its own AI provider; this contract makes the workspace identifier
+/// an explicit, compile-time-enforced parameter across the solution.
 /// </summary>
 public interface IChatClientResolver
 {
     /// <summary>
-    /// Resolves and returns an IChatClient instance for the specified model.
+    /// Returns an <see cref="IChatClient"/> configured for the AI provider of the specified workspace,
+    /// with <paramref name="modelId"/> baked in at construction time.
     /// </summary>
+    /// <param name="workspaceId">The workspace whose configured AI provider should be used.</param>
     /// <param name="modelId">
-    /// Optional workspace-configured model identifier.
-    /// If null, the startup-configured default IChatClient is returned.
-    /// If non-null but unavailable (stale), silently falls back to the default.
-    /// If non-null and available, creates and returns a new IChatClient configured for that model.
+    /// The effective model identifier (never null). Resolved by the caller from workspace feature
+    /// settings (<c>featureModel ?? workspace.DefaultModelId ?? throw</c>).
     /// </param>
-    /// <param name="cancellationToken">Cancellation token for async initialization of new clients.</param>
-    /// <returns>
-    /// An IChatClient instance ready to use for API calls.
-    /// Never null.
-    /// </returns>
-    Task<IChatClient> ResolveChatClientAsync(string? modelId, CancellationToken cancellationToken = default);
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>An <see cref="IChatClient"/> ready for API calls.</returns>
+    /// <exception cref="System.InvalidOperationException">
+    /// Thrown when the workspace has no AI provider configured.
+    /// </exception>
+    Task<IChatClient> ResolveAsync(Guid workspaceId, string modelId, CancellationToken cancellationToken);
 }

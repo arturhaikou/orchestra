@@ -29,20 +29,20 @@ public interface ISentimentAnalysisService
 {
     /// <summary>
     /// Analyzes sentiment for multiple tickets based on their comments.
-    /// If a workspace-configured <paramref name="modelId"/> is provided and is currently available,
-    /// that model is used. If modelId is null or the specified model is no longer available (stale),
-    /// the service silently falls back to the startup-configured default model without raising an error.
+    /// The <paramref name="modelId"/> is baked into the constructed <see cref="IChatClient"/> — no
+    /// <c>ChatOptions</c> override is needed.
     /// </summary>
     /// <param name="requests">List of tickets with their workspace IDs and comments to analyze.</param>
     /// <param name="modelId">
-    /// Optional workspace-configured model identifier. If null, the startup default is used.
-    /// If non-null but unavailable (stale), the startup default is used silently.
+    /// The effective model identifier (never null). The caller must resolve the fallback chain
+    /// (<c>CustomerSatisfactionAnalysisModelId ?? DefaultModelId ?? throw</c>) before calling.
+    /// All requests in a batch share the same workspace.
     /// </param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of sentiment analysis results mapped to ticket IDs.</returns>
     Task<List<TicketSentimentResult>> AnalyzeBatchSentimentAsync(
         List<TicketSentimentRequest> requests,
-        string? modelId = null,
+        string modelId,
         CancellationToken cancellationToken = default
     );
 }

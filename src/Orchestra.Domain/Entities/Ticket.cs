@@ -23,10 +23,6 @@ public class Ticket
     public Guid? AssignedAgentId { get; private set; }
     public Guid? AssignedWorkflowId { get; private set; }
 
-    // Navigation properties
-    public Integration? Integration { get; private set; }
-    public ICollection<TicketComment> Comments { get; private set; } = new List<TicketComment>();
-
     private Ticket() { } // EF Core constructor
 
     public static Ticket Create(
@@ -42,6 +38,12 @@ public class Ticket
 
         if (string.IsNullOrWhiteSpace(title))
             throw new ArgumentException("Title cannot be empty.", nameof(title));
+
+        if (title.Length > 500)
+            throw new ArgumentException("Title cannot exceed 500 characters.", nameof(title));
+
+        if (description != null && description.Length > 10000)
+            throw new ArgumentException("Description cannot exceed 10000 characters.", nameof(description));
 
         if (isInternal)
         {
@@ -88,6 +90,12 @@ public class Ticket
         
         if (string.IsNullOrWhiteSpace(externalTicketId))
             throw new ArgumentException("External ticket ID is required.", nameof(externalTicketId));
+
+        if (!string.IsNullOrEmpty(title) && title.Length > 500)
+            throw new ArgumentException("Title cannot exceed 500 characters.", nameof(title));
+
+        if (!string.IsNullOrEmpty(description) && description.Length > 10000)
+            throw new ArgumentException("Description cannot exceed 10000 characters.", nameof(description));
 
         return new Ticket
         {
@@ -189,12 +197,12 @@ public class Ticket
     /// Updates the description of an internal ticket.
     /// External tickets cannot update their description as it's managed by the provider.
     /// </summary>
-    /// <param name="description">The new description text (required, max 5000 characters)</param>
+    /// <param name="description">The new description text (required, max 10000 characters)</param>
     /// <exception cref="InvalidOperationException">
     /// Thrown when attempting to update description on external tickets
     /// </exception>
     /// <exception cref="ArgumentException">
-    /// Thrown when description is empty or exceeds 5000 characters
+    /// Thrown when description is empty or exceeds 10000 characters
     /// </exception>
     public void UpdateDescription(string description)
     {
@@ -209,9 +217,9 @@ public class Ticket
             throw new ArgumentException("Description cannot be empty.", nameof(description));
         }
 
-        if (description.Length > 5000)
+        if (description.Length > 10000)
         {
-            throw new ArgumentException("Description cannot exceed 5000 characters.", nameof(description));
+            throw new ArgumentException("Description cannot exceed 10000 characters.", nameof(description));
         }
 
         Description = description;

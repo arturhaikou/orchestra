@@ -37,7 +37,7 @@ public class CodeReviewOrchestrationServiceTests : ServiceTestFixture<CodeReview
         _gitHubApiClientFactory.CreateClient(Arg.Any<Integration>()).Returns(_gitHubApiClient);
         _gitLabApiClientFactory.CreateClient(Arg.Any<Integration>()).Returns(_gitLabApiClient);
         _chatClientResolver
-            .ResolveChatClientAsync(Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .ResolveAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .ThrowsAsync(new InvalidOperationException("ChatClientAgent cannot be instantiated in unit tests."));
 
         _sut = new CodeReviewOrchestrationService(
@@ -122,9 +122,9 @@ public class CodeReviewOrchestrationServiceTests : ServiceTestFixture<CodeReview
             projectPrinciples: null,
             integration);
 
-        // Assert
+        // Assert — resolver is called once with the workspace ID from the ReviewAsync parameters.
         await _chatClientResolver.Received(1)
-            .ResolveChatClientAsync(TestModelIdentifier, Arg.Any<CancellationToken>());
+            .ResolveAsync(TestWorkspaceId, TestModelIdentifier, Arg.Any<CancellationToken>());
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -147,9 +147,9 @@ public class CodeReviewOrchestrationServiceTests : ServiceTestFixture<CodeReview
             projectPrinciples: null,
             integration);
 
-        // Assert
+        // Assert — resolver is called once with the workspace ID regardless of model identifier.
         await _chatClientResolver.Received(1)
-            .ResolveChatClientAsync(null, Arg.Any<CancellationToken>());
+            .ResolveAsync(TestWorkspaceId, Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -204,7 +204,7 @@ public class CodeReviewOrchestrationServiceTests : ServiceTestFixture<CodeReview
 
         // Assert — the call still reaches ChatClientResolver (after factory)
         await _chatClientResolver.Received(1)
-            .ResolveChatClientAsync(TestModelIdentifier, Arg.Any<CancellationToken>());
+            .ResolveAsync(TestWorkspaceId, TestModelIdentifier, Arg.Any<CancellationToken>());
     }
 
     // ─────────────────────────────────────────────────────────────────────────

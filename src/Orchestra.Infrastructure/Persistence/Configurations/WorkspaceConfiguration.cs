@@ -52,5 +52,11 @@ public class WorkspaceConfiguration : IEntityTypeConfiguration<Workspace>
         builder.Property(w => w.CustomerSatisfactionAnalysisModelId)
             .IsRequired(false)
             .HasMaxLength(255);
+
+        // --- New columns added in FR-04 ---
+
+        // AIProviderType: stored as integer ordinal (0=AzureOpenAI, 1=Ollama); null = not configured
+        builder.Property(w => w.AIProviderType)
+            .IsRequired(false);
     }
 }

@@ -29,14 +29,14 @@ public class TicketCommentConfiguration : IEntityTypeConfiguration<TicketComment
         builder.Property(c => c.CreatedAt)
             .IsRequired();
         
-        // Foreign Key to Ticket with cascade delete
-        builder.HasOne(c => c.Ticket)
-            .WithMany(t => t.Comments)
+        // Foreign Key to Ticket with cascade delete — no navigation properties
+        builder.HasOne<Ticket>()
+            .WithMany()
             .HasForeignKey(c => c.TicketId)
             .OnDelete(DeleteBehavior.Cascade);
         
-        // Indexes for query performance
-        builder.HasIndex(c => c.TicketId);
-        builder.HasIndex(c => c.CreatedAt);
+        // Composite index on (TicketId, CreatedAt) for efficient comment ordering queries
+        builder.HasIndex(c => new { c.TicketId, c.CreatedAt })
+            .HasDatabaseName("IX_TicketComments_TicketId_CreatedAt");
     }
 }

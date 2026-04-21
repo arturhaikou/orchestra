@@ -1,5 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
+import { Routes, Route, useNavigate } from 'react-router-dom';
+import CreateWorkspacePage from './components/pages/CreateWorkspacePage';
+import EditWorkspacePage from './components/pages/EditWorkspacePage';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
@@ -12,12 +15,13 @@ import Login from './components/Login';
 import ToggleSwitch from './components/ToggleSwitch';
 import WorkspaceModals from './components/WorkspaceModals/WorkspaceModals';
 import { Workspace, User } from './types';
-import { getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace } from './services/workspaceService';
+import { getWorkspaces, deleteWorkspace } from './services/workspaceService';
 import { getToken, logout, getUser, updateUser, changePassword } from './services/authService';
 import { validatePassword } from './utils/passwordValidator';
 import { X, Loader2, AlertTriangle, Pencil, Save, Trash2, Mail, User as UserIcon, Lock, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 
 const App: React.FC = () => {
+  const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -59,8 +63,6 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   
   // Modal States
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [workspaceInAction, setWorkspaceInAction] = useState<Workspace | null>(null);
@@ -109,7 +111,7 @@ const App: React.FC = () => {
           const workspaceExists = data.find(w => w.id === savedWsId);
           setActiveWorkspaceId(workspaceExists ? workspaceExists.id : data[0].id);
         } else {
-          setIsCreateModalOpen(true);
+          navigate('/workspaces/new');
         }
       } catch (error) {
         console.error("Failed to load workspaces", error);
@@ -200,14 +202,6 @@ const App: React.FC = () => {
   };
 
   const renderContent = () => {
-    if (workspaces.length === 0 && !isLoading) {
-       return (
-         <div className="flex h-full items-center justify-center text-textMuted p-6 text-center">
-           <p>Please create a workspace to continue using Orchestra.</p>
-         </div>
-       );
-    }
-
     switch (activeView) {
       case 'integrations': return <Integrations workspaceId={activeWorkspaceId} />;
       case 'tickets': return <TicketList workspaceId={activeWorkspaceId} onNavigateToTickets={() => setActiveView('tickets')} />;
@@ -249,13 +243,6 @@ const App: React.FC = () => {
         workspaces={workspaces}
         activeWorkspaceId={activeWorkspaceId}
         onSwitchWorkspace={setActiveWorkspaceId}
-        onCreateWorkspace={() => {
-          setIsCreateModalOpen(true);
-        }}
-        onEditWorkspace={(ws) => {
-          setWorkspaceInAction(ws);
-          setIsEditModalOpen(true);
-        }}
         onDeleteWorkspace={(ws) => {
           setWorkspaceInAction(ws);
           setIsDeleteModalOpen(true);
@@ -276,7 +263,36 @@ const App: React.FC = () => {
 
         <div className="flex-1 overflow-auto p-4 md:p-6 scroll-smooth">
            <div className="max-w-7xl mx-auto h-full">
-            {renderContent()}
+            <Routes>
+              <Route
+                path="/workspaces/new"
+                element={
+                  <CreateWorkspacePage
+                    hasExistingWorkspaces={workspaces.length > 0}
+                    onWorkspaceCreated={(workspace) => {
+                      setWorkspaces(prev => [...prev, workspace]);
+                      setActiveWorkspaceId(workspace.id);
+                    }}
+                  />
+                }
+              />
+              <Route
+                path="/workspaces/:workspaceId/edit"
+                element={
+                  <EditWorkspacePage
+                    workspaces={workspaces}
+                    onWorkspaceUpdated={(updatedWorkspace) => {
+                      setWorkspaces((prev) =>
+                        prev.map((w) =>
+                          w.id === updatedWorkspace.id ? updatedWorkspace : w
+                        )
+                      );
+                    }}
+                  />
+                }
+              />
+              <Route path="*" element={renderContent()} />
+            </Routes>
            </div>
         </div>
       </main>
@@ -422,28 +438,13 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Create Workspace Modal */}
+      {/* Workspace Modals */}
       <WorkspaceModals
-        workspaces={workspaces}
-        isCreateModalOpen={isCreateModalOpen}
-        isEditModalOpen={isEditModalOpen}
         isDeleteModalOpen={isDeleteModalOpen}
         workspaceInAction={workspaceInAction}
-        onCreateModalClose={() => setIsCreateModalOpen(false)}
-        onEditModalClose={() => {
-          setIsEditModalOpen(false);
-          setWorkspaceInAction(null);
-        }}
         onDeleteModalClose={() => {
           setIsDeleteModalOpen(false);
           setWorkspaceInAction(null);
-        }}
-        onWorkspaceCreated={(workspace) => {
-          setWorkspaces([...workspaces, workspace]);
-          setActiveWorkspaceId(workspace.id);
-        }}
-        onWorkspaceUpdated={(workspace) => {
-          setWorkspaces(prev => prev.map(ws => ws.id === workspace.id ? workspace : ws));
         }}
         onWorkspaceDeleted={(id) => {
           const remaining = workspaces.filter(ws => ws.id !== id);
@@ -453,7 +454,7 @@ const App: React.FC = () => {
               setActiveWorkspaceId(remaining[0].id);
             } else {
               setActiveWorkspaceId('');
-              setIsCreateModalOpen(true);
+              navigate('/workspaces/new');
             }
           }
         }}

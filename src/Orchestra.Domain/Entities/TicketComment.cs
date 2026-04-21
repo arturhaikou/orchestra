@@ -54,6 +54,9 @@ public class TicketComment
         if (string.IsNullOrWhiteSpace(author))
             throw new ArgumentException("Author is required.", nameof(author));
         
+        if (author.Length > 255)
+            throw new ArgumentException("Author cannot exceed 255 characters.", nameof(author));
+        
         if (string.IsNullOrWhiteSpace(content))
             throw new ArgumentException("Content is required.", nameof(content));
 
@@ -66,9 +69,4 @@ public class TicketComment
             CreatedAt = DateTime.UtcNow
         };
     }
-
-    /// <summary>
-    /// Gets the ticket that this comment belongs to.
-    /// </summary>
-    public Ticket Ticket { get; private set; } = null!;
 }

@@ -1,4 +1,5 @@
 using Bogus;
+using Orchestra.Domain.Enums;
 
 namespace Orchestra.Tests.Shared.Builders;
 
@@ -15,6 +16,7 @@ public class WorkspaceBuilder
     private bool _isCustomerSatisfactionAnalysisEnabled = false;
     private string? _aiSummarizationModelId = null;
     private string? _customerSatisfactionAnalysisModelId = null;
+    private AIProviderType? _aiProviderType = null;
 
     /// <summary>
     /// Sets the workspace ID.
@@ -80,6 +82,15 @@ public class WorkspaceBuilder
     }
 
     /// <summary>
+    /// Sets the AI provider type.
+    /// </summary>
+    public WorkspaceBuilder WithAIProviderType(AIProviderType? providerType)
+    {
+        _aiProviderType = providerType;
+        return this;
+    }
+
+    /// <summary>
     /// Sets whether the workspace is active.
     /// </summary>
     public WorkspaceBuilder AsActive(bool active = true)
@@ -97,8 +108,9 @@ public class WorkspaceBuilder
             _name,
             _ownerId,
             _aiSummarizationModelId,
-            _customerSatisfactionAnalysisModelId);
-        
+            _customerSatisfactionAnalysisModelId,
+            aiProviderType: _aiProviderType);
+
         // Apply AI flags and model IDs if configured
         workspace.UpdateAiSettings(
             _isAiSummarizationEnabled,
@@ -106,7 +118,7 @@ public class WorkspaceBuilder
             _aiSummarizationModelId,
             _customerSatisfactionAnalysisModelId,
             updateModelIds: true);
-        
+
         return workspace;
     }
 

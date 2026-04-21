@@ -8,7 +8,7 @@ public class ToolActionConfiguration : IEntityTypeConfiguration<ToolAction>
 {
     public void Configure(EntityTypeBuilder<ToolAction> builder)
     {
-        builder.ToTable("tool_actions");
+        builder.ToTable("ToolActions");
 
         builder.HasKey(ta => ta.Id);
 

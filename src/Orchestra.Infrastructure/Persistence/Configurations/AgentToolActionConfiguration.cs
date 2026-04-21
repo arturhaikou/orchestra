@@ -13,7 +13,7 @@ public class AgentToolActionConfiguration : IEntityTypeConfiguration<AgentToolAc
     /// <param name="builder">The entity type builder for AgentToolAction.</param>
     public void Configure(EntityTypeBuilder<AgentToolAction> builder)
     {
-        builder.ToTable("agent_tool_actions");
+        builder.ToTable("AgentToolActions");
 
         builder.HasKey(ata => new { ata.AgentId, ata.ToolActionId });
 

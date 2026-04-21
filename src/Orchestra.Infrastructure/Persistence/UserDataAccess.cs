@@ -36,7 +36,7 @@ namespace Orchestra.Infrastructure.Persistence
         public async Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken = default)
         {
             return await _context.Users
-                .FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower() && u.IsActive, cancellationToken);
+                .FirstOrDefaultAsync(u => u.Email == email && u.IsActive, cancellationToken);
         }
 
         /// <summary>
@@ -45,7 +45,7 @@ namespace Orchestra.Infrastructure.Persistence
         public async Task<bool> AnyByEmailAsync(string email, CancellationToken cancellationToken = default)
         {
             return await _context.Users
-                .AnyAsync(u => u.Email.ToLower() == email.ToLower(), cancellationToken);
+                .AnyAsync(u => u.Email == email, cancellationToken);
         }
 
         /// <summary>
@@ -59,8 +59,7 @@ namespace Orchestra.Infrastructure.Persistence
         public async Task<bool> AnyByEmailExcludingUserAsync(string email, Guid excludeUserId, CancellationToken cancellationToken = default)
         {
             return await _context.Users
-                .AnyAsync(u => u.Email.ToLower() == email.ToLower() && u.Id != excludeUserId, 
-                         cancellationToken);
+                .AnyAsync(u => u.Email == email && u.Id != excludeUserId, cancellationToken);
         }
 
         /// <summary>

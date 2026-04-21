@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.AspNetCore.SignalR;
 using Orchestra.Application.CodeReview;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Auth.Services;
@@ -20,17 +21,14 @@ using Orchestra.Infrastructure.Integrations.Providers.Jira;
 using Orchestra.Infrastructure.Integrations.Providers.GitHub;
 using Orchestra.Infrastructure.Integrations.Providers.GitLab;
 using Orchestra.Infrastructure.Integrations.Services;
+using Orchestra.Infrastructure.Hubs;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Options;
 using Orchestra.Infrastructure.Services;
-using Microsoft.Extensions.AI;
 using Orchestra.Infrastructure.Tools;
 using Orchestra.Infrastructure.Tools.Services;
 using Microsoft.Extensions.Logging;
 using Orchestra.Application.Common.Configuration;
-using System;
-using CommunityToolkit.Aspire.OllamaSharp;
-using Azure.AI.OpenAI;
-using OllamaSharp;
 
 public static class Extensions
 {
@@ -43,10 +41,30 @@ public static class Extensions
     public static IHostApplicationBuilder AddInfrastructureServices(this IHostApplicationBuilder builder)
     {
         builder.AddNpgsqlDbContext<AppDbContext>("Orchestra");
-        builder.AddAIProvider();
-        builder.AddAIModelListService();
-        builder.Services.AddScoped<IAIModelRegistry, AIModelRegistry>();
+        builder.Services.AddDataProtection();
+        
+        // Register a no-op hub context only if SignalR infrastructure isn't present.
+        // The API will call AddSignalR() which registers the real hub context.
+        // The Worker doesn't call AddSignalR(), so it gets the no-op version.
+        var hasSignalRServices = builder.Services.Any(sd => 
+            sd.ServiceType.Name.Contains("SignalR") || 
+            sd.ServiceType.Name.Contains("HubContext") ||
+            sd.ServiceType.Name.Contains("HubConnectionManager"));
+        
+        if (!hasSignalRServices && !builder.Services.Any(sd => sd.ServiceType == typeof(IHubContext<NotificationHub>)))
+        {
+            builder.Services.AddScoped<IHubContext<NotificationHub>>(provider =>
+                new NoOpHubContext<NotificationHub>());
+        }
+        
         builder.Services.AddScoped<IChatClientResolver, ChatClientResolver>();
+        // AI Provider Phase 2 — concrete EF Core repository implementations
+        builder.Services.AddScoped<IWorkspaceAIProviderRepository, EfWorkspaceAIProviderRepository>();
+        builder.Services.AddScoped<IProviderCredentialEncryptionService, DataProtectionCredentialEncryptionService>();
+        builder.Services.AddScoped<IAIProviderResolver, AIProviderResolver>();
+        builder.Services.AddScoped<IAzureOpenAIModelDiscoveryService, AzureOpenAIModelDiscoveryService>();
+        builder.Services.AddScoped<IOllamaModelDiscoveryService, OllamaModelDiscoveryService>();
+        builder.Services.AddScoped<IWorkspaceProviderService, WorkspaceProviderService>();
         // Bind ADF conversion service configuration from appsettings.json
         builder.Services.Configure<AdfConversionServiceOptions>(
             builder.Configuration.GetSection("AdfConversionService"));
@@ -58,7 +76,6 @@ public static class Extensions
         builder.Services.AddScoped<IWorkspaceDataAccess, WorkspaceDataAccess>();
         builder.Services.AddScoped<IWorkspaceService, WorkspaceService>();
         builder.Services.AddScoped<IWorkspaceAuthorizationService, WorkspaceAuthorizationService>();
-        builder.Services.AddScoped<IWorkspaceAIModelValidationService, WorkspaceAIModelValidationService>();
         builder.Services.AddScoped<IAgentService, AgentService>();
         builder.Services.AddSingleton<ICredentialEncryptionService, CredentialEncryptionService>();
         builder.Services.AddScoped<IIntegrationDataAccess, IntegrationDataAccess>();
@@ -166,81 +183,8 @@ public static class Extensions
         return builder;
     }
 
-    /// <summary>
-    /// Registers the <see cref="IChatClient"/> for the configured AI provider.
-    /// Provider is controlled by the <c>AgentExecution:Provider</c> configuration key
-    /// (injected by the AppHost as <c>AgentExecution__Provider</c>).
-    ///
-    /// Azure path  — uses Aspire.Azure.AI.OpenAI with connection-string key "ai".
-    /// Ollama path — uses CommunityToolkit.Aspire.OllamaSharp with connection-string key "ai".
-    /// Both paths apply UseFunctionInvocation() and UseOpenTelemetry() middleware.
-    ///
-    /// Throws <see cref="InvalidOperationException"/> at startup for unknown provider values.
-    /// </summary>
-    private static IHostApplicationBuilder AddAIProvider(this IHostApplicationBuilder builder)
-    {
-        var provider = builder.Configuration[
-            $"{AgentExecutionSettings.SectionName}:{nameof(AgentExecutionSettings.Provider)}"]
-            ?? "Azure";
 
-        var modelName = builder.Configuration[
-            $"{AgentExecutionSettings.SectionName}:{nameof(AgentExecutionSettings.ModelDeploymentName)}"]
-            ?? "gpt-4o-mini";
 
-        if (provider.Equals("Azure", StringComparison.OrdinalIgnoreCase))
-        {
-            builder.AddAzureOpenAIClient("ai")
-                   .AddChatClient(modelName)
-                   .UseFunctionInvocation()
-                   .UseOpenTelemetry(configure: c => c.EnableSensitiveData = false);
-        }
-        else if (provider.Equals("Ollama", StringComparison.OrdinalIgnoreCase))
-        {
-            // No model name passed here — Ollama encodes the model in the
-            // connection string that was injected by the AppHost via AddModel().
-            builder.AddOllamaApiClient("ai")
-                   .AddChatClient()
-                   .UseFunctionInvocation()
-                   .UseOpenTelemetry(configure: c => c.EnableSensitiveData = false);
-        }
-        else
-        {
-            throw new InvalidOperationException(
-                $"Unrecognized AI provider '{provider}'. " +
-                $"Valid values are 'Azure' and 'Ollama'. " +
-                $"Check the '{AgentExecutionSettings.SectionName}:" +
-                $"{nameof(AgentExecutionSettings.Provider)}' configuration key.");
-        }
-
-        return builder;
-    }
-
-    private static IHostApplicationBuilder AddAIModelListService(
-        this IHostApplicationBuilder builder)
-    {
-        var provider = builder.Configuration[
-            $"{AgentExecutionSettings.SectionName}:{nameof(AgentExecutionSettings.Provider)}"]
-            ?? "Azure";
-
-        if (provider.Equals("Azure", StringComparison.OrdinalIgnoreCase))
-        {
-            builder.Services.AddScoped<IAIModelListService, AzureOpenAIModelListService>();
-        }
-        else if (provider.Equals("Ollama", StringComparison.OrdinalIgnoreCase))
-        {
-            builder.Services.AddScoped<IAIModelListService, OllamaModelListService>();
-        }
-        else
-        {
-            throw new InvalidOperationException(
-                $"Unrecognized AI provider '{provider}' for IAIModelListService. " +
-                $"Valid values are 'Azure' and 'Ollama'. " +
-                $"Check the '{AgentExecutionSettings.SectionName}:" +
-                $"{nameof(AgentExecutionSettings.Provider)}' configuration key.");
-        }
-
-        return builder;
-    }
 
     private static ILogger<T> GetLogger<T>(IServiceProvider serviceProvider)
     {

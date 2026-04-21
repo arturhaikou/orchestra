@@ -33,7 +33,7 @@ namespace Orchestra.Application.Tests.Tests.Tickets
                 .Build();
             var tickets = new List<TicketDto> { ticket };
 
-            await _sut.CalculateSentimentAsync(tickets, null, CancellationToken.None);
+            await _sut.CalculateSentimentAsync(tickets, "gpt-4o", CancellationToken.None);
 
             Assert.Equal(100, tickets[0].Satisfaction);
         }
@@ -48,7 +48,7 @@ namespace Orchestra.Application.Tests.Tests.Tickets
                 .Build();
             var tickets = new List<TicketDto> { ticket };
 
-            await _sut.CalculateSentimentAsync(tickets, null, CancellationToken.None);
+            await _sut.CalculateSentimentAsync(tickets, "gpt-4o", CancellationToken.None);
 
             Assert.Equal(100, tickets[0].Satisfaction);
         }
@@ -261,11 +261,13 @@ namespace Orchestra.Application.Tests.Tests.Tickets
         [Fact]
         public async Task GenerateSummaryAsync_DelegatesToSummarizationService()
         {
+            var workspaceId = Guid.NewGuid();
+            const string modelId = "gpt-4o";
 
-            _summarizationMock.GenerateSummaryAsync("content", Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            _summarizationMock.GenerateSummaryAsync("content", workspaceId, modelId, Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult("summary"));
 
-            var result = await _sut.GenerateSummaryAsync("content", null, CancellationToken.None);
+            var result = await _sut.GenerateSummaryAsync("content", workspaceId, modelId, CancellationToken.None);
 
             Assert.Equal("summary", result);
         }

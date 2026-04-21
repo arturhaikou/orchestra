@@ -52,9 +52,13 @@ public class HybridReviewPipeline : ICodeReviewPipeline
                 request.WorkspaceId, request.IntegrationId, request.ProviderType, cancellationToken);
             var provider = _providerFactory.Create(integration);
 
-            // Step 2: Resolve LLM client and create analyzer (per-request model selection)
-            var chatClient = await _chatClientResolver.ResolveChatClientAsync(
-                request.ModelIdentifier, cancellationToken);
+            // Step 2: Resolve LLM client scoped to the request's workspace and model.
+            // request.ModelIdentifier is set by CodeReviewOrchestrationService before building ReviewRequest.
+            var chatClient = await _chatClientResolver.ResolveAsync(
+                request.WorkspaceId,
+                request.ModelIdentifier ?? throw new InvalidOperationException(
+                    $"ReviewRequest.ModelIdentifier is required for workspace {request.WorkspaceId}."),
+                cancellationToken);
             var analyzer = new StructuredCodeAnalyzer(
                 chatClient, _loggerFactory.CreateLogger<StructuredCodeAnalyzer>());
 

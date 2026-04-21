@@ -39,4 +39,27 @@ public class WorkspaceAuthorizationService : IWorkspaceAuthorizationService
     {
         return await _workspaceDataAccess.IsMemberAsync(userId, workspaceId, cancellationToken);
     }
+
+    public async Task EnsureUserIsOwnerAsync(Guid userId, Guid workspaceId, CancellationToken cancellationToken = default)
+    {
+        // Stage 1: membership check — non-members receive UnauthorizedWorkspaceAccessException (→ 404).
+        var isMember = await _workspaceDataAccess.IsMemberAsync(userId, workspaceId, cancellationToken);
+        if (!isMember)
+        {
+            throw new UnauthorizedWorkspaceAccessException(userId, workspaceId);
+        }
+
+        // Stage 2: ownership check — members who are not the owner receive WorkspaceForbiddenException (→ 403).
+        var workspace = await _workspaceDataAccess.GetByIdAsync(workspaceId, cancellationToken);
+        if (workspace is null)
+        {
+            // Workspace disappeared between the membership and ownership checks (unlikely but safe).
+            throw new UnauthorizedWorkspaceAccessException(userId, workspaceId);
+        }
+
+        if (workspace.OwnerId != userId)
+        {
+            throw new WorkspaceForbiddenException(userId, workspaceId);
+        }
+    }
 }

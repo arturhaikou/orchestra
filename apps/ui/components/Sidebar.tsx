@@ -1,5 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Layers, 
   Ticket as TicketIcon, 
@@ -25,8 +26,6 @@ interface SidebarProps {
   workspaces: Workspace[];
   activeWorkspaceId: string;
   onSwitchWorkspace: (id: string) => void;
-  onCreateWorkspace: () => void;
-  onEditWorkspace: (ws: Workspace) => void;
   onDeleteWorkspace: (ws: Workspace) => void;
   onEditProfile: () => void;
   onLogout: () => void;
@@ -59,14 +58,13 @@ const Sidebar: React.FC<SidebarProps> = ({
   workspaces, 
   activeWorkspaceId, 
   onSwitchWorkspace, 
-  onCreateWorkspace,
-  onEditWorkspace,
   onDeleteWorkspace,
   onEditProfile,
   onLogout,
   isOpen,
   onClose
 }) => {
+  const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
@@ -149,7 +147,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                       <button 
                         onClick={(e) => {
                           e.stopPropagation();
-                          onEditWorkspace(ws);
+                          navigate(`/workspaces/${ws.id}/edit`);
+                          setIsDropdownOpen(false);
                         }}
                         className="p-1 text-textMuted hover:text-primary transition-colors"
                         title="Edit Workspace"
@@ -174,7 +173,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               <div className="p-1 border-t border-border bg-surfaceHighlight/30">
                  <button 
                    onClick={() => {
-                     onCreateWorkspace();
+                     navigate('/workspaces/new');
                      setIsDropdownOpen(false);
                    }}
                    className="w-full flex items-center gap-2 px-2 py-2 text-sm text-textMuted hover:text-text hover:bg-surfaceHighlight rounded-md transition-colors"

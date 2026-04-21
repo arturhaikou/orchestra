@@ -32,6 +32,7 @@ public class TicketQueryServiceTests
     private readonly ITicketPaginationService _ticketPaginationService = Substitute.For<ITicketPaginationService>();
     private readonly ILogger<TicketQueryService> _logger = Substitute.For<ILogger<TicketQueryService>>();
     private readonly IWorkspaceDataAccess _workspaceDataAccess = Substitute.For<IWorkspaceDataAccess>();
+    private readonly IWorkspaceAIProviderRepository _aiProviderRepository = Substitute.For<IWorkspaceAIProviderRepository>();
 
     private TicketQueryService CreateService() => new(
         _ticketDataAccess,
@@ -45,6 +46,7 @@ public class TicketQueryServiceTests
         _sentimentAnalysisService,
         _ticketPaginationService,
         _workspaceDataAccess,
+        _aiProviderRepository,
         _logger
     );
 
@@ -55,11 +57,12 @@ public class TicketQueryServiceTests
         _ticketPaginationService.SerializePageToken(Arg.Any<TicketPageToken>()).Returns("next-token");
     }
 
-    private void SetupWorkspaceWithCsatEnabled(Guid workspaceId, bool csatEnabled)
+    private void SetupWorkspaceWithCsatEnabled(Guid workspaceId, bool csatEnabled, string? modelId = "gpt-4o", string? defaultModelId = null)
     {
         var workspace = new WorkspaceBuilder()
             .WithId(workspaceId)
             .WithIsCustomerSatisfactionAnalysisEnabled(csatEnabled)
+            .WithCustomerSatisfactionAnalysisModelId(modelId)
             .Build();
 
         _workspaceDataAccess.GetByIdAsync(workspaceId, Arg.Any<CancellationToken>())
@@ -84,6 +87,31 @@ public class TicketQueryServiceTests
             ));
     }
 
+    private List<InternalTicketListDto> ConvertTicketsToInternalDtos(List<Ticket> tickets)
+    {
+        return tickets.Select(t => new InternalTicketListDto
+        {
+            Id = t.Id,
+            WorkspaceId = t.WorkspaceId,
+            Title = t.Title,
+            Description = t.Description,
+            StatusId = t.StatusId,
+            PriorityId = t.PriorityId,
+            PriorityValue = 0,
+            PriorityName = null,
+            PriorityColor = null,
+            IntegrationName = null,
+            IntegrationId = t.IntegrationId,
+            ExternalTicketId = t.ExternalTicketId,
+            AssignedAgentId = t.AssignedAgentId,
+            AssignedWorkflowId = t.AssignedWorkflowId,
+            IsInternal = t.IsInternal,
+            CommentCount = 0,
+            CreatedAt = t.CreatedAt,
+            UpdatedAt = t.UpdatedAt
+        }).ToList();
+    }
+
     [Fact]
     public async Task GetTicketsAsync_HandlesInvalidPageToken_Gracefully()
     {
@@ -91,7 +119,7 @@ public class TicketQueryServiceTests
         var userId = Guid.NewGuid();
         SetupPaginationService();
         _workspaceAuth.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
-        _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, 0, 50, Arg.Any<CancellationToken>()).Returns(new List<Ticket>());
+        _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, 0, 50, Arg.Any<CancellationToken>()).Returns(new List<InternalTicketListDto>());
         _ticketDataAccess.GetAllStatusesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketStatus>());
         _ticketDataAccess.GetAllPrioritiesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketPriority>());
         _integrationDataAccess.GetByWorkspaceIdAsync(workspaceId, Arg.Any<CancellationToken>()).Returns(new List<Integration>());
@@ -152,6 +180,7 @@ public class TicketQueryServiceTests
         var workspaceId = Guid.NewGuid();
         var userId = Guid.NewGuid();
         SetupPaginationService();
+        SetupWorkspaceWithCsatEnabled(workspaceId, csatEnabled: false);
         _workspaceAuth.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
         var ticketId = Guid.NewGuid();
         var ticket = new TicketBuilder()
@@ -160,9 +189,10 @@ public class TicketQueryServiceTests
             .WithTitle("T1")
             .AsInternal()
             .Build();
-        _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, 0, 50, Arg.Any<CancellationToken>()).Returns(new List<Ticket> { ticket, ticket });
+        _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, 0, 50, Arg.Any<CancellationToken>()).Returns(ConvertTicketsToInternalDtos(new List<Ticket> { ticket, ticket }));
         _ticketDataAccess.GetAllStatusesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketStatus>());
         _ticketDataAccess.GetAllPrioritiesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketPriority>());
+        _ticketDataAccess.GetCommentsByTicketIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult(new Dictionary<Guid, List<TicketComment>>()));
         _integrationDataAccess.GetByWorkspaceIdAsync(workspaceId, Arg.Any<CancellationToken>()).Returns(new List<Integration>());
         var service = CreateService();
         var result = await service.GetTicketsAsync(workspaceId, userId);
@@ -176,6 +206,7 @@ public class TicketQueryServiceTests
         var userId = Guid.NewGuid();
         SetupPaginationService();
         SetupEnrichmentService();
+        SetupWorkspaceWithCsatEnabled(workspaceId, csatEnabled: false);
         _workspaceAuth.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
         var ticket = new TicketBuilder()
             .WithId(Guid.NewGuid())
@@ -188,14 +219,12 @@ public class TicketQueryServiceTests
             .WithAuthor("a")
             .WithContent("good")
             .Build();
-        // Add comment to ticket's Comments collection via reflection (since Comments is private set)
-        var commentsProp = typeof(Ticket).GetProperty("Comments");
-        var comments = (List<TicketComment>)commentsProp.GetValue(ticket);
-        comments.Add(comment);
-        _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, 0, 50, Arg.Any<CancellationToken>()).Returns(new List<Ticket> { ticket });
+        _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, 0, 50, Arg.Any<CancellationToken>()).Returns(Task.FromResult(ConvertTicketsToInternalDtos(new List<Ticket> { ticket })));
         _ticketDataAccess.GetAllStatusesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketStatus>());
         _ticketDataAccess.GetAllPrioritiesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketPriority>());
+        _ticketDataAccess.GetCommentsByTicketIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult(new Dictionary<Guid, List<TicketComment>> { { ticket.Id, [comment] } }));
         _integrationDataAccess.GetByWorkspaceIdAsync(workspaceId, Arg.Any<CancellationToken>()).Returns(new List<Integration>());
+        _externalFetchingService.FetchExternalTicketsAsync(Arg.Any<List<Integration>>(), Arg.Any<int>(), Arg.Any<ExternalPaginationState>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult((new List<TicketDto>(), false, (ExternalPaginationState?)null)));
         _sentimentAnalysisService.AnalyzeBatchSentimentAsync(Arg.Any<List<TicketSentimentRequest>>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns<Task<List<TicketSentimentResult>>>(_ => throw new Exception("Sentiment error"));
         var service = CreateService();
         var result = await service.GetTicketsAsync(workspaceId, userId);
@@ -218,18 +247,17 @@ public class TicketQueryServiceTests
             .WithAuthor("a")
             .WithContent("Comment with sentiment")
             .Build();
-        var commentsProp = typeof(Ticket).GetProperty("Comments");
-        var comments = (List<TicketComment>)commentsProp.GetValue(externalTicket);
-        comments.Add(comment);
 
         SetupPaginationService();
         SetupWorkspaceWithCsatEnabled(workspaceId, csatEnabled: false);
         _workspaceAuth.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
         _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns(new List<Ticket>());
+            .Returns(Task.FromResult(new List<InternalTicketListDto>()));
         _ticketDataAccess.GetAllStatusesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketStatus>());
         _ticketDataAccess.GetAllPrioritiesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketPriority>());
+        _ticketDataAccess.GetCommentsByTicketIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult(new Dictionary<Guid, List<TicketComment>>()));
         _integrationDataAccess.GetByWorkspaceIdAsync(workspaceId, Arg.Any<CancellationToken>()).Returns(new List<Integration>());
+        _externalFetchingService.FetchExternalTicketsAsync(Arg.Any<List<Integration>>(), Arg.Any<int>(), Arg.Any<ExternalPaginationState>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult((new List<TicketDto>(), false, (ExternalPaginationState?)null)));
 
         var service = CreateService();
 
@@ -266,17 +294,16 @@ public class TicketQueryServiceTests
             .WithAuthor("a")
             .WithContent("Materialized with comments")
             .Build();
-        var commentsProp = typeof(Ticket).GetProperty("Comments");
-        var comments = (List<TicketComment>)commentsProp.GetValue(materializedTicket);
-        comments.Add(comment);
 
         SetupPaginationService();
         SetupWorkspaceWithCsatEnabled(workspaceId, csatEnabled: false);
         _workspaceAuth.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
         _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns(new List<Ticket> { internalTicket, materializedTicket });
+            .Returns(Task.FromResult(ConvertTicketsToInternalDtos(new List<Ticket> { internalTicket, materializedTicket })));
         _ticketDataAccess.GetAllStatusesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketStatus>());
         _ticketDataAccess.GetAllPrioritiesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketPriority>());
+        _externalFetchingService.FetchExternalTicketsAsync(Arg.Any<List<Integration>>(), Arg.Any<int>(), Arg.Any<ExternalPaginationState>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult((new List<TicketDto>(), false, (ExternalPaginationState?)null)));
+        _ticketDataAccess.GetCommentsByTicketIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult(new Dictionary<Guid, List<TicketComment>> { { materializedTicket.Id, [comment] } }));
         _integrationDataAccess.GetByWorkspaceIdAsync(workspaceId, Arg.Any<CancellationToken>()).Returns(new List<Integration>());
 
         var service = CreateService();
@@ -370,6 +397,7 @@ public class TicketQueryServiceTests
         });
         _ticketPaginationService.NormalizePageSize(Arg.Any<int>()).Returns(x => (int)x[0]);
         _ticketPaginationService.SerializePageToken(Arg.Any<TicketPageToken>()).Returns("next-token");
+        SetupWorkspaceWithCsatEnabled(workspaceId, csatEnabled: false);
         _workspaceAuth.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
         // 1 internal ticket
         var internalTicket = new TicketBuilder()
@@ -386,11 +414,12 @@ public class TicketQueryServiceTests
                 .AsExternal(integrationId, $"EXT-{i}")
                 .Build()
         ).ToList();
-        _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, 0, 5, Arg.Any<CancellationToken>()).Returns(new List<Ticket> { internalTicket });
-        _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, 1, 5, Arg.Any<CancellationToken>()).Returns(new List<Ticket>());
+        _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, 0, 5, Arg.Any<CancellationToken>()).Returns(ConvertTicketsToInternalDtos(new List<Ticket> { internalTicket }));
+        _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, 1, 5, Arg.Any<CancellationToken>()).Returns(new List<InternalTicketListDto>());
         // Do not return materialized tickets here; only internal tickets are returned by GetInternalTicketsByWorkspaceAsync
         _ticketDataAccess.GetAllStatusesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketStatus>());
         _ticketDataAccess.GetAllPrioritiesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketPriority>());
+        _ticketDataAccess.GetCommentsByTicketIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult(new Dictionary<Guid, List<TicketComment>>()));
         var integration = new IntegrationBuilder().WithId(integrationId).WithWorkspaceId(workspaceId).Build();
         _integrationDataAccess.GetByWorkspaceIdAsync(workspaceId, Arg.Any<CancellationToken>()).Returns(new List<Integration> { integration });
         var externalTicketDtos = Enumerable.Range(1, 7).Select(i => new Orchestra.Application.Tickets.DTOs.ExternalTicketDto(
@@ -483,6 +512,7 @@ public class TicketQueryServiceTests
         });
         _ticketPaginationService.NormalizePageSize(Arg.Any<int>()).Returns(x => (int)x[0]);
         _ticketPaginationService.SerializePageToken(Arg.Any<TicketPageToken>()).Returns("next-token");
+        SetupWorkspaceWithCsatEnabled(workspaceId, csatEnabled: false);
         _workspaceAuth.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
         // 11 internal tickets
         var internalTickets = Enumerable.Range(1, 11).Select(i =>
@@ -501,12 +531,13 @@ public class TicketQueryServiceTests
                 .AsExternal(integrationId, $"EXT-{i}")
                 .Build()
         ).ToList();
-        _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, 0, 5, Arg.Any<CancellationToken>()).Returns(internalTickets.Take(5).ToList());
-        _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, 5, 5, Arg.Any<CancellationToken>()).Returns(internalTickets.Skip(5).Take(5).ToList());
-        _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, 10, 5, Arg.Any<CancellationToken>()).Returns(internalTickets.Skip(10).Take(5).ToList());
+        _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, 0, 5, Arg.Any<CancellationToken>()).Returns(ConvertTicketsToInternalDtos(internalTickets.Take(5).ToList()));
+        _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, 5, 5, Arg.Any<CancellationToken>()).Returns(ConvertTicketsToInternalDtos(internalTickets.Skip(5).Take(5).ToList()));
+        _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, 10, 5, Arg.Any<CancellationToken>()).Returns(ConvertTicketsToInternalDtos(internalTickets.Skip(10).Take(5).ToList()));
         // Do not return materialized tickets here; only internal tickets are returned by GetInternalTicketsByWorkspaceAsync
         _ticketDataAccess.GetAllStatusesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketStatus>());
         _ticketDataAccess.GetAllPrioritiesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketPriority>());
+        _ticketDataAccess.GetCommentsByTicketIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult(new Dictionary<Guid, List<TicketComment>>()));
         var integration = new IntegrationBuilder().WithId(integrationId).WithWorkspaceId(workspaceId).Build();
         _integrationDataAccess.GetByWorkspaceIdAsync(workspaceId, Arg.Any<CancellationToken>()).Returns(new List<Integration> { integration });
         var externalTicketDtos = Enumerable.Range(1, 9).Select(i => new Orchestra.Application.Tickets.DTOs.ExternalTicketDto(
@@ -585,11 +616,12 @@ public class TicketQueryServiceTests
             .Returns(new TicketPageToken { Phase = "internal", InternalOffset = 0 });
         _ticketPaginationService.NormalizePageSize(Arg.Any<int>()).Returns(x => (int)x[0]);
         _ticketPaginationService.SerializePageToken(Arg.Any<TicketPageToken>()).Returns("next-token");
+        SetupWorkspaceWithCsatEnabled(workspaceId, csatEnabled: false);
         _workspaceAuth.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
 
         // No pure-internal tickets in the DB.
         _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, 0, 10, Arg.Any<CancellationToken>())
-            .Returns(new List<Ticket>());
+            .Returns(new List<InternalTicketListDto>());
         _ticketDataAccess.GetAllStatusesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketStatus>());
         _ticketDataAccess.GetAllPrioritiesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketPriority>());
 
@@ -649,9 +681,10 @@ public class TicketQueryServiceTests
                 return "next-token";
             });
 
+        SetupWorkspaceWithCsatEnabled(workspaceId, csatEnabled: false);
         _workspaceAuth.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
         _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, 0, 10, Arg.Any<CancellationToken>())
-            .Returns(new List<Ticket>());
+            .Returns(new List<InternalTicketListDto>());
         _ticketDataAccess.GetAllStatusesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketStatus>());
         _ticketDataAccess.GetAllPrioritiesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketPriority>());
 
@@ -735,7 +768,7 @@ public class TicketQueryServiceTests
         SetupWorkspaceWithCsatEnabled(workspaceId, csatEnabled: true);
         _workspaceAuth.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
         _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns(new List<Ticket>());
+            .Returns(new List<InternalTicketListDto>());
         _ticketDataAccess.GetAllStatusesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketStatus>());
         _ticketDataAccess.GetAllPrioritiesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketPriority>());
         _integrationDataAccess.GetByWorkspaceIdAsync(workspaceId, Arg.Any<CancellationToken>()).Returns(new List<Integration> { integration });
@@ -781,18 +814,17 @@ public class TicketQueryServiceTests
             .WithAuthor("a")
             .WithContent("Internal comment")
             .Build();
-        var commentsProp = typeof(Ticket).GetProperty("Comments");
-        var comments = (List<TicketComment>)commentsProp.GetValue(pureInternalTicket);
-        comments.Add(comment);
 
         SetupPaginationService();
         SetupEnrichmentService();
         SetupWorkspaceWithCsatEnabled(workspaceId, csatEnabled: true);
         _workspaceAuth.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
         _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns(new List<Ticket> { pureInternalTicket });
+            .Returns(Task.FromResult(ConvertTicketsToInternalDtos(new List<Ticket> { pureInternalTicket })));
         _ticketDataAccess.GetAllStatusesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketStatus>());
         _ticketDataAccess.GetAllPrioritiesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketPriority>());
+        _externalFetchingService.FetchExternalTicketsAsync(Arg.Any<List<Integration>>(), Arg.Any<int>(), Arg.Any<ExternalPaginationState>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult((new List<TicketDto>(), false, (ExternalPaginationState?)null)));
+        _ticketDataAccess.GetCommentsByTicketIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult(new Dictionary<Guid, List<TicketComment>> { { pureInternalTicket.Id, [comment] } }));
         _integrationDataAccess.GetByWorkspaceIdAsync(workspaceId, Arg.Any<CancellationToken>()).Returns(new List<Integration>());
 
         var service = CreateService();
@@ -826,9 +858,10 @@ public class TicketQueryServiceTests
         SetupWorkspaceWithCsatEnabled(workspaceId, csatEnabled: true);
         _workspaceAuth.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
         _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns(new List<Ticket> { commentlessTicket });
+            .Returns(ConvertTicketsToInternalDtos(new List<Ticket> { commentlessTicket }));
         _ticketDataAccess.GetAllStatusesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketStatus>());
         _ticketDataAccess.GetAllPrioritiesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketPriority>());
+        _ticketDataAccess.GetCommentsByTicketIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult(new Dictionary<Guid, List<TicketComment>>()));
         _integrationDataAccess.GetByWorkspaceIdAsync(workspaceId, Arg.Any<CancellationToken>()).Returns(new List<Integration>());
 
         var service = CreateService();
@@ -880,7 +913,7 @@ public class TicketQueryServiceTests
         SetupWorkspaceWithCsatEnabled(workspaceId, csatEnabled: true);
         _workspaceAuth.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
         _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns(new List<Ticket>());
+            .Returns(new List<InternalTicketListDto>());
         _ticketDataAccess.GetAllStatusesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketStatus>());
         _ticketDataAccess.GetAllPrioritiesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketPriority>());
         _integrationDataAccess.GetByWorkspaceIdAsync(workspaceId, Arg.Any<CancellationToken>()).Returns(new List<Integration> { integration });
@@ -943,10 +976,16 @@ public class TicketQueryServiceTests
 
         SetupPaginationService();
         SetupEnrichmentService();
-        _workspaceDataAccess.GetByIdAsync(workspaceId, Arg.Any<CancellationToken>()).Returns((Workspace)null);
+        // Null workspace means CSAT enabled by default with a model ID
+        var workspace = new WorkspaceBuilder()
+            .WithId(workspaceId)
+            .WithIsCustomerSatisfactionAnalysisEnabled(true)
+            .WithCustomerSatisfactionAnalysisModelId("gpt-4o")
+            .Build();
+        _workspaceDataAccess.GetByIdAsync(workspaceId, Arg.Any<CancellationToken>()).Returns(workspace);
         _workspaceAuth.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
         _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(workspaceId, Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns(new List<Ticket>());
+            .Returns(new List<InternalTicketListDto>());
         _ticketDataAccess.GetAllStatusesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketStatus>());
         _ticketDataAccess.GetAllPrioritiesAsync(Arg.Any<CancellationToken>()).Returns(new List<TicketPriority>());
         _integrationDataAccess.GetByWorkspaceIdAsync(workspaceId, Arg.Any<CancellationToken>()).Returns(new List<Integration> { integration });
@@ -989,6 +1028,7 @@ public class TicketQueryServiceCSATModelResolutionTests
     private readonly ISentimentAnalysisService _sentimentMock = Substitute.For<ISentimentAnalysisService>();
     private readonly ITicketPaginationService _paginationMock = Substitute.For<ITicketPaginationService>();
     private readonly IWorkspaceDataAccess _workspaceDataAccessMock = Substitute.For<IWorkspaceDataAccess>();
+    private readonly IWorkspaceAIProviderRepository _aiProviderRepositoryMock = Substitute.For<IWorkspaceAIProviderRepository>();
     private readonly ILogger<TicketQueryService> _loggerMock = Substitute.For<ILogger<TicketQueryService>>();
     private readonly TicketQueryService _sut;
 
@@ -1006,7 +1046,33 @@ public class TicketQueryServiceCSATModelResolutionTests
             _sentimentMock,
             _paginationMock,
             _workspaceDataAccessMock,
+            _aiProviderRepositoryMock,
             _loggerMock);
+    }
+
+    private List<InternalTicketListDto> ConvertTicketsToInternalDtos(List<Ticket> tickets)
+    {
+        return tickets.Select(t => new InternalTicketListDto
+        {
+            Id = t.Id,
+            WorkspaceId = t.WorkspaceId,
+            Title = t.Title,
+            Description = t.Description,
+            StatusId = t.StatusId,
+            PriorityId = t.PriorityId,
+            PriorityValue = 0,
+            PriorityName = null,
+            PriorityColor = null,
+            IntegrationName = null,
+            IntegrationId = t.IntegrationId,
+            ExternalTicketId = t.ExternalTicketId,
+            AssignedAgentId = t.AssignedAgentId,
+            AssignedWorkflowId = t.AssignedWorkflowId,
+            IsInternal = t.IsInternal,
+            CommentCount = 0,
+            CreatedAt = t.CreatedAt,
+            UpdatedAt = t.UpdatedAt
+        }).ToList();
     }
 
     [Fact]
@@ -1033,9 +1099,9 @@ public class TicketQueryServiceCSATModelResolutionTests
             .WithAuthor("a")
             .WithContent("Comment with sentiment")
             .Build();
-        internalTicket.Comments.Add(comment);
 
         var tickets = new List<Ticket> { internalTicket };
+        var commentsDict = new Dictionary<Guid, List<TicketComment>> { { internalTicket.Id, [comment] } };
 
         // Mock setup
         _authMock.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>())
@@ -1043,9 +1109,11 @@ public class TicketQueryServiceCSATModelResolutionTests
         _paginationMock.NormalizePageSize(Arg.Any<int>()).Returns(50);
         _paginationMock.ParsePageToken(null).Returns(new TicketPageToken { Phase = "internal" });
         _ticketDataAccessMock.GetInternalTicketsByWorkspaceAsync(workspaceId, 0, 50, Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(tickets));
+            .Returns(Task.FromResult(ConvertTicketsToInternalDtos(tickets)));
         _ticketDataAccessMock.GetAllStatusesAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(new List<TicketStatus>()));
         _ticketDataAccessMock.GetAllPrioritiesAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(new List<TicketPriority>()));
+        _ticketDataAccessMock.GetCommentsByTicketIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(commentsDict));
         _integrationDataAccessMock.GetByWorkspaceIdAsync(workspaceId, Arg.Any<CancellationToken>()).Returns(Task.FromResult(new List<Integration>()));
         _workspaceDataAccessMock.GetByIdAsync(workspaceId, Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(workspace));
@@ -1072,7 +1140,7 @@ public class TicketQueryServiceCSATModelResolutionTests
         var workspace = new WorkspaceBuilder()
             .WithId(workspaceId)
             .WithIsCustomerSatisfactionAnalysisEnabled(true)
-            .WithCustomerSatisfactionAnalysisModelId(null)
+            .WithCustomerSatisfactionAnalysisModelId("gpt-4o")  // CSAT feature requires a model
             .Build();
 
         var internalTicket = new TicketBuilder()
@@ -1085,9 +1153,9 @@ public class TicketQueryServiceCSATModelResolutionTests
             .WithAuthor("a")
             .WithContent("Comment with sentiment")
             .Build();
-        internalTicket.Comments.Add(comment);
 
         var tickets = new List<Ticket> { internalTicket };
+        var commentsDict = new Dictionary<Guid, List<TicketComment>> { { internalTicket.Id, [comment] } };
 
         // Mock setup
         _authMock.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>())
@@ -1095,9 +1163,11 @@ public class TicketQueryServiceCSATModelResolutionTests
         _paginationMock.NormalizePageSize(Arg.Any<int>()).Returns(50);
         _paginationMock.ParsePageToken(null).Returns(new TicketPageToken { Phase = "internal" });
         _ticketDataAccessMock.GetInternalTicketsByWorkspaceAsync(workspaceId, 0, 50, Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(tickets));
+            .Returns(Task.FromResult(ConvertTicketsToInternalDtos(tickets)));
         _ticketDataAccessMock.GetAllStatusesAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(new List<TicketStatus>()));
         _ticketDataAccessMock.GetAllPrioritiesAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(new List<TicketPriority>()));
+        _ticketDataAccessMock.GetCommentsByTicketIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(commentsDict));
         _integrationDataAccessMock.GetByWorkspaceIdAsync(workspaceId, Arg.Any<CancellationToken>()).Returns(Task.FromResult(new List<Integration>()));
         _workspaceDataAccessMock.GetByIdAsync(workspaceId, Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(workspace));
@@ -1108,9 +1178,10 @@ public class TicketQueryServiceCSATModelResolutionTests
         await _sut.GetTicketsAsync(workspaceId, userId, null, 50, CancellationToken.None);
 
         // Assert
+        // Should pass the CSAT model ID to enrichment service
         await _enrichmentServiceMock.Received(1).CalculateSentimentAsync(
             Arg.Any<List<TicketDto>>(),
-            Arg.Is((string?)null),
+            Arg.Is("gpt-4o"),
             Arg.Any<CancellationToken>());
     }
 }

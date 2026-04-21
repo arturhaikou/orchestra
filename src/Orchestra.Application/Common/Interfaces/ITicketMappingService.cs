@@ -62,11 +62,13 @@ public interface ITicketMappingService
     /// <param name="ticket">The ticket entity to map</param>
     /// <param name="statusLookup">Dictionary of TicketStatus indexed by ID</param>
     /// <param name="priorityLookup">Dictionary of TicketPriority indexed by ID</param>
+    /// <param name="comments">Pre-fetched comments for the ticket</param>
     /// <returns>Mapped TicketDto with proper ID format and status/priority details</returns>
     TicketDto MapInternalTicketToDto(
         Ticket ticket,
         Dictionary<Guid, TicketStatus> statusLookup,
-        Dictionary<Guid, TicketPriority> priorityLookup);
+        Dictionary<Guid, TicketPriority> priorityLookup,
+        IEnumerable<TicketComment> comments);
 
     /// <summary>
     /// Maps an external ticket from provider to TicketDto with optional materialized data merging.
@@ -76,11 +78,13 @@ public interface ITicketMappingService
     /// <param name="materializedTicket">Optional materialized DB record with assignments</param>
     /// <param name="statusLookup">Dictionary of internal TicketStatus indexed by ID (for materialized status override)</param>
     /// <param name="priorityLookup">Dictionary of internal TicketPriority indexed by ID (for materialized priority override)</param>
+    /// <param name="materializedComments">Optional pre-fetched comments for materialized ticket</param>
     /// <returns>Mapped TicketDto in composite ID format with merged assignments</returns>
     Task<TicketDto> MapExternalTicketToDtoAsync(
         Integration integration,
         ExternalTicketDto externalTicket,
         Ticket? materializedTicket,
         Dictionary<Guid, TicketStatus> statusLookup,
-        Dictionary<Guid, TicketPriority> priorityLookup);
+        Dictionary<Guid, TicketPriority> priorityLookup,
+        IEnumerable<TicketComment>? materializedComments = null);
 }

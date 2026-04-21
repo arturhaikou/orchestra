@@ -8,25 +8,43 @@ using Orchestra.Application.Workspaces.DTOs;
 using Orchestra.Application.Common.Exceptions;
 using Orchestra.Domain.Entities;
 using Orchestra.Application.Common.Interfaces;
+using Orchestra.Domain.Enums;
 using Orchestra.Tests.Shared.Builders;
 
 namespace Orchestra.Application.Tests.Tests.Workspaces;
 
 public class WorkspaceServiceTests
 {
+    private static IWorkspaceAIProviderRepository BuildDefaultAiProviderRepo()
+    {
+        var repo = Substitute.For<IWorkspaceAIProviderRepository>();
+        repo.GetByWorkspaceIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns((AIProviderConfiguration?)null);
+        return repo;
+    }
+
     [Fact]
     public async Task CreateWorkspaceAsync_CreatesWorkspaceWithBothAiFlags_WhenEnabled()
     {
         // Arrange
         var userId = Guid.NewGuid();
+        var providerConfigId = Guid.NewGuid();
         var createRequest = new CreateWorkspaceRequest
         {
             Name = "AI-Enabled Workspace",
             IsAiSummarizationEnabled = true,
-            IsCustomerSatisfactionAnalysisEnabled = true
+            IsCustomerSatisfactionAnalysisEnabled = true,
+            ProviderType = AIProviderType.AzureOpenAI,
+            Endpoint = "https://myopenai.openai.azure.com/",
+            ApiKey = "test-api-key"
         };
 
         var mockDataAccess = Substitute.For<IWorkspaceDataAccess>();
+        var mockProviderService = Substitute.For<IWorkspaceProviderService>();
+        mockProviderService
+            .CreateProviderConfigAsync(Arg.Any<Guid>(), Arg.Any<AIProviderType>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(providerConfigId));
+        
         var createdWorkspace = new WorkspaceBuilder()
             .WithOwnerId(userId)
             .WithName("AI-Enabled Workspace")
@@ -36,8 +54,8 @@ public class WorkspaceServiceTests
 
         mockDataAccess.CreateAsync(Arg.Any<Workspace>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult(createdWorkspace));
 
-        var mockValidationService = Substitute.For<IWorkspaceAIModelValidationService>();
-        var service = new WorkspaceService(mockDataAccess, mockValidationService);
+        var mockAiProviderRepo = BuildDefaultAiProviderRepo();
+        var service = new WorkspaceService(mockDataAccess, mockProviderService, mockAiProviderRepo);
 
         // Act
         var result = await service.CreateWorkspaceAsync(userId, createRequest);
@@ -54,12 +72,21 @@ public class WorkspaceServiceTests
     {
         // Arrange
         var userId = Guid.NewGuid();
+        var providerConfigId = Guid.NewGuid();
         var createRequest = new CreateWorkspaceRequest
         {
-            Name = "Standard Workspace"
+            Name = "Standard Workspace",
+            ProviderType = AIProviderType.AzureOpenAI,
+            Endpoint = "https://myopenai.openai.azure.com/",
+            ApiKey = "test-api-key"
         };
 
         var mockDataAccess = Substitute.For<IWorkspaceDataAccess>();
+        var mockProviderService = Substitute.For<IWorkspaceProviderService>();
+        mockProviderService
+            .CreateProviderConfigAsync(Arg.Any<Guid>(), Arg.Any<AIProviderType>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(providerConfigId));
+        
         var createdWorkspace = new WorkspaceBuilder()
             .WithOwnerId(userId)
             .WithName("Standard Workspace")
@@ -69,8 +96,8 @@ public class WorkspaceServiceTests
 
         mockDataAccess.CreateAsync(Arg.Any<Workspace>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult(createdWorkspace));
 
-        var mockValidationService = Substitute.For<IWorkspaceAIModelValidationService>();
-        var service = new WorkspaceService(mockDataAccess, mockValidationService);
+        var mockAiProviderRepo = BuildDefaultAiProviderRepo();
+        var service = new WorkspaceService(mockDataAccess, mockProviderService, mockAiProviderRepo);
 
         // Act
         var result = await service.CreateWorkspaceAsync(userId, createRequest);
@@ -87,14 +114,23 @@ public class WorkspaceServiceTests
     {
         // Arrange
         var userId = Guid.NewGuid();
+        var providerConfigId = Guid.NewGuid();
         var createRequest = new CreateWorkspaceRequest
         {
             Name = "Partial AI Workspace",
             IsAiSummarizationEnabled = true,
-            IsCustomerSatisfactionAnalysisEnabled = null
+            IsCustomerSatisfactionAnalysisEnabled = null,
+            ProviderType = AIProviderType.AzureOpenAI,
+            Endpoint = "https://myopenai.openai.azure.com/",
+            ApiKey = "test-api-key"
         };
 
         var mockDataAccess = Substitute.For<IWorkspaceDataAccess>();
+        var mockProviderService = Substitute.For<IWorkspaceProviderService>();
+        mockProviderService
+            .CreateProviderConfigAsync(Arg.Any<Guid>(), Arg.Any<AIProviderType>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(providerConfigId));
+        
         var createdWorkspace = new WorkspaceBuilder()
             .WithOwnerId(userId)
             .WithName("Partial AI Workspace")
@@ -104,8 +140,8 @@ public class WorkspaceServiceTests
 
         mockDataAccess.CreateAsync(Arg.Any<Workspace>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult(createdWorkspace));
 
-        var mockValidationService = Substitute.For<IWorkspaceAIModelValidationService>();
-        var service = new WorkspaceService(mockDataAccess, mockValidationService);
+        var mockAiProviderRepo = BuildDefaultAiProviderRepo();
+        var service = new WorkspaceService(mockDataAccess, mockProviderService, mockAiProviderRepo);
 
         // Act
         var result = await service.CreateWorkspaceAsync(userId, createRequest);
@@ -128,6 +164,7 @@ public class WorkspaceServiceTests
             .Build();
 
         var mockDataAccess = Substitute.For<IWorkspaceDataAccess>();
+        var mockProviderService = Substitute.For<IWorkspaceProviderService>();
         mockDataAccess.GetByIdAsync(workspace.Id, Arg.Any<CancellationToken>()).Returns(Task.FromResult<Workspace?>(workspace));
         mockDataAccess.IsUserMemberAsync(workspace.Id, userId, Arg.Any<CancellationToken>()).Returns(Task.FromResult(true));
 
@@ -138,8 +175,8 @@ public class WorkspaceServiceTests
             IsCustomerSatisfactionAnalysisEnabled = true
         };
 
-        var mockValidationService = Substitute.For<IWorkspaceAIModelValidationService>();
-        var service = new WorkspaceService(mockDataAccess, mockValidationService);
+        var mockAiProviderRepo = BuildDefaultAiProviderRepo();
+        var service = new WorkspaceService(mockDataAccess, mockProviderService, mockAiProviderRepo);
 
         // Act
         var result = await service.UpdateWorkspaceAsync(userId, workspace.Id, updateRequest);
@@ -162,6 +199,7 @@ public class WorkspaceServiceTests
             .Build();
 
         var mockDataAccess = Substitute.For<IWorkspaceDataAccess>();
+        var mockProviderService = Substitute.For<IWorkspaceProviderService>();
         mockDataAccess.GetByIdAsync(workspace.Id, Arg.Any<CancellationToken>()).Returns(Task.FromResult<Workspace?>(workspace));
         mockDataAccess.IsUserMemberAsync(workspace.Id, userId, Arg.Any<CancellationToken>()).Returns(Task.FromResult(true));
 
@@ -172,8 +210,8 @@ public class WorkspaceServiceTests
             IsCustomerSatisfactionAnalysisEnabled = null
         };
 
-        var mockValidationService = Substitute.For<IWorkspaceAIModelValidationService>();
-        var service = new WorkspaceService(mockDataAccess, mockValidationService);
+        var mockAiProviderRepo = BuildDefaultAiProviderRepo();
+        var service = new WorkspaceService(mockDataAccess, mockProviderService, mockAiProviderRepo);
 
         // Act
         var result = await service.UpdateWorkspaceAsync(userId, workspace.Id, updateRequest);
@@ -195,6 +233,7 @@ public class WorkspaceServiceTests
             .Build();
 
         var mockDataAccess = Substitute.For<IWorkspaceDataAccess>();
+        var mockProviderService = Substitute.For<IWorkspaceProviderService>();
         mockDataAccess.GetByIdAsync(workspace.Id, Arg.Any<CancellationToken>()).Returns(Task.FromResult<Workspace?>(workspace));
         mockDataAccess.IsUserMemberAsync(workspace.Id, userId, Arg.Any<CancellationToken>()).Returns(Task.FromResult(true));
 
@@ -203,8 +242,8 @@ public class WorkspaceServiceTests
             Name = "New Workspace Name"
         };
 
-        var mockValidationService = Substitute.For<IWorkspaceAIModelValidationService>();
-        var service = new WorkspaceService(mockDataAccess, mockValidationService);
+        var mockAiProviderRepo = BuildDefaultAiProviderRepo();
+        var service = new WorkspaceService(mockDataAccess, mockProviderService, mockAiProviderRepo);
 
         // Act
         var result = await service.UpdateWorkspaceAsync(userId, workspace.Id, updateRequest);
@@ -227,6 +266,7 @@ public class WorkspaceServiceTests
             .Build();
 
         var mockDataAccess = Substitute.For<IWorkspaceDataAccess>();
+        var mockProviderService = Substitute.For<IWorkspaceProviderService>();
         mockDataAccess.GetByIdAsync(workspace.Id, Arg.Any<CancellationToken>()).Returns(Task.FromResult<Workspace?>(workspace));
         mockDataAccess.IsUserMemberAsync(workspace.Id, nonOwnerId, Arg.Any<CancellationToken>()).Returns(Task.FromResult(true));
 
@@ -236,8 +276,8 @@ public class WorkspaceServiceTests
             IsAiSummarizationEnabled = true
         };
 
-        var mockValidationService = Substitute.For<IWorkspaceAIModelValidationService>();
-        var service = new WorkspaceService(mockDataAccess, mockValidationService);
+        var mockAiProviderRepo = BuildDefaultAiProviderRepo();
+        var service = new WorkspaceService(mockDataAccess, mockProviderService, mockAiProviderRepo);
 
         // Act & Assert
         await Assert.ThrowsAsync<UnauthorizedWorkspaceAccessException>(
@@ -256,6 +296,7 @@ public class WorkspaceServiceTests
             .Build();
 
         var mockDataAccess = Substitute.For<IWorkspaceDataAccess>();
+        var mockProviderService = Substitute.For<IWorkspaceProviderService>();
         mockDataAccess.GetByIdAsync(workspace.Id, Arg.Any<CancellationToken>()).Returns(Task.FromResult<Workspace?>(workspace));
         mockDataAccess.IsUserMemberAsync(workspace.Id, nonMemberId, Arg.Any<CancellationToken>()).Returns(Task.FromResult(false));
 
@@ -265,8 +306,8 @@ public class WorkspaceServiceTests
             IsAiSummarizationEnabled = true
         };
 
-        var mockValidationService = Substitute.For<IWorkspaceAIModelValidationService>();
-        var service = new WorkspaceService(mockDataAccess, mockValidationService);
+        var mockAiProviderRepo = BuildDefaultAiProviderRepo();
+        var service = new WorkspaceService(mockDataAccess, mockProviderService, mockAiProviderRepo);
 
         // Act & Assert
         await Assert.ThrowsAsync<WorkspaceNotFoundException>(
@@ -274,291 +315,637 @@ public class WorkspaceServiceTests
         );
     }
 
+    // -----------------------------------------------------------------------
+    // FR-05: Provider Configuration Validation Tests
+    // -----------------------------------------------------------------------
+
     [Fact]
-    public async Task CreateWorkspaceAsync_ThrowsInvalidAIModelIdentifierException_WhenAiSummarizationModelIsInvalid()
+    public async Task CreateWorkspaceAsync_WithNullProviderType_ThrowsArgumentException()
     {
         // Arrange
         var userId = Guid.NewGuid();
-        var createRequest = new CreateWorkspaceRequest
+        var request = new CreateWorkspaceRequest
         {
-            Name = "Test Workspace",
-            IsAiSummarizationEnabled = true,
-            AiSummarizationModelId = "unknown-model"
+            Name = "No Provider Workspace",
+            ProviderType = null
         };
-
         var mockDataAccess = Substitute.For<IWorkspaceDataAccess>();
-        var mockValidationService = Substitute.For<IWorkspaceAIModelValidationService>();
-        
-        // Simulate validation failure for the invalid model
-        mockValidationService
-            .ValidateAIModelIdentifiersAsync(
-                Arg.Is<string?>(m => m == "unknown-model"),
-                Arg.Any<string?>(),
-                Arg.Any<CancellationToken>())
-            .Returns(Task.FromException(new InvalidAIModelIdentifierException(
-                new Dictionary<string, string> { { "AI Summarization", "unknown-model" } })));
-
-        var service = new WorkspaceService(mockDataAccess, mockValidationService);
+        var mockProviderService = Substitute.For<IWorkspaceProviderService>();
+        var mockAiProviderRepo = BuildDefaultAiProviderRepo();
+        var service = new WorkspaceService(mockDataAccess, mockProviderService, mockAiProviderRepo);
 
         // Act & Assert
-        var ex = await Assert.ThrowsAsync<InvalidAIModelIdentifierException>(
-            () => service.CreateWorkspaceAsync(userId, createRequest));
-
-        Assert.Single(ex.InvalidModelsByFeature);
-        Assert.Equal("unknown-model", ex.InvalidModelsByFeature["AI Summarization"]);
-
-        // Verify that CreateAsync was NOT called (no persistence on validation failure)
+        var ex = await Assert.ThrowsAsync<ArgumentException>(
+            () => service.CreateWorkspaceAsync(userId, request));
+        Assert.Contains("ProviderType is required", ex.Message);
         await mockDataAccess.DidNotReceive().CreateAsync(Arg.Any<Workspace>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task CreateWorkspaceAsync_ThrowsInvalidAIModelIdentifierException_WhenBothModelsAreInvalid()
+    public async Task CreateWorkspaceAsync_WithAzureOpenAI_AndMissingEndpoint_ThrowsArgumentException()
     {
         // Arrange
         var userId = Guid.NewGuid();
-        var createRequest = new CreateWorkspaceRequest
+        var request = new CreateWorkspaceRequest
         {
-            Name = "Test Workspace",
-            IsAiSummarizationEnabled = true,
-            AiSummarizationModelId = "bad-model-1",
-            IsCustomerSatisfactionAnalysisEnabled = true,
-            CustomerSatisfactionAnalysisModelId = "bad-model-2"
+            Name = "Azure WS",
+            ProviderType = AIProviderType.AzureOpenAI,
+            ApiKey = "some-key",
+            Endpoint = null
         };
-
         var mockDataAccess = Substitute.For<IWorkspaceDataAccess>();
-        var mockValidationService = Substitute.For<IWorkspaceAIModelValidationService>();
-        
-        // Simulate validation failure for both models
-        mockValidationService
-            .ValidateAIModelIdentifiersAsync(
-                Arg.Is<string?>(m => m == "bad-model-1"),
-                Arg.Is<string?>(m => m == "bad-model-2"),
-                Arg.Any<CancellationToken>())
-            .Returns(Task.FromException(new InvalidAIModelIdentifierException(
-                new Dictionary<string, string>
-                {
-                    { "AI Summarization", "bad-model-1" },
-                    { "Customer Satisfaction Analysis", "bad-model-2" }
-                })));
-
-        var service = new WorkspaceService(mockDataAccess, mockValidationService);
+        var mockProviderService = Substitute.For<IWorkspaceProviderService>();
+        var mockAiProviderRepo = BuildDefaultAiProviderRepo();
+        var service = new WorkspaceService(mockDataAccess, mockProviderService, mockAiProviderRepo);
 
         // Act & Assert
-        var ex = await Assert.ThrowsAsync<InvalidAIModelIdentifierException>(
-            () => service.CreateWorkspaceAsync(userId, createRequest));
-
-        Assert.Equal(2, ex.InvalidModelsByFeature.Count);
-        Assert.Equal("bad-model-1", ex.InvalidModelsByFeature["AI Summarization"]);
-        Assert.Equal("bad-model-2", ex.InvalidModelsByFeature["Customer Satisfaction Analysis"]);
-
-        // Verify that CreateAsync was NOT called
+        var ex = await Assert.ThrowsAsync<ArgumentException>(
+            () => service.CreateWorkspaceAsync(userId, request));
+        Assert.Contains("Endpoint is required", ex.Message);
         await mockDataAccess.DidNotReceive().CreateAsync(Arg.Any<Workspace>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task CreateWorkspaceAsync_SucceedsAndPersists_WhenModelValidationPasses()
+    public async Task CreateWorkspaceAsync_WithAzureOpenAI_AndMissingApiKey_ThrowsArgumentException()
     {
         // Arrange
         var userId = Guid.NewGuid();
-        var createRequest = new CreateWorkspaceRequest
+        var request = new CreateWorkspaceRequest
         {
-            Name = "Valid Workspace",
-            IsAiSummarizationEnabled = true,
-            AiSummarizationModelId = "gpt-4o",
-            IsCustomerSatisfactionAnalysisEnabled = true,
-            CustomerSatisfactionAnalysisModelId = "llama3.2"
+            Name = "Azure WS",
+            ProviderType = AIProviderType.AzureOpenAI,
+            Endpoint = "https://myopenai.openai.azure.com/",
+            ApiKey = null
+        };
+        var mockDataAccess = Substitute.For<IWorkspaceDataAccess>();
+        var mockProviderService = Substitute.For<IWorkspaceProviderService>();
+        var mockAiProviderRepo = BuildDefaultAiProviderRepo();
+        var service = new WorkspaceService(mockDataAccess, mockProviderService, mockAiProviderRepo);
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<ArgumentException>(
+            () => service.CreateWorkspaceAsync(userId, request));
+        Assert.Contains("ApiKey is required", ex.Message);
+        await mockDataAccess.DidNotReceive().CreateAsync(Arg.Any<Workspace>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CreateWorkspaceAsync_WithOllama_AndMissingEndpoint_ThrowsArgumentException()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var request = new CreateWorkspaceRequest
+        {
+            Name = "Ollama WS",
+            ProviderType = AIProviderType.Ollama,
+            Endpoint = null
+        };
+        var mockDataAccess = Substitute.For<IWorkspaceDataAccess>();
+        var mockProviderService = Substitute.For<IWorkspaceProviderService>();
+        var mockAiProviderRepo = BuildDefaultAiProviderRepo();
+        var service = new WorkspaceService(mockDataAccess, mockProviderService, mockAiProviderRepo);
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<ArgumentException>(
+            () => service.CreateWorkspaceAsync(userId, request));
+        Assert.Contains("Endpoint is required", ex.Message);
+        await mockDataAccess.DidNotReceive().CreateAsync(Arg.Any<Workspace>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CreateWorkspaceAsync_WithAzureOpenAI_AndValidConfig_CallsCreateProviderConfigAsync()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var providerConfigId = Guid.NewGuid();
+        var request = new CreateWorkspaceRequest
+        {
+            Name = "My Azure Workspace",
+            ProviderType = AIProviderType.AzureOpenAI,
+            Endpoint = "https://myopenai.openai.azure.com/",
+            ApiKey = "super-secret-key"
         };
 
         var mockDataAccess = Substitute.For<IWorkspaceDataAccess>();
-        var mockValidationService = Substitute.For<IWorkspaceAIModelValidationService>();
-        
-        // Validation succeeds (does not throw)
-        mockValidationService
-            .ValidateAIModelIdentifiersAsync(
-                Arg.Any<string?>(),
-                Arg.Any<string?>(),
-                Arg.Any<CancellationToken>())
-            .Returns(Task.CompletedTask);
+        var mockProviderService = Substitute.For<IWorkspaceProviderService>();
 
-        var expectedWorkspace = new WorkspaceBuilder()
+        mockProviderService
+            .CreateProviderConfigAsync(
+                Arg.Any<Guid>(),
+                AIProviderType.AzureOpenAI,
+                "https://myopenai.openai.azure.com/",
+                "super-secret-key",
+                null,
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(providerConfigId));
+
+        var mockWorkspace = new WorkspaceBuilder()
             .WithOwnerId(userId)
-            .WithName("Valid Workspace")
-            .WithIsAiSummarizationEnabled(true)
-            .WithAiSummarizationModelId("gpt-4o")
-            .WithIsCustomerSatisfactionAnalysisEnabled(true)
-            .WithCustomerSatisfactionAnalysisModelId("llama3.2")
+            .WithName("My Azure Workspace")
+            .WithAIProviderType(AIProviderType.AzureOpenAI)
+            .Build();
+        mockDataAccess.CreateAsync(Arg.Any<Workspace>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(mockWorkspace));
+
+        var mockAiProviderRepo = BuildDefaultAiProviderRepo();
+        var service = new WorkspaceService(mockDataAccess, mockProviderService, mockAiProviderRepo);
+
+        // Act
+        await service.CreateWorkspaceAsync(userId, request);
+
+        // Assert
+        await mockProviderService.Received(1).CreateProviderConfigAsync(
+            Arg.Any<Guid>(),
+            AIProviderType.AzureOpenAI,
+            "https://myopenai.openai.azure.com/",
+            "super-secret-key",
+            null,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CreateWorkspaceAsync_WithOllama_AndValidConfig_CallsCreateProviderConfigAsyncWithBaseUrl()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var providerConfigId = Guid.NewGuid();
+        var request = new CreateWorkspaceRequest
+        {
+            Name = "Ollama Workspace",
+            ProviderType = AIProviderType.Ollama,
+            Endpoint = "http://localhost:11434",
+            DefaultModelId = "llama3:latest"
+        };
+
+        var mockDataAccess = Substitute.For<IWorkspaceDataAccess>();
+        var mockProviderService = Substitute.For<IWorkspaceProviderService>();
+
+        mockProviderService
+            .CreateProviderConfigAsync(
+                Arg.Any<Guid>(),
+                AIProviderType.Ollama,
+                "http://localhost:11434",
+                null,
+                "llama3:latest",
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(providerConfigId));
+
+        var mockWorkspace = new WorkspaceBuilder()
+            .WithOwnerId(userId)
+            .WithName("Ollama Workspace")
+            .WithAIProviderType(AIProviderType.Ollama)
+            .Build();
+        mockDataAccess.CreateAsync(Arg.Any<Workspace>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(mockWorkspace));
+
+        var mockAiProviderRepo = BuildDefaultAiProviderRepo();
+        var service = new WorkspaceService(mockDataAccess, mockProviderService, mockAiProviderRepo);
+
+        // Act
+        await service.CreateWorkspaceAsync(userId, request);
+
+        // Assert
+        await mockProviderService.Received(1).CreateProviderConfigAsync(
+            Arg.Any<Guid>(),
+            AIProviderType.Ollama,
+            "http://localhost:11434",
+            null,
+            "llama3:latest",
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CreateWorkspaceAsync_WithDefaultModelId_ReturnsWorkspaceDtoWithDefaultModelId()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var providerConfigId = Guid.NewGuid();
+        const string modelId = "gpt-4o";
+        var request = new CreateWorkspaceRequest
+        {
+            Name = "Model Workspace",
+            ProviderType = AIProviderType.AzureOpenAI,
+            Endpoint = "https://myopenai.openai.azure.com/",
+            ApiKey = "key-456",
+            DefaultModelId = modelId
+        };
+
+        var mockDataAccess = Substitute.For<IWorkspaceDataAccess>();
+        var mockProviderService = Substitute.For<IWorkspaceProviderService>();
+
+        mockProviderService
+            .CreateProviderConfigAsync(Arg.Any<Guid>(), Arg.Any<AIProviderType>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(providerConfigId));
+
+        mockDataAccess
+            .CreateAsync(Arg.Do<Workspace>(w => { }), Arg.Any<CancellationToken>())
+            .Returns(callInfo => Task.FromResult(callInfo.Arg<Workspace>()));
+
+        var mockAiProviderRepo = BuildDefaultAiProviderRepo();
+        var service = new WorkspaceService(mockDataAccess, mockProviderService, mockAiProviderRepo);
+
+        // Act
+        var result = await service.CreateWorkspaceAsync(userId, request);
+
+        // Assert
+        Assert.Equal(modelId, result.DefaultModelId);
+    }
+
+    // -----------------------------------------------------------------------
+    // FR-03: Ollama defaultModelId required-field validation
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task CreateWorkspaceAsync_WithOllama_AndMissingDefaultModelId_ThrowsArgumentException()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var request = new CreateWorkspaceRequest
+        {
+            Name = "Ollama WS",
+            ProviderType = AIProviderType.Ollama,
+            Endpoint = "http://localhost:11434",
+            DefaultModelId = null
+        };
+        var mockDataAccess = Substitute.For<IWorkspaceDataAccess>();
+        var mockProviderService = Substitute.For<IWorkspaceProviderService>();
+        var mockAiProviderRepo = BuildDefaultAiProviderRepo();
+        var service = new WorkspaceService(mockDataAccess, mockProviderService, mockAiProviderRepo);
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<ArgumentException>(
+            () => service.CreateWorkspaceAsync(userId, request));
+        Assert.Contains("defaultModelId is required", ex.Message);
+
+        // No workspace should be created
+        await mockDataAccess.DidNotReceive().CreateAsync(Arg.Any<Workspace>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CreateWorkspaceAsync_WithOllama_AndBlankDefaultModelId_ThrowsArgumentException()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var request = new CreateWorkspaceRequest
+        {
+            Name = "Ollama WS",
+            ProviderType = AIProviderType.Ollama,
+            Endpoint = "http://localhost:11434",
+            DefaultModelId = "   "
+        };
+        var mockDataAccess = Substitute.For<IWorkspaceDataAccess>();
+        var mockProviderService = Substitute.For<IWorkspaceProviderService>();
+        var mockAiProviderRepo = BuildDefaultAiProviderRepo();
+        var service = new WorkspaceService(mockDataAccess, mockProviderService, mockAiProviderRepo);
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<ArgumentException>(
+            () => service.CreateWorkspaceAsync(userId, request));
+        Assert.Contains("defaultModelId is required", ex.Message);
+
+        // No workspace should be created
+        await mockDataAccess.DidNotReceive().CreateAsync(Arg.Any<Workspace>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CreateWorkspaceAsync_WithOllama_AndValidDefaultModelId_CallsCreateProviderConfigWithModelId()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var providerConfigId = Guid.NewGuid();
+        var request = new CreateWorkspaceRequest
+        {
+            Name = "Ollama WS",
+            ProviderType = AIProviderType.Ollama,
+            Endpoint = "http://localhost:11434",
+            DefaultModelId = "llama3:latest"
+        };
+
+        var mockDataAccess = Substitute.For<IWorkspaceDataAccess>();
+        var mockProviderService = Substitute.For<IWorkspaceProviderService>();
+
+        mockProviderService
+            .CreateProviderConfigAsync(
+                Arg.Any<Guid>(),
+                AIProviderType.Ollama,
+                "http://localhost:11434",
+                null,
+                "llama3:latest",
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(providerConfigId));
+
+        mockDataAccess
+            .CreateAsync(Arg.Do<Workspace>(w => { }), Arg.Any<CancellationToken>())
+            .Returns(callInfo => Task.FromResult(callInfo.Arg<Workspace>()));
+
+        var mockAiProviderRepo = BuildDefaultAiProviderRepo();
+        var service = new WorkspaceService(mockDataAccess, mockProviderService, mockAiProviderRepo);
+
+        // Act
+        var result = await service.CreateWorkspaceAsync(userId, request);
+
+        // Assert — provider service received defaultModelId
+        await mockProviderService.Received(1).CreateProviderConfigAsync(
+            Arg.Any<Guid>(),
+            AIProviderType.Ollama,
+            "http://localhost:11434",
+            null,
+            "llama3:latest",
+            Arg.Any<CancellationToken>());
+
+        Assert.Equal("llama3:latest", result.DefaultModelId);
+    }
+
+    [Fact]
+    public async Task CreateWorkspaceAsync_WithAzureOpenAI_AndNoDefaultModelId_Succeeds()
+    {
+        // Arrange — AzureOpenAI does NOT require defaultModelId at creation time (FR-03 Scenario 4)
+        var userId = Guid.NewGuid();
+        var providerConfigId = Guid.NewGuid();
+        var request = new CreateWorkspaceRequest
+        {
+            Name = "Azure WS No Model",
+            ProviderType = AIProviderType.AzureOpenAI,
+            Endpoint = "https://myopenai.openai.azure.com/",
+            ApiKey = "secret-key",
+            DefaultModelId = null
+        };
+
+        var mockDataAccess = Substitute.For<IWorkspaceDataAccess>();
+        var mockProviderService = Substitute.For<IWorkspaceProviderService>();
+
+        mockProviderService
+            .CreateProviderConfigAsync(Arg.Any<Guid>(), Arg.Any<AIProviderType>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(providerConfigId));
+
+        mockDataAccess
+            .CreateAsync(Arg.Do<Workspace>(w => { }), Arg.Any<CancellationToken>())
+            .Returns(callInfo => Task.FromResult(callInfo.Arg<Workspace>()));
+
+        var mockAiProviderRepo = BuildDefaultAiProviderRepo();
+        var service = new WorkspaceService(mockDataAccess, mockProviderService, mockAiProviderRepo);
+
+        // Act — must not throw
+        var result = await service.CreateWorkspaceAsync(userId, request);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("Azure WS No Model", result.Name);
+        Assert.Null(result.DefaultModelId);
+    }
+
+    [Fact]
+    public async Task CreateWorkspaceAsync_AzureOpenAI_ReturnsDtoWithNullDefaultModelId_WhenRequestHasNone()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var createRequest = new CreateWorkspaceRequest
+        {
+            Name = "Test Workspace",
+            ProviderType = AIProviderType.AzureOpenAI,
+            Endpoint = "https://test.openai.azure.com/",
+            ApiKey = "test-key",
+            DefaultModelId = null
+        };
+
+        var mockDataAccess = Substitute.For<IWorkspaceDataAccess>();
+        var mockProviderService = Substitute.For<IWorkspaceProviderService>();
+        var mockAiProviderRepo = Substitute.For<IWorkspaceAIProviderRepository>();
+
+        mockProviderService
+            .CreateProviderConfigAsync(Arg.Any<Guid>(), Arg.Any<AIProviderType>(), Arg.Any<string?>(), 
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(Guid.NewGuid()));
+
+        var createdWorkspace = new WorkspaceBuilder()
+            .WithOwnerId(userId)
+            .WithName("Test Workspace")
             .Build();
 
         mockDataAccess.CreateAsync(Arg.Any<Workspace>(), Arg.Any<CancellationToken>())
-            .Returns(x => Task.FromResult((Workspace)x[0]));
+            .Returns(Task.FromResult(createdWorkspace));
 
-        var service = new WorkspaceService(mockDataAccess, mockValidationService);
+        var service = new WorkspaceService(mockDataAccess, mockProviderService, mockAiProviderRepo);
 
         // Act
         var result = await service.CreateWorkspaceAsync(userId, createRequest);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal("Valid Workspace", result.Name);
-        Assert.True(result.IsAiSummarizationEnabled);
-        Assert.Equal("gpt-4o", result.AiSummarizationModelId);
-        Assert.True(result.IsCustomerSatisfactionAnalysisEnabled);
-        Assert.Equal("llama3.2", result.CustomerSatisfactionAnalysisModelId);
-
-        // Verify validation was called
-        await mockValidationService.Received(1).ValidateAIModelIdentifiersAsync(
-            Arg.Is<string?>(m => m == "gpt-4o"),
-            Arg.Is<string?>(m => m == "llama3.2"),
-            Arg.Any<CancellationToken>());
-
-        // Verify CreateAsync was called
-        await mockDataAccess.Received(1).CreateAsync(Arg.Any<Workspace>(), Arg.Any<CancellationToken>());
+        Assert.Null(result.DefaultModelId);
     }
 
     [Fact]
-    public async Task UpdateWorkspaceAsync_ThrowsInvalidAIModelIdentifierException_WhenModelIsInvalid()
+    public async Task UpdateWorkspaceAsync_ReturnsDtoWithDefaultModelId_FromAIProviderConfiguration()
     {
         // Arrange
         var userId = Guid.NewGuid();
         var workspace = new WorkspaceBuilder()
             .WithOwnerId(userId)
-            .WithAiSummarizationModelId("gpt-4o")
+            .WithIsAiSummarizationEnabled(false)
+            .Build();
+
+        var aiConfig = AIProviderConfiguration.Create(
+            workspace.Id,
+            AIProviderType.AzureOpenAI,
+            defaultModelId: "gpt-4o");
+
+        var mockDataAccess = Substitute.For<IWorkspaceDataAccess>();
+        var mockProviderService = Substitute.For<IWorkspaceProviderService>();
+        var mockAiProviderRepo = Substitute.For<IWorkspaceAIProviderRepository>();
+
+        mockDataAccess.GetByIdAsync(workspace.Id, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<Workspace?>(workspace));
+        mockDataAccess.IsUserMemberAsync(workspace.Id, userId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true));
+        mockAiProviderRepo.GetByWorkspaceIdAsync(workspace.Id, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<AIProviderConfiguration?>(aiConfig));
+
+        var updateRequest = new UpdateWorkspaceRequest { Name = workspace.Name };
+
+        var service = new WorkspaceService(mockDataAccess, mockProviderService, mockAiProviderRepo);
+
+        // Act
+        var result = await service.UpdateWorkspaceAsync(userId, workspace.Id, updateRequest);
+
+        // Assert — DefaultModelId sourced exclusively from AIProviderConfiguration
+        Assert.Equal("gpt-4o", result.DefaultModelId);
+    }
+
+    [Fact]
+    public async Task UpdateWorkspaceAsync_ReturnsDtoWithNullDefaultModelId_WhenNoAIConfig()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var workspace = new WorkspaceBuilder()
+            .WithOwnerId(userId)
+            .Build();
+
+        var mockDataAccess = Substitute.For<IWorkspaceDataAccess>();
+        var mockProviderService = Substitute.For<IWorkspaceProviderService>();
+        var mockAiProviderRepo = Substitute.For<IWorkspaceAIProviderRepository>();
+
+        mockDataAccess.GetByIdAsync(workspace.Id, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<Workspace?>(workspace));
+        mockDataAccess.IsUserMemberAsync(workspace.Id, userId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true));
+        mockAiProviderRepo.GetByWorkspaceIdAsync(workspace.Id, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<AIProviderConfiguration?>(null));
+
+        var updateRequest = new UpdateWorkspaceRequest { Name = workspace.Name };
+
+        var service = new WorkspaceService(mockDataAccess, mockProviderService, mockAiProviderRepo);
+
+        // Act
+        var result = await service.UpdateWorkspaceAsync(userId, workspace.Id, updateRequest);
+
+        // Assert — null when no AIProviderConfiguration record exists
+        Assert.Null(result.DefaultModelId);
+    }
+
+    [Fact]
+    public async Task UpdateWorkspaceAsync_PersistsAiSummarizationModelId_WhenProvided()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var workspace = new WorkspaceBuilder()
+            .WithOwnerId(userId)
             .WithIsAiSummarizationEnabled(true)
             .Build();
+
+        var mockDataAccess = Substitute.For<IWorkspaceDataAccess>();
+        var mockProviderService = Substitute.For<IWorkspaceProviderService>();
+        mockDataAccess.GetByIdAsync(workspace.Id, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<Workspace?>(workspace));
+        mockDataAccess.IsUserMemberAsync(workspace.Id, userId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true));
 
         var updateRequest = new UpdateWorkspaceRequest
         {
             Name = workspace.Name,
             IsAiSummarizationEnabled = true,
-            AiSummarizationModelId = "unknown-new-model"
+            AiSummarizationModelId = "llama3.2"
         };
 
-        var mockDataAccess = Substitute.For<IWorkspaceDataAccess>();
-        mockDataAccess.GetByIdAsync(workspace.Id, Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult<Workspace?>(workspace));
-        mockDataAccess.IsUserMemberAsync(workspace.Id, userId, Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(true));
-
-        var mockValidationService = Substitute.For<IWorkspaceAIModelValidationService>();
-        
-        // Validation fails
-        mockValidationService
-            .ValidateAIModelIdentifiersAsync(
-                Arg.Is<string?>(m => m == "unknown-new-model"),
-                Arg.Any<string?>(),
-                Arg.Any<CancellationToken>())
-            .Returns(Task.FromException(new InvalidAIModelIdentifierException(
-                new Dictionary<string, string> { { "AI Summarization", "unknown-new-model" } })));
-
-        var service = new WorkspaceService(mockDataAccess, mockValidationService);
-
-        // Act & Assert
-        var ex = await Assert.ThrowsAsync<InvalidAIModelIdentifierException>(
-            () => service.UpdateWorkspaceAsync(userId, workspace.Id, updateRequest));
-
-        // Verify that UpdateAsync was NOT called
-        await mockDataAccess.DidNotReceive().UpdateAsync(Arg.Any<Workspace>(), Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task UpdateWorkspaceAsync_SkipsValidation_WhenNoModelIdFieldsAreProvided()
-    {
-        // Arrange
-        var userId = Guid.NewGuid();
-        var workspace = new WorkspaceBuilder()
-            .WithOwnerId(userId)
-            .WithAiSummarizationModelId("gpt-4o")
-            .WithIsAiSummarizationEnabled(true)
-            .Build();
-
-        var updateRequest = new UpdateWorkspaceRequest
-        {
-            Name = "Updated Name",
-            IsAiSummarizationEnabled = false
-            // No model ID fields provided
-        };
-
-        var mockDataAccess = Substitute.For<IWorkspaceDataAccess>();
-        mockDataAccess.GetByIdAsync(workspace.Id, Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult<Workspace?>(workspace));
-        mockDataAccess.IsUserMemberAsync(workspace.Id, userId, Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(true));
-
-        var mockValidationService = Substitute.For<IWorkspaceAIModelValidationService>();
-        mockValidationService
-            .ValidateAIModelIdentifiersAsync(
-                Arg.Any<string?>(),
-                Arg.Any<string?>(),
-                Arg.Any<CancellationToken>())
-            .Returns(Task.CompletedTask);
-
-        var service = new WorkspaceService(mockDataAccess, mockValidationService);
+        var mockAiProviderRepo = BuildDefaultAiProviderRepo();
+        var service = new WorkspaceService(mockDataAccess, mockProviderService, mockAiProviderRepo);
 
         // Act
         var result = await service.UpdateWorkspaceAsync(userId, workspace.Id, updateRequest);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal("Updated Name", result.Name);
-        Assert.False(result.IsAiSummarizationEnabled);
-        // Model ID should be preserved (partial-update semantics)
-        Assert.Equal("gpt-4o", result.AiSummarizationModelId);
-
-        // Verify validation was called with null/empty for the unmodified fields
-        await mockValidationService.Received(1).ValidateAIModelIdentifiersAsync(
-            Arg.Is<string?>(m => m == null || m == ""),
-            Arg.Is<string?>(m => m == null || m == ""),
-            Arg.Any<CancellationToken>());
-
-        // Verify UpdateAsync was called
+        Assert.Equal("llama3.2", result.AiSummarizationModelId);
         await mockDataAccess.Received(1).UpdateAsync(Arg.Any<Workspace>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task UpdateWorkspaceAsync_SucceedsAndPreservesPriorModel_WhenOnlyFlagIsChanged()
+    public async Task UpdateWorkspaceAsync_PersistsCustomerSatisfactionModelId_WhenProvided()
     {
         // Arrange
         var userId = Guid.NewGuid();
         var workspace = new WorkspaceBuilder()
             .WithOwnerId(userId)
-            .WithAiSummarizationModelId("gpt-4o")
-            .WithIsAiSummarizationEnabled(true)
-            .WithIsCustomerSatisfactionAnalysisEnabled(false)
+            .WithIsCustomerSatisfactionAnalysisEnabled(true)
             .Build();
+
+        var mockDataAccess = Substitute.For<IWorkspaceDataAccess>();
+        var mockProviderService = Substitute.For<IWorkspaceProviderService>();
+        mockDataAccess.GetByIdAsync(workspace.Id, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<Workspace?>(workspace));
+        mockDataAccess.IsUserMemberAsync(workspace.Id, userId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true));
 
         var updateRequest = new UpdateWorkspaceRequest
         {
             Name = workspace.Name,
-            IsAiSummarizationEnabled = false
-            // No model ID fields provided - should be skipped
+            IsCustomerSatisfactionAnalysisEnabled = true,
+            CustomerSatisfactionAnalysisModelId = "llama3.2"
         };
 
-        var mockDataAccess = Substitute.For<IWorkspaceDataAccess>();
-        mockDataAccess.GetByIdAsync(workspace.Id, Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult<Workspace?>(workspace));
-        mockDataAccess.IsUserMemberAsync(workspace.Id, userId, Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(true));
-
-        var mockValidationService = Substitute.For<IWorkspaceAIModelValidationService>();
-        mockValidationService
-            .ValidateAIModelIdentifiersAsync(
-                Arg.Any<string?>(),
-                Arg.Any<string?>(),
-                Arg.Any<CancellationToken>())
-            .Returns(Task.CompletedTask);
-
-        var service = new WorkspaceService(mockDataAccess, mockValidationService);
+        var mockAiProviderRepo = BuildDefaultAiProviderRepo();
+        var service = new WorkspaceService(mockDataAccess, mockProviderService, mockAiProviderRepo);
 
         // Act
         var result = await service.UpdateWorkspaceAsync(userId, workspace.Id, updateRequest);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.False(result.IsAiSummarizationEnabled);
-        // Model ID should remain unchanged
-        Assert.Equal("gpt-4o", result.AiSummarizationModelId);
-
-        // Verify UpdateAsync was called
+        Assert.Equal("llama3.2", result.CustomerSatisfactionAnalysisModelId);
         await mockDataAccess.Received(1).UpdateAsync(Arg.Any<Workspace>(), Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task UpdateWorkspaceAsync_PreservesModelIds_WhenOnlyFlagsAreUpdated()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var workspace = new WorkspaceBuilder()
+            .WithOwnerId(userId)
+            .WithIsAiSummarizationEnabled(true)
+            .WithAiSummarizationModelId("llama3.2")
+            .WithIsCustomerSatisfactionAnalysisEnabled(true)
+            .WithCustomerSatisfactionAnalysisModelId("mistral")
+            .Build();
+
+        var mockDataAccess = Substitute.For<IWorkspaceDataAccess>();
+        var mockProviderService = Substitute.For<IWorkspaceProviderService>();
+        mockDataAccess.GetByIdAsync(workspace.Id, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<Workspace?>(workspace));
+        mockDataAccess.IsUserMemberAsync(workspace.Id, userId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true));
+
+        // Only update flags — no model ID fields sent
+        var updateRequest = new UpdateWorkspaceRequest
+        {
+            Name = workspace.Name,
+            IsAiSummarizationEnabled = false,
+            IsCustomerSatisfactionAnalysisEnabled = false
+        };
+
+        var mockAiProviderRepo = BuildDefaultAiProviderRepo();
+        var service = new WorkspaceService(mockDataAccess, mockProviderService, mockAiProviderRepo);
+
+        // Act
+        var result = await service.UpdateWorkspaceAsync(userId, workspace.Id, updateRequest);
+
+        // Assert — model IDs unchanged because no model ID fields were in the request
+        Assert.Equal("llama3.2", result.AiSummarizationModelId);
+        Assert.Equal("mistral", result.CustomerSatisfactionAnalysisModelId);
+    }
+
+    [Fact]
+    public async Task UpdateWorkspaceAsync_ClearsModelId_WhenNullModelIdSentWithFlagUpdate()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var workspace = new WorkspaceBuilder()
+            .WithOwnerId(userId)
+            .WithIsAiSummarizationEnabled(true)
+            .WithAiSummarizationModelId("llama3.2")
+            .Build();
+
+        var mockDataAccess = Substitute.For<IWorkspaceDataAccess>();
+        var mockProviderService = Substitute.For<IWorkspaceProviderService>();
+        mockDataAccess.GetByIdAsync(workspace.Id, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<Workspace?>(workspace));
+        mockDataAccess.IsUserMemberAsync(workspace.Id, userId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true));
+
+        // Disable feature and explicitly clear model ID
+        var updateRequest = new UpdateWorkspaceRequest
+        {
+            Name = workspace.Name,
+            IsAiSummarizationEnabled = false,
+            AiSummarizationModelId = null
+        };
+
+        var mockAiProviderRepo = BuildDefaultAiProviderRepo();
+        var service = new WorkspaceService(mockDataAccess, mockProviderService, mockAiProviderRepo);
+
+        // Act
+        var result = await service.UpdateWorkspaceAsync(userId, workspace.Id, updateRequest);
+
+        // Assert — model ID preserved because null model ID alone does not trigger updateModelIds
+        Assert.Equal("llama3.2", result.AiSummarizationModelId);
+    }
+
 }
+

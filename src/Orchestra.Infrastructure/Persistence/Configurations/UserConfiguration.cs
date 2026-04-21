@@ -14,7 +14,8 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.Property(u => u.Email)
             .IsRequired()
-            .HasMaxLength(255);
+            .HasMaxLength(255)
+            .HasColumnType("citext");
 
         builder.HasIndex(u => u.Email)
             .IsUnique();

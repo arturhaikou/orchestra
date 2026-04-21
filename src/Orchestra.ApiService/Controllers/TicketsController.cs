@@ -177,7 +177,7 @@ public async Task<IActionResult> GetTicketById(
 
             if (pageSize < 1 || pageSize > 100)
             {
-                return BadRequest(new ErrorResponse("Page size must be between 1 and 100"));
+                return BadRequest(new ErrorResponse("pageSize must be between 1 and 100"));
             }
 
             // Check user workspace membership
@@ -651,6 +651,11 @@ public async Task<IActionResult> UpdateTicket(
         {
             _logger.LogError(ex, "Summarization failed for ticket {TicketId}", id);
             return StatusCode(500, new ErrorResponse("Failed to generate summary: " + ex.Message));
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "AI provider not configured for ticket {TicketId}", id);
+            return StatusCode(503, new ErrorResponse("AI provider is not configured for this workspace."));
         }
         catch (ArgumentException ex)
         {

@@ -36,6 +36,7 @@ public class TicketQueryService : ITicketQueryService
     private readonly ISentimentAnalysisService _sentimentAnalysisService;
     private readonly ITicketPaginationService _ticketPaginationService;
     private readonly IWorkspaceDataAccess _workspaceDataAccess;
+    private readonly IWorkspaceAIProviderRepository _aiProviderRepository;
     private readonly ILogger<TicketQueryService> _logger;
 
     public TicketQueryService(
@@ -50,6 +51,7 @@ public class TicketQueryService : ITicketQueryService
         ISentimentAnalysisService sentimentAnalysisService,
         ITicketPaginationService ticketPaginationService,
         IWorkspaceDataAccess workspaceDataAccess,
+        IWorkspaceAIProviderRepository aiProviderRepository,
         ILogger<TicketQueryService> logger)
     {
         _ticketDataAccess = ticketDataAccess;
@@ -63,6 +65,7 @@ public class TicketQueryService : ITicketQueryService
         _sentimentAnalysisService = sentimentAnalysisService;
         _ticketPaginationService = ticketPaginationService;
         _workspaceDataAccess = workspaceDataAccess;
+        _aiProviderRepository = aiProviderRepository;
         _logger = logger;
     }
 
@@ -225,26 +228,21 @@ public class TicketQueryService : ITicketQueryService
             "Fetching internal phase (offset: {Offset}, limit: {Limit})",
             currentToken.InternalOffset, pageSize);
 
-        // Fetch internal tickets
+        // Now returns List<InternalTicketListDto> — single explicit join query with comment count scalar.
+        // No .Include() calls, no cartesian expansion, no batch comment fetch required.
         var internalTickets = await _ticketDataAccess.GetInternalTicketsByWorkspaceAsync(
             workspaceId,
             currentToken.InternalOffset,
             pageSize,
             cancellationToken);
 
-        var pureInternalTickets = internalTickets
-            .Where(t => t.IntegrationId == null && string.IsNullOrEmpty(t.ExternalTicketId))
-            .ToList();
-
-        // Load lookups
+        // Load status lookup only — priority fields are projected directly in InternalTicketListDto
         var allStatuses = await _ticketDataAccess.GetAllStatusesAsync(cancellationToken);
-        var allPriorities = await _ticketDataAccess.GetAllPrioritiesAsync(cancellationToken);
         var statusLookup = allStatuses.ToDictionary(s => s.Id, s => s);
-        var priorityLookup = allPriorities.ToDictionary(p => p.Id, p => p);
 
-        // Map to DTOs
-        var resultTickets = pureInternalTickets
-            .Select(t => MapInternalTicketToDto(t, statusLookup, priorityLookup))
+        // Map to DTOs — comment count comes from scalar projection, no batch comment fetch needed
+        var resultTickets = internalTickets
+            .Select(t => MapInternalTicketListDtoToTicketDto(t, statusLookup))
             .ToList();
 
         _logger.LogInformation(
@@ -273,7 +271,7 @@ public class TicketQueryService : ITicketQueryService
             remainingSlots,
             null,
             statusLookup,
-            priorityLookup,
+            new Dictionary<Guid, TicketPriority>(),
             cancellationToken);
 
         resultTickets.AddRange(externalTickets);
@@ -283,9 +281,8 @@ public class TicketQueryService : ITicketQueryService
             var nextToken = new TicketPageToken
             {
                 Phase = TicketPaginationPhase.External,
-                // Advance by the number of pure internal DB rows consumed, not by the total
-                // result count (which also includes external tickets already fetched this page).
-                InternalOffset = currentToken.InternalOffset + pureInternalTickets.Count,
+                // Advance by the number of internal DB rows consumed on this page.
+                InternalOffset = currentToken.InternalOffset + internalTickets.Count,
                 ExternalState = externalState
             };
             return (resultTickets, false, nextToken);
@@ -481,8 +478,10 @@ public class TicketQueryService : ITicketQueryService
             priority = allPriorities.FirstOrDefault(p => p.Id == ticket.PriorityId.Value);
         }
 
-        // 4. Map comments with timestamp for internal tickets
-        var commentDtos = ticket.Comments
+        // 4. Explicitly fetch comments (navigation property removed)
+        var ticketComments = await _ticketDataAccess.GetCommentsByTicketIdAsync(ticketId, cancellationToken);
+
+        var commentDtos = ticketComments
             .OrderBy(c => c.CreatedAt)
             .Select(c => new CommentDto(
                 c.Id.ToString(),
@@ -661,36 +660,40 @@ public class TicketQueryService : ITicketQueryService
         {
             assignedAgentId = materializedTicket.AssignedAgentId;
             assignedWorkflowId = materializedTicket.AssignedWorkflowId;
-            
+
             // Use internal status/priority for materialized tickets if set
             if (materializedTicket.StatusId.HasValue)
             {
                 var internalStatus = await _ticketDataAccess.GetStatusByIdAsync(
-                    materializedTicket.StatusId.Value, 
+                    materializedTicket.StatusId.Value,
                     cancellationToken);
                 if (internalStatus != null)
                 {
                     status = new TicketStatusDto(internalStatus.Id, internalStatus.Name, internalStatus.Color);
                 }
             }
-            
+
             if (materializedTicket.PriorityId.HasValue)
             {
                 var internalPriority = await _ticketDataAccess.GetPriorityByIdAsync(
-                    materializedTicket.PriorityId.Value, 
+                    materializedTicket.PriorityId.Value,
                     cancellationToken);
                 if (internalPriority != null)
                 {
                     priority = new TicketPriorityDto(
-                        internalPriority.Id, 
-                        internalPriority.Name, 
-                        internalPriority.Color, 
+                        internalPriority.Id,
+                        internalPriority.Name,
+                        internalPriority.Color,
                         internalPriority.Value);
                 }
             }
 
-            // Merge comments: combine external and internal comments, sort by timestamp descending
-            var internalCommentDtos = materializedTicket.Comments
+            // Explicitly fetch internal comments for materialized ticket (navigation property removed)
+            var materializedComments = await _ticketDataAccess.GetCommentsByTicketIdAsync(
+                materializedTicket.Id,
+                cancellationToken);
+
+            var internalCommentDtos = materializedComments
                 .OrderBy(c => c.CreatedAt)
                 .Select(c => new CommentDto(
                     c.Id.ToString(),
@@ -745,26 +748,69 @@ public class TicketQueryService : ITicketQueryService
         return ticketDto;
     }
 
+    /// <summary>
+    /// Maps a flat <see cref="InternalTicketListDto"/> projection (from explicit DB join) to the
+    /// API-facing <see cref="TicketDto"/>.
+    /// Priority fields are taken directly from the DTO (already projected via LEFT JOIN).
+    /// Comments list is empty for list-view responses; <see cref="TicketDto.CommentCount"/> carries the scalar count.
+    /// </summary>
+    private TicketDto MapInternalTicketListDtoToTicketDto(
+        InternalTicketListDto dto,
+        Dictionary<Guid, TicketStatus> statusLookup)
+    {
+        var status = dto.StatusId.HasValue && statusLookup.ContainsKey(dto.StatusId.Value)
+            ? statusLookup[dto.StatusId.Value]
+            : null;
+
+        TicketPriorityDto? priority = dto.PriorityId.HasValue
+            ? new TicketPriorityDto(
+                dto.PriorityId.Value,
+                dto.PriorityName ?? string.Empty,
+                dto.PriorityColor ?? string.Empty,
+                dto.PriorityValue)
+            : null;
+
+        return new TicketDto(
+            Id: dto.Id.ToString(),
+            WorkspaceId: dto.WorkspaceId,
+            Title: dto.Title,
+            Description: dto.Description ?? string.Empty,
+            Status: status != null ? new TicketStatusDto(status.Id, status.Name, status.Color) : null,
+            Priority: priority,
+            Internal: dto.IsInternal,
+            IntegrationId: dto.IntegrationId,
+            ExternalTicketId: dto.ExternalTicketId,
+            ExternalUrl: null,
+            Source: "INTERNAL",
+            AssignedAgentId: dto.AssignedAgentId,
+            AssignedWorkflowId: dto.AssignedWorkflowId,
+            Comments: [],
+            Satisfaction: null,
+            Summary: null
+        ) { CommentCount = dto.CommentCount };
+    }
+
     private TicketDto MapInternalTicketToDto(
-        Ticket ticket, 
+        Ticket ticket,
         Dictionary<Guid, TicketStatus> statusLookup,
-        Dictionary<Guid, TicketPriority> priorityLookup)
+        Dictionary<Guid, TicketPriority> priorityLookup,
+        IEnumerable<TicketComment> comments)
     {
         var status = ticket.StatusId.HasValue && statusLookup.ContainsKey(ticket.StatusId.Value)
             ? statusLookup[ticket.StatusId.Value]
             : null;
-        
+
         var priority = ticket.PriorityId.HasValue && priorityLookup.ContainsKey(ticket.PriorityId.Value)
             ? priorityLookup[ticket.PriorityId.Value]
             : null;
-        
+
         // For materialized external tickets, use composite ID format instead of GUID
         var ticketId = (ticket.IntegrationId.HasValue && !string.IsNullOrEmpty(ticket.ExternalTicketId))
             ? $"{ticket.IntegrationId.Value}:{ticket.ExternalTicketId}"
             : ticket.Id.ToString();
-        
-        // Map comments with timestamp for internal tickets
-        var commentDtos = ticket.Comments
+
+        // Map pre-fetched comments (navigation property removed — comments passed explicitly)
+        var commentDtos = comments
             .OrderBy(c => c.CreatedAt)
             .Select(c => new CommentDto(
                 c.Id.ToString(),
@@ -793,6 +839,54 @@ public class TicketQueryService : ITicketQueryService
         );
     }
 
+    /// <summary>
+    /// Maps a <see cref="TicketWithIntegrationDto"/> projection (from explicit DB join) to the
+    /// API-facing <see cref="TicketDto"/>. Comments are passed explicitly — no navigation properties.
+    /// </summary>
+    private TicketDto MapTicketWithIntegrationToDto(
+        TicketWithIntegrationDto ticket,
+        Dictionary<Guid, TicketStatus> statusLookup,
+        Dictionary<Guid, TicketPriority> priorityLookup,
+        IEnumerable<TicketComment> comments)
+    {
+        var status = ticket.StatusId.HasValue && statusLookup.ContainsKey(ticket.StatusId.Value)
+            ? statusLookup[ticket.StatusId.Value]
+            : null;
+
+        var priority = ticket.PriorityId.HasValue && priorityLookup.ContainsKey(ticket.PriorityId.Value)
+            ? priorityLookup[ticket.PriorityId.Value]
+            : null;
+
+        // Materialized external tickets use composite ID format; pure internal tickets use GUID string
+        var ticketId = (ticket.IntegrationId.HasValue && !string.IsNullOrEmpty(ticket.ExternalTicketId))
+            ? $"{ticket.IntegrationId.Value}:{ticket.ExternalTicketId}"
+            : ticket.Id.ToString();
+
+        var commentDtos = comments
+            .OrderBy(c => c.CreatedAt)
+            .Select(c => new CommentDto(c.Id.ToString(), c.Author, c.Content, c.CreatedAt))
+            .ToList();
+
+        return new TicketDto(
+            Id: ticketId,
+            WorkspaceId: ticket.WorkspaceId,
+            Title: ticket.Title,
+            Description: ticket.Description,
+            Status: status != null ? new TicketStatusDto(status.Id, status.Name, status.Color) : null,
+            Priority: priority != null ? new TicketPriorityDto(priority.Id, priority.Name, priority.Color, priority.Value) : null,
+            Internal: ticket.IsInternal,
+            IntegrationId: ticket.IntegrationId,
+            ExternalTicketId: ticket.ExternalTicketId,
+            ExternalUrl: null,
+            Source: ticket.IntegrationProvider ?? "INTERNAL",
+            AssignedAgentId: ticket.AssignedAgentId,
+            AssignedWorkflowId: ticket.AssignedWorkflowId,
+            Comments: commentDtos,
+            Satisfaction: null,
+            Summary: null
+        );
+    }
+
     private async Task<TicketDto> CalculateSentimentForSingleTicketAsync(
         TicketDto ticket,
         CancellationToken cancellationToken)
@@ -810,13 +904,19 @@ public class TicketQueryService : ITicketQueryService
             return ticket with { Satisfaction = 100 };
         }
 
-        // Extract the workspace-configured model ID for CSAT (may be null)
-        var cstModelId = workspace?.CustomerSatisfactionAnalysisModelId;
+        // Resolve effective model: feature-specific → provider default → fail fast.
+        // Both fields are nullable; a workspace with neither configured cannot perform CSAT.
+        var aiConfig = await _aiProviderRepository.GetByWorkspaceIdAsync(ticket.WorkspaceId, cancellationToken);
+        var effectiveModelId = workspace?.CustomerSatisfactionAnalysisModelId
+            ?? aiConfig?.DefaultModelId
+            ?? throw new InvalidOperationException(
+                $"No CSAT model configured for workspace {ticket.WorkspaceId}. "
+                + "Set CustomerSatisfactionAnalysisModelId or configure a default model in the AI provider settings.");
 
         // Delegate to enrichment service for sentiment calculation
         return await _ticketEnrichmentService.CalculateSentimentForSingleAsync(
             ticket,
-            cstModelId,
+            effectiveModelId,
             cancellationToken);
     }
 
@@ -847,21 +947,22 @@ public class TicketQueryService : ITicketQueryService
             return;
         }
 
-        // Extract the workspace-configured model ID for CSAT (may be null)
-        var cstModelId = workspace?.CustomerSatisfactionAnalysisModelId;
+        // Resolve effective model: feature-specific → provider default → fail fast.
+        var aiConfig = await _aiProviderRepository.GetByWorkspaceIdAsync(workspaceId, cancellationToken);
+        var effectiveModelId = workspace?.CustomerSatisfactionAnalysisModelId
+            ?? aiConfig?.DefaultModelId
+            ?? throw new InvalidOperationException(
+                $"No CSAT model configured for workspace {workspaceId}. "
+                + "Set CustomerSatisfactionAnalysisModelId or configure a default model in the AI provider settings.");
 
-        // Delegate to enrichment service, which will:
-        // 1. Apply automatic scores (100) to internal and commentless tickets
-        // 2. Pass eligible tickets to sentiment analysis with the workspace modelId
-        // 3. The sentiment analysis service will resolve the model (valid, null, or stale) via IChatClientResolver
         await _ticketEnrichmentService.CalculateSentimentAsync(
             tickets,
-            cstModelId,
+            effectiveModelId,
             cancellationToken);
 
         _logger.LogInformation(
             "Sentiment enrichment complete for {Count} tickets using model {ModelId}",
-            tickets.Count, cstModelId ?? "default");
+            tickets.Count, effectiveModelId);
     }
 
     // Pagination token structure is now handled by TicketPageToken in ITicketPaginationService

@@ -1,3 +1,5 @@
+using Orchestra.Domain.Enums;
+
 namespace Orchestra.Domain.Entities;
 
 public class Workspace
@@ -12,6 +14,7 @@ public class Workspace
     public bool IsCustomerSatisfactionAnalysisEnabled { get; private set; }
     public string? AiSummarizationModelId { get; private set; }
     public string? CustomerSatisfactionAnalysisModelId { get; private set; }
+    public AIProviderType? AIProviderType { get; private set; }
 
     private Workspace() { } // For EF Core
 
@@ -19,7 +22,8 @@ public class Workspace
         string name, 
         Guid ownerId, 
         string? aiSummarizationModelId = null, 
-        string? customerSatisfactionAnalysisModelId = null)
+        string? customerSatisfactionAnalysisModelId = null,
+        AIProviderType? aiProviderType = null)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -40,7 +44,8 @@ public class Workspace
             CreatedAt = DateTime.UtcNow,
             IsActive = true,
             AiSummarizationModelId = aiSummarizationModelId,
-            CustomerSatisfactionAnalysisModelId = customerSatisfactionAnalysisModelId
+            CustomerSatisfactionAnalysisModelId = customerSatisfactionAnalysisModelId,
+            AIProviderType = aiProviderType
         };
     }
 
@@ -78,4 +83,6 @@ public class Workspace
         
         UpdatedAt = DateTime.UtcNow;
     }
+
+
 }

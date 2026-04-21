@@ -34,7 +34,7 @@ public class TicketEnrichmentService : ITicketEnrichmentService
     /// </summary>
     public async Task CalculateSentimentAsync(
         List<TicketDto> tickets,
-        string? modelId = null,
+        string modelId,
         CancellationToken cancellationToken = default)
     {
         if (tickets == null || tickets.Count == 0)
@@ -130,7 +130,7 @@ public class TicketEnrichmentService : ITicketEnrichmentService
     /// </summary>
     public async Task<TicketDto> CalculateSentimentForSingleAsync(
         TicketDto ticket,
-        string? modelId = null,
+        string modelId,
         CancellationToken cancellationToken = default)
     {
         // Pure internal tickets always get 100
@@ -200,16 +200,20 @@ public class TicketEnrichmentService : ITicketEnrichmentService
     /// </param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The generated summary text.</returns>
-    public async Task<string> GenerateSummaryAsync(string content, string? modelId = null, CancellationToken cancellationToken = default)
+    public async Task<string> GenerateSummaryAsync(
+        string content,
+        Guid workspaceId,
+        string modelId,
+        CancellationToken cancellationToken = default)
     {
         try
         {
-            return await _summarizationService.GenerateSummaryAsync(content, modelId, cancellationToken);
+            return await _summarizationService.GenerateSummaryAsync(content, workspaceId, modelId, cancellationToken);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, 
-                "Failed to generate summary for content"); 
+            _logger.LogError(ex,
+                "Failed to generate summary for content");
             throw;
         }
     }

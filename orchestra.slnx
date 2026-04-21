@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/tests/">
     <Project Path="tests/Orchestra.Tests.Shared/Orchestra.Tests.Shared.csproj" />
+    <Project Path="tests/Orchestra.ApiService.Tests/Orchestra.ApiService.Tests.csproj" />
     <Project Path="tests/Orchestra.Infrastructure.Tests/Orchestra.Infrastructure.Tests.csproj" />
   </Folder>
   <Project Path="src/Orchestra.ApiService/Orchestra.ApiService.csproj" />

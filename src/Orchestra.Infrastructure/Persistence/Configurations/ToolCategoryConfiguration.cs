@@ -8,7 +8,7 @@ public class ToolCategoryConfiguration : IEntityTypeConfiguration<ToolCategory>
 {
     public void Configure(EntityTypeBuilder<ToolCategory> builder)
     {
-        builder.ToTable("tool_categories");
+        builder.ToTable("ToolCategories");
 
         builder.HasKey(tc => tc.Id);
 
