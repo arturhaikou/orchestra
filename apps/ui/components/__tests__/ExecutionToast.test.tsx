@@ -83,14 +83,56 @@ describe('ExecutionToast', () => {
   });
 
   describe('Accessibility', () => {
-    it('should have role="alert"', () => {
-      render(<ExecutionToast toast={successToast} onDismiss={mockDismiss} onViewTicket={mockViewTicket} />);
-      expect(screen.getByRole('alert')).toBeInTheDocument();
+    it('should have role="status" and aria-live="polite" for success toasts', () => {
+      const { container } = render(
+        <ExecutionToast toast={successToast} onDismiss={mockDismiss} onViewTicket={mockViewTicket} />
+      );
+      const toastEl = container.firstChild as HTMLElement;
+      expect(toastEl).toHaveAttribute('role', 'status');
+      expect(toastEl).toHaveAttribute('aria-live', 'polite');
+    });
+
+    it('should have role="alert" and aria-live="assertive" for failed toasts', () => {
+      const { container } = render(
+        <ExecutionToast toast={failedToast} onDismiss={mockDismiss} onViewTicket={mockViewTicket} />
+      );
+      const toastEl = container.firstChild as HTMLElement;
+      expect(toastEl).toHaveAttribute('role', 'alert');
+      expect(toastEl).toHaveAttribute('aria-live', 'assertive');
     });
 
     it('should have dismiss button with aria-label', () => {
       render(<ExecutionToast toast={successToast} onDismiss={mockDismiss} onViewTicket={mockViewTicket} />);
       expect(screen.getByLabelText('Dismiss notification')).toBeInTheDocument();
+    });
+
+    it('should have aria-label for execution status badge', () => {
+      render(<ExecutionToast toast={failedToast} onDismiss={mockDismiss} onViewTicket={mockViewTicket} />);
+      expect(screen.getByLabelText('Execution status: Failed')).toBeInTheDocument();
+    });
+  });
+
+  describe('Security', () => {
+    it('should not render any exception details even if present in toast data', () => {
+      const toastWithNoExceptionField: ExecutionToastData = {
+        id: 'toast-sec',
+        agentId: 'agent-sec',
+        agentName: 'Support Bot',
+        ticketId: 'ticket-sec',
+        ticketTitle: 'Login Bug',
+        status: 'failed',
+        reviewUrl: null,
+        createdAt: Date.now(),
+      };
+      const { container } = render(
+        <ExecutionToast toast={toastWithNoExceptionField} onDismiss={mockDismiss} onViewTicket={mockViewTicket} />
+      );
+      const text = container.textContent || '';
+      expect(text).not.toContain('NullReferenceException');
+      expect(text).not.toContain('stack trace');
+      expect(text).not.toContain('Exception');
+      expect(text).toContain('Support Bot');
+      expect(text).toContain('Login Bug');
     });
   });
 

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using NSubstitute.ExceptionExtensions;
 using Orchestra.Application.Agents.DTOs;
+using Orchestra.Application.Tickets.DTOs;
 using Orchestra.Infrastructure.Hubs;
 using Orchestra.Infrastructure.Services;
 
@@ -153,6 +154,66 @@ public class NotificationServiceTests
         await clientProxy.Received(1).SendCoreAsync(
             "AgentExecutionCompleted",
             Arg.Is<object?[]>(args => args.Length == 1 && args[0] != null),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task NotifyTicketStatusChangedAsync_BroadcastsToCorrectWorkspaceGroup()
+    {
+        var (sut, hubContext, clientProxy) = BuildSut();
+        var workspaceId = Guid.NewGuid();
+        var notification = new TicketStatusChangedNotification(
+            workspaceId, Guid.NewGuid(), "In Progress", "To Do");
+
+        await sut.NotifyTicketStatusChangedAsync(notification);
+
+        hubContext.Clients.Received(1).Group($"workspace-{workspaceId}");
+        await clientProxy.Received(1).SendCoreAsync(
+            "TicketStatusChanged",
+            Arg.Any<object?[]>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task NotifyTicketStatusChangedAsync_SwallowsExceptions()
+    {
+        var (sut, hubContext, clientProxy) = BuildSut();
+        var notification = new TicketStatusChangedNotification(
+            Guid.NewGuid(), Guid.NewGuid(), "Completed", "In Progress");
+
+        clientProxy.SendCoreAsync(
+            Arg.Any<string>(),
+            Arg.Any<object?[]>(),
+            Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("SignalR transport failure"));
+
+        var exception = await Record.ExceptionAsync(() =>
+            sut.NotifyTicketStatusChangedAsync(notification));
+
+        Assert.Null(exception);
+    }
+
+    [Fact]
+    public async Task NotifyTicketStatusChangedAsync_ThrowsOnNullNotification()
+    {
+        var (sut, _, _) = BuildSut();
+
+        await Assert.ThrowsAsync<ArgumentNullException>(
+            () => sut.NotifyTicketStatusChangedAsync(null!));
+    }
+
+    [Fact]
+    public async Task NotifyTicketStatusChangedAsync_IncludesNullPreviousStatus()
+    {
+        var (sut, hubContext, clientProxy) = BuildSut();
+        var notification = new TicketStatusChangedNotification(
+            Guid.NewGuid(), Guid.NewGuid(), "To Do", null);
+
+        await sut.NotifyTicketStatusChangedAsync(notification);
+
+        await clientProxy.Received(1).SendCoreAsync(
+            "TicketStatusChanged",
+            Arg.Any<object?[]>(),
             Arg.Any<CancellationToken>());
     }
 }

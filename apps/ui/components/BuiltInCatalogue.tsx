@@ -1,32 +1,27 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getAgentTemplates } from '../services/agentService';
-import { Agent, AgentTemplateDto } from '../types';
-import { fetchWorkspaceModels } from '../services/workspaceService';
+import { AgentTemplateDto } from '../types';
 import TemplateCard from './TemplateCard';
 import CatalogueSkeleton from './CatalogueSkeleton';
 import CatalogueEmptyState from './CatalogueEmptyState';
-import DeployBuiltInAgentModal from './DeployBuiltInAgentModal';
 
 interface BuiltInCatalogueProps {
   workspaceId: string;
   onViewAgent: (agentId: string) => void;
   onBack: () => void;
-  onAgentDeployed?: (agent: Agent) => void;
+  onAgentDeployed?: () => void;
 }
 
 const BuiltInCatalogue: React.FC<BuiltInCatalogueProps> = ({
   workspaceId,
   onViewAgent,
   onBack,
-  onAgentDeployed,
 }) => {
+  const navigate = useNavigate();
   const [templates, setTemplates] = useState<AgentTemplateDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedTemplate, setSelectedTemplate] = useState<AgentTemplateDto | null>(null);
-  const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
-  const [availableModels, setAvailableModels] = useState<string[]>([]);
-  const [defaultModel, setDefaultModel] = useState<string | undefined>(undefined);
 
   const fetchTemplates = async () => {
     setLoading(true);
@@ -45,29 +40,8 @@ const BuiltInCatalogue: React.FC<BuiltInCatalogueProps> = ({
     fetchTemplates();
   }, [workspaceId]);
 
-  useEffect(() => {
-    if (!isDeployModalOpen) return;
-    fetchWorkspaceModels(workspaceId)
-      .then(models => setAvailableModels(models))
-      .catch(() => setAvailableModels([]));
-  }, [isDeployModalOpen, workspaceId]);
-
   const handleDeployClick = (templateId: string) => {
-    const template = templates.find(t => t.templateId === templateId);
-    if (!template) return;
-    setSelectedTemplate(template);
-    setIsDeployModalOpen(true);
-  };
-
-  const handleDeployed = (agent: Agent) => {
-    setIsDeployModalOpen(false);
-    setSelectedTemplate(null);
-    onAgentDeployed?.(agent);
-  };
-
-  const closeDeployModal = () => {
-    setIsDeployModalOpen(false);
-    setSelectedTemplate(null);
+    navigate(`/workspaces/${workspaceId}/agents/deploy/${templateId}`);
   };
 
   if (loading) return <CatalogueSkeleton />;
@@ -108,17 +82,6 @@ const BuiltInCatalogue: React.FC<BuiltInCatalogueProps> = ({
           />
         ))}
       </div>
-      {selectedTemplate && (
-        <DeployBuiltInAgentModal
-          isOpen={isDeployModalOpen}
-          onClose={closeDeployModal}
-          onDeployed={handleDeployed}
-          template={selectedTemplate}
-          workspaceId={workspaceId}
-          availableModels={availableModels}
-          defaultModel={defaultModel}
-        />
-      )}
     </div>
   );
 };

@@ -23,6 +23,7 @@ public class TicketCommandService : ITicketCommandService
     private readonly ITicketMaterializationService _materializationService;
     private readonly ITicketQueryService _queryService;
     private readonly ILogger<TicketCommandService> _logger;
+    private readonly INotificationService _notificationService;
 
     public TicketCommandService(
         ITicketDataAccess ticketDataAccess,
@@ -35,7 +36,8 @@ public class TicketCommandService : ITicketCommandService
         IUserDataAccess userDataAccess,
         ITicketMaterializationService materializationService,
         ITicketQueryService queryService,
-        ILogger<TicketCommandService> logger)
+        ILogger<TicketCommandService> logger,
+        INotificationService notificationService)
     {
         _ticketDataAccess = ticketDataAccess;
         _workspaceDataAccess = workspaceDataAccess;
@@ -48,6 +50,7 @@ public class TicketCommandService : ITicketCommandService
         _materializationService = materializationService;
         _queryService = queryService;
         _logger = logger;
+        _notificationService = notificationService;
     }
 
     public async Task<TicketDto> CreateTicketAsync(
@@ -340,10 +343,15 @@ public class TicketCommandService : ITicketCommandService
             throw new UnauthorizedTicketAccessException(userId, ticketId.ToString());
         }
 
+        Guid? previousStatusId = null;
+        var statusChanged = false;
+
         try
         {
-            if (request.StatusId.HasValue)
+            if (request.StatusId.HasValue && request.StatusId.Value != ticket.StatusId)
             {
+                previousStatusId = ticket.StatusId;
+                statusChanged = true;
                 ticket.UpdateStatus(request.StatusId.Value);
             }
 
@@ -380,6 +388,12 @@ public class TicketCommandService : ITicketCommandService
         }
 
         await _ticketDataAccess.UpdateTicketAsync(ticket, cancellationToken);
+
+        if (statusChanged)
+        {
+            await DispatchStatusChangeNotificationAsync(
+                ticket, previousStatusId, request.StatusId!.Value, cancellationToken);
+        }
 
         _logger.LogInformation(
             "Successfully updated internal ticket {TicketId}",
@@ -536,5 +550,27 @@ public class TicketCommandService : ITicketCommandService
             request.AssignedWorkflowId, workflowWorkspaceId);
 
         await _ticketDataAccess.UpdateTicketAsync(ticket, cancellationToken);
+    }
+
+    private async Task DispatchStatusChangeNotificationAsync(
+        Ticket ticket,
+        Guid? previousStatusId,
+        Guid newStatusId,
+        CancellationToken cancellationToken)
+    {
+        var previousStatusName = previousStatusId.HasValue
+            ? (await _ticketDataAccess.GetStatusByIdAsync(previousStatusId.Value, cancellationToken))?.Name
+            : null;
+
+        var newStatusName = (await _ticketDataAccess.GetStatusByIdAsync(newStatusId, cancellationToken))?.Name
+            ?? "Unknown";
+
+        await _notificationService.NotifyTicketStatusChangedAsync(
+            new TicketStatusChangedNotification(
+                ticket.WorkspaceId,
+                ticket.Id,
+                newStatusName,
+                previousStatusName),
+            cancellationToken);
     }
 }

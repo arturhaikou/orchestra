@@ -10,21 +10,14 @@ import {
   updateWorkspace,
   getWorkspaceProviderConfig,
   updateWorkspaceProvider,
+  getWorkspaces,
 } from '../../services/workspaceService';
 import { detectStaleModels } from '../../utils/staleModelDetection';
 import { getUser } from '../../services/authService';
 
-interface EditWorkspacePageProps {
-  /** The full list of workspaces from application state (used to pre-populate form fields). */
-  workspaces: Workspace[];
-  /** Called with the updated workspace after a successful save, so App.tsx can refresh state. */
-  onWorkspaceUpdated: (workspace: Workspace) => void;
-}
+interface EditWorkspacePageProps {}
 
-const EditWorkspacePage: React.FC<EditWorkspacePageProps> = ({
-  workspaces,
-  onWorkspaceUpdated,
-}) => {
+const EditWorkspacePage: React.FC<EditWorkspacePageProps> = () => {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const navigate = useNavigate();
 
@@ -34,8 +27,8 @@ const EditWorkspacePage: React.FC<EditWorkspacePageProps> = ({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isAccessDenied, setIsAccessDenied] = useState(false);
 
-  // ── Workspace from app state (already fetched by App.tsx) ───────────────
-  const workspace = workspaces.find((w) => w.id === workspaceId) ?? null;
+  // ── Workspace loaded from API ───────────────────────────────────────────
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
 
   // ── Form fields: Workspace Name ─────────────────────────────────────────
   const [workspaceName, setWorkspaceName] = useState('');
@@ -78,18 +71,25 @@ const EditWorkspacePage: React.FC<EditWorkspacePageProps> = ({
     setLoadError(null);
     setIsAccessDenied(false);
 
-    getWorkspaceProviderConfig(workspaceId)
-      .then((config) => {
+    Promise.all([
+      getWorkspaceProviderConfig(workspaceId),
+      getWorkspaces(),
+    ])
+      .then(([config, allWorkspaces]) => {
         if (cancelled) return;
         setProviderConfig(config);
-        // Initialise the tracked provider type from the loaded config.
         setSelectedProviderType(config.providerType as 'AzureOpenAI' | 'Ollama');
+        const found = allWorkspaces.find((w) => w.id === workspaceId) ?? null;
+        if (!found) {
+          setLoadError('Workspace not found.');
+        } else {
+          setWorkspace(found);
+        }
       })
       .catch((err) => {
         if (cancelled) return;
         const msg =
           err instanceof Error ? err.message : 'Failed to load provider configuration.';
-        // 404 means workspace not found or the user is not a member.
         if (msg.toLowerCase().includes('not found')) {
           setLoadError('Workspace not found.');
         } else if (
@@ -218,7 +218,7 @@ const EditWorkspacePage: React.FC<EditWorkspacePageProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isFormValid || !workspaceId || !workspace) return;
+    if (!isFormValid || !workspaceId) return;
 
     // Snapshot AI toggle state before submission so they can be reverted on failure.
     const prevAiSummarizationEnabled = isAiSummarizationEnabled;
@@ -247,7 +247,7 @@ const EditWorkspacePage: React.FC<EditWorkspacePageProps> = ({
         aiSummarizationModelToSave,
         customerSatisfactionModelToSave
       );
-      onWorkspaceUpdated(updatedWorkspace);
+      setWorkspace(updatedWorkspace);
 
       // ── Step 2: Update provider only if user changed it ────────────────
       if (isProviderDirty && providerOutput && providerOutput.isValid) {

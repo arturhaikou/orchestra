@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using Orchestra.Application.Agents.DTOs;
 using Orchestra.Application.Common.Interfaces;
+using Orchestra.Application.Tickets.DTOs;
 using Orchestra.Infrastructure.Hubs;
 
 namespace Orchestra.Infrastructure.Services;
@@ -55,6 +56,43 @@ public class NotificationService : INotificationService
                 "Failed to dispatch AgentExecutionCompleted notification. WorkspaceId={WorkspaceId} AgentId={AgentId} TicketId={TicketId}",
                 notification.WorkspaceId,
                 notification.AgentId,
+                notification.TicketId);
+        }
+    }
+
+    public async Task NotifyTicketStatusChangedAsync(
+        TicketStatusChangedNotification notification,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+
+        var groupName = $"workspace-{notification.WorkspaceId}";
+
+        var payload = new
+        {
+            workspaceId = notification.WorkspaceId,
+            ticketId = notification.TicketId,
+            newStatus = notification.NewStatus,
+            previousStatus = notification.PreviousStatus
+        };
+
+        try
+        {
+            await _hubContext.Clients.Group(groupName)
+                .SendAsync("TicketStatusChanged", payload, cancellationToken);
+
+            _logger.LogDebug(
+                "Dispatched TicketStatusChanged notification. WorkspaceId={WorkspaceId} TicketId={TicketId} NewStatus={NewStatus}",
+                notification.WorkspaceId,
+                notification.TicketId,
+                notification.NewStatus);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Failed to dispatch TicketStatusChanged notification. WorkspaceId={WorkspaceId} TicketId={TicketId}",
+                notification.WorkspaceId,
                 notification.TicketId);
         }
     }

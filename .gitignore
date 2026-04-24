@@ -85,4 +85,14 @@ TestResults/
 
 specification/
 
+.github/agents/
+.github/prompts/
+.github/skills/
+
+audit/
+.spec-workflow/
+
+research/
+
+*.lscache
 # End of file

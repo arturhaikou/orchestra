@@ -49,6 +49,26 @@ export const getTicketPriorities = async (): Promise<TicketPriority[]> => {
   }
 };
 
+export const getTicketById = async (ticketId: string): Promise<Ticket> => {
+  const response = await fetch(`${API_BASE_URL}/${ticketId}`, {
+    headers: getAuthHeaders()
+  });
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error('Ticket not found');
+    }
+    try {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || errorData.message || 'Failed to fetch ticket');
+    } catch {
+      throw new Error(`Backend error: ${response.statusText}`);
+    }
+  }
+
+  return await response.json();
+};
+
 export const getTickets = async (workspaceId: string, pageToken?: string, pageSize: number = 50): Promise<PaginatedResponse<Ticket>> => {
   try {
     const url = new URL(API_BASE_URL);

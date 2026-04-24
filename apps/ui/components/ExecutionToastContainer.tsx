@@ -1,15 +1,11 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import ExecutionToast from './ExecutionToast';
 import { useExecutionToasts } from '../hooks/useExecutionToasts';
 
-interface ExecutionToastContainerProps {
-  workspaceId: string;
-  activeView: string;
-}
-
-const ExecutionToastContainer: React.FC<ExecutionToastContainerProps> = ({ workspaceId }) => {
-  const { toasts, dismiss } = useExecutionToasts(workspaceId);
+const ExecutionToastContainer: React.FC = () => {
+  const { workspaceId } = useParams<{ workspaceId: string }>();
+  const { toasts, dismiss } = useExecutionToasts(workspaceId || '');
   const navigate = useNavigate();
 
   const handleViewTicket = (ticketId: string) => {

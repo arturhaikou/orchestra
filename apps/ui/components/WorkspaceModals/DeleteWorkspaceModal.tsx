@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, Loader2, AlertTriangle, Trash2 } from 'lucide-react';
+import ModalErrorBanner from '../ModalErrorBanner';
 
 interface DeleteWorkspaceModalProps {
   isOpen: boolean;
@@ -7,6 +8,9 @@ interface DeleteWorkspaceModalProps {
   onConfirm: () => void;
   workspaceName: string;
   isProcessing: boolean;
+  error?: string | null;
+  confirmationValue?: string;
+  onConfirmationChange?: (value: string) => void;
 }
 
 const DeleteWorkspaceModal: React.FC<DeleteWorkspaceModalProps> = ({
@@ -15,8 +19,13 @@ const DeleteWorkspaceModal: React.FC<DeleteWorkspaceModalProps> = ({
   onConfirm,
   workspaceName,
   isProcessing,
+  error = null,
+  confirmationValue = '',
+  onConfirmationChange,
 }) => {
   if (!isOpen) return null;
+
+  const isNameConfirmed = !onConfirmationChange || confirmationValue === workspaceName;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
@@ -25,7 +34,7 @@ const DeleteWorkspaceModal: React.FC<DeleteWorkspaceModalProps> = ({
           <h3 className="text-lg font-bold text-text flex items-center gap-2">
             <Trash2 className="w-4 h-4 text-red-500" /> Delete
           </h3>
-          <button onClick={onClose} className="text-textMuted hover:text-text transition-colors">
+          <button onClick={onClose} disabled={isProcessing} className="text-textMuted hover:text-text transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -36,6 +45,25 @@ const DeleteWorkspaceModal: React.FC<DeleteWorkspaceModalProps> = ({
           <p className="text-sm text-text">
             Confirm delete <span className="font-bold">"{workspaceName}"</span>?
           </p>
+
+          {onConfirmationChange && (
+            <div className="text-left">
+              <label className="text-xs text-textMuted block mb-1">
+                Type <span className="font-semibold text-text">{workspaceName}</span> to confirm
+              </label>
+              <input
+                type="text"
+                value={confirmationValue}
+                onChange={(e) => onConfirmationChange(e.target.value)}
+                className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm text-text focus:outline-none focus:border-primary"
+                placeholder={workspaceName}
+                disabled={isProcessing}
+              />
+            </div>
+          )}
+
+          {error && <ModalErrorBanner error={error} />}
+
           <div className="pt-2 flex gap-3">
             <button 
               type="button" 
@@ -47,10 +75,12 @@ const DeleteWorkspaceModal: React.FC<DeleteWorkspaceModalProps> = ({
             </button>
             <button 
               onClick={onConfirm}
-              disabled={isProcessing}
+              disabled={isProcessing || !isNameConfirmed}
+              aria-label={isProcessing ? 'Processing' : error ? 'Retry' : 'Confirm'}
               className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-red-500/20"
             >
-              {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Confirm'}
+              {isProcessing && <Loader2 className="w-4 h-4 animate-spin" />}
+              {error ? 'Retry' : 'Confirm'}
             </button>
           </div>
         </div>

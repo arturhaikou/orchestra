@@ -1,36 +1,17 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Layers, GitBranch, Gitlab, Database, Globe, X, Save, Check, Loader2, Trash2, AlertTriangle, RefreshCw, Key, Filter, Zap, User, Link as LinkIcon, Search, ChevronDown, Wifi } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Layers, GitBranch, Gitlab, Database, Globe, Loader2, Trash2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Integration, IntegrationType } from '../types';
-import { getIntegrations, createIntegration, updateIntegration, deleteIntegration, testIntegrationConnection } from '../services/integrationService';
-import { validateFilterQuery } from '../utils/filterValidator';
-import FilterWarningModal from './FilterWarningModal';
+import { getIntegrations, deleteIntegration } from '../services/integrationService';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 
-interface IntegrationsProps {
-  workspaceId: string;
-}
-
-const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
+const Integrations: React.FC = () => {
+  const { workspaceId } = useParams<{ workspaceId: string }>();
+  const navigate = useNavigate();
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
   const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isFilterWarningOpen, setIsFilterWarningOpen] = useState(false);
-  const [isTestingConnection, setIsTestingConnection] = useState(false);
-  const [connectionTestError, setConnectionTestError] = useState<string | null>(null);
-  const [connectionTestSuccess, setConnectionTestSuccess] = useState(false);
-  const [testFailed, setTestFailed] = useState(false);
-  const [validationError, setValidationError] = useState<string | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [typesError, setTypesError] = useState<string | null>(null);
-
-  const usedProviders = useMemo(
-    () => new Set(integrations.map(i => i.provider?.toLowerCase()).filter(Boolean) as string[]),
-    [integrations]
-  );
 
   const fetchAll = async () => {
     setIsLoading(true);
@@ -48,17 +29,6 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
     fetchAll();
   }, [workspaceId]);
 
-  const [formState, setFormState] = useState({
-    name: '',
-    types: [IntegrationType.TRACKER] as IntegrationType[],
-    provider: 'jira',
-    url: '',
-    username: '',
-    apiKey: '',
-    filterQuery: '',
-    vectorize: false,
-  });
-
   const categories = [
     { type: IntegrationType.TRACKER, label: 'Tracker Systems', icon: Layers, color: 'text-indigo-600' },
     { type: IntegrationType.KNOWLEDGE_BASE, label: 'Knowledge Bases', icon: Database, color: 'text-purple-600' },
@@ -69,105 +39,6 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
     [IntegrationType.TRACKER]: 'Tracker',
     [IntegrationType.KNOWLEDGE_BASE]: 'Knowledge Base',
     [IntegrationType.CODE_SOURCE]: 'Code Source',
-  };
-
-  const providers = [
-    { value: 'jira', label: 'Jira' },
-    { value: 'confluence', label: 'Confluence' },
-    { value: 'github', label: 'GitHub' },
-    { value: 'gitlab', label: 'GitLab' },
-    // Unsupported providers - pending backend implementation
-    // { value: 'azure-devops', label: 'Azure DevOps' },
-    // { value: 'linear', label: 'Linear' },
-    // { value: 'notion', label: 'Notion' },
-    // { value: 'custom', label: 'Custom' },
-  ];
-
-  const getFilterConfig = (provider: string) => {
-    switch (provider) {
-      case 'jira':
-        return {
-          label: 'JQL QUERY',
-          placeholder: 'e.g. project = "WEB" AND status = "To Do"',
-          hint: 'Limit which tickets are synced by providing a specific Jira Query Language string.'
-        };
-      case 'confluence':
-        return {
-          label: 'CQL QUERY',
-          placeholder: 'e.g. type = "page" AND space = "ENG"',
-          hint: 'Limit which pages are synced by providing a specific Confluence Query Language string.'
-        };
-      case 'github':
-        return {
-          label: 'SEARCH FILTER',
-          placeholder: 'e.g. is:open label:bug state:open',
-          hint: 'Limit which issues are synced by providing a GitHub search filter.'
-        };
-      case 'gitlab':
-        return {
-          label: 'SEARCH FILTER',
-          placeholder: 'e.g. state:opened labels:bug',
-          hint: 'Limit which issues are synced using GitLab search syntax.'
-        };
-      // Unsupported providers - pending backend implementation
-      // case 'azure-devops':
-      //   return {
-      //     label: 'WIQL QUERY',
-      //     placeholder: 'SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = "Nexus"',
-      //     hint: 'Limit work items using Work Item Query Language.'
-      //   };
-      // case 'gitlab':
-      //   return {
-      //     label: 'SEARCH FILTER',
-      //     placeholder: 'e.g. state:opened labels:bug',
-      //     hint: 'Limit items using standard GitLab search syntax.'
-      //   };
-      // case 'notion':
-      //   return {
-      //     label: 'FILTER JSON',
-      //     placeholder: '{ "property": "Status", "select": { "equals": "Done" } }',
-      //     hint: 'Provide a valid Notion API filter object in JSON format.'
-      //   };
-      default:
-        return {
-          label: 'QUERY FILTER',
-          placeholder: 'e.g. status:active type:task',
-          hint: 'Limit which items are synced by providing a specific query string.'
-        };
-    }
-  };
-
-  const handleOpenModal = (integration?: Integration) => {
-    if (integration) {
-      setEditingId(integration.id);
-      setFormState({
-        name: integration.name,
-        types: Array.isArray(integration.types) ? integration.types : [],
-        provider: (integration.provider || 'custom').toLowerCase(),
-        url: integration.url || '',
-        username: integration.username || '',
-        apiKey: '••••••••••••', // Masked for existing
-        filterQuery: integration.filterQuery || '',
-        vectorize: integration.vectorize || false,
-      });
-    } else {
-      setEditingId(null);
-      setFormState({
-        name: '',
-        types: [IntegrationType.TRACKER] as IntegrationType[],
-        provider: 'jira',
-        url: '',
-        username: '',
-        apiKey: '',
-        filterQuery: '',
-        vectorize: false,
-      });
-    }
-    setValidationError(null);
-    setSaveError(null);
-    setTypesError(null);
-    setConnectionTestError(null);
-    setIsModalOpen(true);
   };
 
   const executeDelete = async () => {
@@ -184,93 +55,12 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
     }
   };
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Validate that at least one type is selected
-    if (formState.types.length === 0) {
-      setTypesError('At least one integration type must be selected.');
-      return;
-    }
-    setTypesError(null);
-    
-    // Check if filter warning should be shown
-    if (shouldShowFilterWarning()) {
-      setIsFilterWarningOpen(true);
-      return;
-    }
-    
-    // Proceed with saving
-    await performSave();
-  };
-
-  const shouldShowFilterWarning = (): boolean => {
-    const needsFilter = formState.provider === 'jira' || formState.provider === 'confluence';
-    return needsFilter && !formState.filterQuery.trim();
-  };
-
-  const performSave = async () => {
-    setIsSaving(true);
-    setSaveError(null);
-    try {
-      // Determine connected status: false if test failed, true by default
-      const connected = testFailed ? false : true;
-      
-      if (editingId) {
-        const updated = await updateIntegration(editingId, { ...formState, connected });
-        setIntegrations(prev => prev.map(item => item.id === editingId ? { ...updated, workspaceId } : item));
-      } else {
-        const newIntegration = await createIntegration({ ...formState, workspaceId, connected });
-        setIntegrations(prev => [...prev, { ...newIntegration, workspaceId }]);
-      }
-      setIsModalOpen(false);
-      setConnectionTestError(null);
-      setConnectionTestSuccess(false);
-      setTestFailed(false);
-      setValidationError(null);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to save integration';
-      setSaveError(errorMessage);
-      console.error("Failed to save integration", error);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleTestConnection = async () => {
-    setIsTestingConnection(true);
-    setConnectionTestError(null);
-    setConnectionTestSuccess(false);
-    setTestFailed(false);
-    
-    try {
-      const testRequest: any = {
-        provider: formState.provider,
-        url: formState.url,
-        username: formState.username,
-        apiKey: formState.apiKey
-      };
-      
-      await testIntegrationConnection(testRequest);
-      setConnectionTestSuccess(true);
-      setTestFailed(false);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to test connection';
-      setConnectionTestError(errorMessage);
-      setTestFailed(true);
-    } finally {
-      setIsTestingConnection(false);
-    }
-  };
-
   const renderIcon = (providerName: string) => {
     switch (providerName) {
       case 'jira': return <Layers className="w-5 h-5 text-indigo-500" />;
       case 'confluence': return <Database className="w-5 h-5 text-blue-400" />;
       case 'github': return <GitBranch className="w-5 h-5 text-orange-500" />;
       case 'gitlab': return <Gitlab className="w-5 h-5 text-orange-500" />;
-      // Unsupported providers - pending backend implementation
-      // case 'linear': return <Zap className="w-5 h-5 text-purple-500" />;
       default: return <Globe className="w-5 h-5 text-zinc-600" />;
     }
   };
@@ -283,7 +73,7 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
           <p className="text-textMuted text-sm mt-0.5">Manage your development ecosystem connections.</p>
         </div>
         <button 
-            onClick={() => handleOpenModal()}
+            onClick={() => navigate('new')}
             className="bg-primary hover:bg-primaryHover text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-semibold transition-all shadow-lg shadow-primary/20 active:scale-95"
         >
             <Plus className="w-4 h-4" /> Add Connection
@@ -371,12 +161,12 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
                           >
                               <Trash2 className="w-4 h-4" />
                           </button>
-                          <button 
-                              onClick={() => handleOpenModal(integration)}
-                              className="bg-surface border border-border hover:border-primary/50 text-text px-4 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
+                          <Link
+                              to={`${integration.id}/edit`}
+                              className="bg-surface border border-border hover:border-primary/50 text-text px-4 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 inline-flex items-center"
                           >
                               Configure
-                          </button>
+                          </Link>
                         </div>
                       </div>
                     </div>
@@ -388,258 +178,6 @@ const Integrations: React.FC<IntegrationsProps> = ({ workspaceId }) => {
         })
       )}
 
-      {/* Connection Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-          <div className="bg-surface border border-border w-full max-w-[480px] rounded-xl shadow-2xl overflow-hidden animate-scale-in flex flex-col max-h-[95vh]">
-            <div className="px-6 py-5 flex justify-between items-center bg-surface shrink-0">
-              <h3 className="text-xl font-bold text-text">
-                {editingId ? 'Edit Integration' : 'New Integration'}
-              </h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-textMuted hover:text-text transition-colors">
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            
-            <form onSubmit={handleSave} className="px-6 pb-6 space-y-4 overflow-y-auto custom-scrollbar">
-              {/* Provider selector — always full-width */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-textMuted uppercase tracking-wider">Provider</label>
-                <div className="relative">
-                  <select
-                    value={formState.provider}
-                    onChange={(e) => {
-                      const newProvider = e.target.value;
-                      let newTypes: IntegrationType[];
-                      if (newProvider === 'jira') newTypes = [IntegrationType.TRACKER];
-                      else if (newProvider === 'confluence') newTypes = [IntegrationType.KNOWLEDGE_BASE];
-                      else newTypes = [];
-                      setFormState({ ...formState, provider: newProvider, types: newTypes });
-                      setTypesError(null);
-                    }}
-                    className="w-full bg-background border border-border rounded-lg pl-3 pr-10 py-2.5 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary appearance-none transition-all shadow-sm"
-                  >
-                    {providers.map(p => {
-                      const isUsed = !editingId && usedProviders.has(p.value);
-                      return (
-                        <option key={p.value} value={p.value} disabled={isUsed}>
-                          {isUsed ? `${p.label} — Already connected` : p.label}
-                        </option>
-                      );
-                    })}
-                  </select>
-                  <Globe className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-textMuted pointer-events-none" />
-                </div>
-              </div>
-
-              {/* Integration Type selector — provider-aware */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-textMuted uppercase tracking-wider">Integration Type</label>
-                {(formState.provider === 'github' || formState.provider === 'gitlab') ? (
-                  /* Multi-select checkbox group for providers that support multiple types */
-                  <div className="space-y-2 p-3 bg-background border border-border rounded-lg">
-                    {[
-                      { value: IntegrationType.TRACKER, label: 'Tracker' },
-                      { value: IntegrationType.KNOWLEDGE_BASE, label: 'Knowledge Base' },
-                      { value: IntegrationType.CODE_SOURCE, label: 'Code Source' },
-                    ].map(({ value, label }) => (
-                      <label key={value} className="flex items-center gap-2 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={formState.types.includes(value)}
-                          onChange={(e) => {
-                            const updated = e.target.checked
-                              ? [...formState.types, value]
-                              : formState.types.filter(t => t !== value);
-                            setFormState({ ...formState, types: updated });
-                            if (updated.length > 0) setTypesError(null);
-                          }}
-                          className="w-4 h-4 accent-primary rounded"
-                        />
-                        <span className="text-sm text-text">{label}</span>
-                      </label>
-                    ))}
-                  </div>
-                ) : (
-                  /* Read-only badge for providers locked to a single type (Jira, Confluence) */
-                  <div className="flex items-center gap-3 py-1">
-                    <span className="bg-surfaceHighlight border border-border text-text text-sm px-3 py-2 rounded-lg font-medium">
-                      {formState.provider === 'jira' ? 'Tracker' : 'Knowledge Base'}
-                    </span>
-                    <span className="text-[10px] text-textMuted italic">This provider supports only this type</span>
-                  </div>
-                )}
-                {typesError && (
-                  <p className="text-[10px] text-red-500 ml-1">⚠ {typesError}</p>
-                )}
-              </div>
-
-              <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-textMuted uppercase tracking-wider">Display Name</label>
-                  <input 
-                  type="text" 
-                  value={formState.name}
-                  onChange={(e) => setFormState({...formState, name: e.target.value})}
-                  className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all shadow-sm placeholder:text-textMuted/40"
-                  placeholder="e.g., Company Jira"
-                  required
-                  />
-              </div>
-
-              <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-textMuted uppercase tracking-wider">Base URL</label>
-                  <input 
-                  type="url" 
-                  value={formState.url}
-                  onChange={(e) => setFormState({...formState, url: e.target.value})}
-                  className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all shadow-sm font-mono placeholder:text-textMuted/40"
-                  placeholder="https://your-domain.atlassian.net"
-                  required
-                  />
-              </div>
-
-              <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-textMuted uppercase tracking-wider">Username / Email</label>
-                  <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-textMuted" />
-                      <input 
-                      type="text" 
-                      value={formState.username}
-                      onChange={(e) => setFormState({...formState, username: e.target.value})}
-                      className="w-full bg-background border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all shadow-sm placeholder:text-textMuted/40"
-                      placeholder="user@example.com"
-                      />
-                  </div>
-              </div>
-
-              <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-textMuted uppercase tracking-wider">API Key / Token</label>
-                  <input 
-                  type="password" 
-                  value={formState.apiKey}
-                  onChange={(e) => setFormState({...formState, apiKey: e.target.value})}
-                  className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all shadow-sm font-mono placeholder:text-textMuted/40"
-                  placeholder="••••••••••••••••"
-                  />
-                  <p className="text-[10px] text-textMuted ml-1">Keys are encrypted at rest.</p>
-              </div>
-
-              {/* Test Connection Button */}
-              <div className="pt-2 space-y-2">
-                  <button
-                    type="button"
-                    onClick={handleTestConnection}
-                    disabled={isTestingConnection || !formState.url || !formState.apiKey}
-                    className="w-full px-4 py-2.5 border border-primary/40 hover:border-primary bg-primary/5 hover:bg-primary/10 text-primary rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isTestingConnection ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Testing...
-                      </>
-                    ) : connectionTestSuccess ? (
-                      <>
-                        <Check className="w-4 h-4 text-emerald-500" />
-                        <span className="text-emerald-500">Connection Verified</span>
-                      </>
-                    ) : (
-                      <>
-                        <Wifi className="w-4 h-4" />
-                        Test Connection
-                      </>
-                    )}
-                  </button>
-                  {connectionTestError && (
-                    <p className="text-[10px] text-red-500 ml-1">⚠ {connectionTestError}</p>
-                  )}
-              </div>
-
-              {/* JQL Query / Filter Query Section - Improved with dynamic labeling */}
-              {(formState.provider === 'jira' || formState.provider === 'confluence') && (
-                <div className="space-y-1.5 pt-2 border-t border-border/40">
-                    <div className="flex justify-between items-center mb-1">
-                        <label className="text-[10px] font-bold text-textMuted uppercase tracking-wider">
-                            {getFilterConfig(formState.provider).label}
-                        </label>
-                        <span className="text-[9px] bg-surfaceHighlight text-textMuted px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter">required</span>
-                    </div>
-                    <div className="relative">
-                        <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-textMuted" />
-                        <input 
-                          type="text"
-                          value={formState.filterQuery}
-                          onChange={(e) => {
-                            const newValue = e.target.value;
-                            setFormState({...formState, filterQuery: newValue});
-                            // Run client-side validation
-                            const validation = validateFilterQuery(newValue, formState.provider);
-                            setValidationError(validation.isValid ? null : validation.error || null);
-                          }}
-                          className="w-full bg-background border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all shadow-sm font-mono placeholder:text-textMuted/40"
-                          placeholder={getFilterConfig(formState.provider).placeholder}
-                        />
-                    </div>
-                    {(validationError || saveError) && (
-                      <p className="text-[10px] text-red-500 ml-1">⚠ {validationError || saveError}</p>
-                    )}
-                    <p className="text-[10px] text-textMuted italic ml-1">{getFilterConfig(formState.provider).hint}</p>
-                </div>
-              )}
-
-              {/* Vectorize toggle ONLY for Knowledge Bases */}
-              {formState.types.includes(IntegrationType.KNOWLEDGE_BASE) && (
-                <div className="pt-2 border-t border-border/40 flex items-center justify-between">
-                    <div className="flex flex-col">
-                        <span className="text-sm font-bold text-text tracking-tight uppercase">Vectorize Context</span>
-                        <span className="text-[10px] text-textMuted">Enable AI indexing for deep knowledge retrieval.</span>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                        <input 
-                            type="checkbox" 
-                            className="sr-only peer" 
-                            checked={formState.vectorize}
-                            onChange={(e) => setFormState({...formState, vectorize: e.target.checked})}
-                        />
-                        <div className="w-11 h-6 bg-surfaceHighlight peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                    </label>
-                </div>
-              )}
-
-              <div className="pt-4 flex gap-4">
-                 <button 
-                   type="button" 
-                   onClick={() => setIsModalOpen(false)}
-                   className="flex-1 px-4 py-2.5 border border-border rounded-lg text-sm font-bold text-text hover:bg-surfaceHighlight transition-all active:scale-[0.98]"
-                 >
-                   Cancel
-                 </button>
-                 <button 
-                   type="submit" 
-                   disabled={isSaving}
-                   className="flex-1 px-4 py-2.5 bg-primary hover:bg-primaryHover text-white rounded-lg text-sm font-bold transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 active:scale-[0.98]"
-                 >
-                   {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                   {isSaving ? 'Saving...' : editingId ? 'Save Connection' : 'Save Connection'}
-                 </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Filter Warning Modal */}
-      <FilterWarningModal
-        isOpen={isFilterWarningOpen}
-        providerName={formState.provider}
-        isProcessing={isSaving}
-        onCancel={() => setIsFilterWarningOpen(false)}
-        onProceed={() => {
-          setIsFilterWarningOpen(false);
-          performSave();
-        }}
-      />
-
-      {/* Delete Confirmation */}
       {deleteConfirmationId && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm animate-fade-in">
           <div className="bg-surface border border-border w-full max-w-sm rounded-xl shadow-2xl p-6 space-y-4 animate-scale-in">

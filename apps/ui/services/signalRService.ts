@@ -1,7 +1,7 @@
 
 import { HubConnection, HubConnectionBuilder, HubConnectionState } from '@microsoft/signalr';
 import { getToken } from './authService';
-import { ModelPullProgressEvent, ModelPullCompletedEvent, ModelPullFailedEvent, AgentExecutionCompletedEvent, ConnectionStatus } from '../types';
+import { ModelPullProgressEvent, ModelPullCompletedEvent, ModelPullFailedEvent, AgentExecutionCompletedEvent, TicketStatusChangedEvent, ConnectionStatus } from '../types';
 
 const HUB_URL = `${import.meta.env.VITE_API_URL}/hubs/notifications`;
 
@@ -10,6 +10,8 @@ let activeWorkspaceId: string | null = null;
 let connectionStatus: ConnectionStatus = 'disconnected';
 let connectionStatusHandler: ((status: ConnectionStatus) => void) | null = null;
 let executionCompletedHandler: ((event: AgentExecutionCompletedEvent) => void) | null = null;
+let ticketStatusChangedHandler: ((event: TicketStatusChangedEvent) => void) | null = null;
+let reconnectedHandler: (() => void) | null = null;
 
 const RETRY_DELAYS = [0, 2000, 5000, 10000, 30000];
 
@@ -40,6 +42,7 @@ export const connect = async (workspaceId: string): Promise<void> => {
     } catch (err) {
       console.error('SignalR: Failed to re-join workspace group after reconnect:', err);
     }
+    reconnectedHandler?.();
   });
 
   connection.onclose(() => {
@@ -49,6 +52,11 @@ export const connect = async (workspaceId: string): Promise<void> => {
   connection.on('AgentExecutionCompleted', (event: AgentExecutionCompletedEvent) => {
     if (event.workspaceId !== activeWorkspaceId) return;
     executionCompletedHandler?.(event);
+  });
+
+  connection.on('TicketStatusChanged', (event: TicketStatusChangedEvent) => {
+    if (event.workspaceId !== activeWorkspaceId) return;
+    ticketStatusChangedHandler?.(event);
   });
 
   activeConnection = connection;
@@ -138,6 +146,22 @@ export const onAgentExecutionCompleted = (handler: (event: AgentExecutionComplet
 
 export const offAgentExecutionCompleted = (): void => {
   executionCompletedHandler = null;
+};
+
+export const onTicketStatusChanged = (handler: (event: TicketStatusChangedEvent) => void): void => {
+  ticketStatusChangedHandler = handler;
+};
+
+export const offTicketStatusChanged = (): void => {
+  ticketStatusChangedHandler = null;
+};
+
+export const onReconnected = (handler: () => void): void => {
+  reconnectedHandler = handler;
+};
+
+export const offReconnected = (): void => {
+  reconnectedHandler = null;
 };
 
 export const onConnectionStatusChange = (handler: (status: ConnectionStatus) => void): void => {

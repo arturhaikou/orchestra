@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Bot, Sparkles, RefreshCw, X, Send, Loader2, MessageSquare, Plus, Save, Database, Globe, Workflow as WorkflowIcon, Flag, Activity, ChevronDown, Clock, ChevronRight, Layers, Smile, Meh, Frown, ExternalLink, Zap, Trash2, AlertTriangle, User, Github, Gitlab } from 'lucide-react';
+import ModalErrorBanner from './ModalErrorBanner';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { marked } from 'marked';
-import { Ticket, TicketPriority, TicketStatus, Comment, Workflow, Agent } from '../types';
-import { addComment, createTicket, updateTicket, getTickets, convertToExternal, deleteTicket, getTicketStatuses, getTicketPriorities, generateSummary } from '../services/ticketService';
+import { Ticket, TicketPriority, TicketStatus, Comment, Workflow, Agent, TicketStatusChangedEvent } from '../types';
+import { onTicketStatusChanged, offTicketStatusChanged, onReconnected, offReconnected } from '../services/signalRService';
+import { addComment, updateTicket, getTickets, convertToExternal, deleteTicket, getTicketStatuses, getTicketPriorities, generateSummary } from '../services/ticketService';
 import { getWorkspacesWorkflows } from '../services/workflowService';
 import { getUser } from '../services/authService';
 import { getAgents } from '../services/agentService';
@@ -10,10 +13,7 @@ import { IntegrationSelector } from './IntegrationSelector';
 import { IssueTypeSelector } from './IssueTypeSelector';
 import Toast from './Toast';
 
-interface TicketListProps {
-  workspaceId: string;
-  onNavigateToTickets?: () => void;
-}
+interface TicketListProps {}
 
 interface ProviderInfo {
   icon: React.ReactNode;
@@ -68,7 +68,9 @@ const Markdown: React.FC<{ content: string; className?: string }> = ({ content, 
   );
 };
 
-const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTickets }) => {
+const TicketList: React.FC<TicketListProps> = () => {
+  const { workspaceId } = useParams<{ workspaceId: string }>();
+  const navigate = useNavigate();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const selectedTicketRef = useRef<Ticket | null>(null);
@@ -107,6 +109,9 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
   const [isConverting, setIsConverting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [highlightedTicketId, setHighlightedTicketId] = useState<string | null>(null);
   
   // Conversion state
   const [conversionConfig, setConversionConfig] = useState<{
@@ -115,18 +120,6 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
     issueTypeName: string;
   } | null>(null);
   const [showConversionForm, setShowConversionForm] = useState(false);
-
-  // Create Ticket State
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
-  const [newTicketData, setNewTicketData] = useState({
-      title: '',
-      description: '',
-      assignedAgentId: '',
-      assignedWorkflowId: '',
-      priorityId: '',
-      statusId: ''
-  });
   
   // Read state for unread counts
   const [lastReadCounts, setLastReadCounts] = useState<Record<string, number>>({});
@@ -148,14 +141,6 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
         setStatuses(statusesData);
         setPriorities(prioritiesData);
         setAgents(agentsData);
-        // Set defaults if not already set
-        if (!newTicketData.statusId && statusesData.length > 0) {
-          setNewTicketData(prev => ({ ...prev, statusId: statusesData[0].id }));
-        }
-        if (!newTicketData.priorityId && prioritiesData.length > 0) {
-          const mediumPriority = prioritiesData.find(p => p.name === 'Medium') || prioritiesData[0];
-          setNewTicketData(prev => ({ ...prev, priorityId: mediumPriority.id }));
-        }
       } catch (err) {
         console.error('Failed to load ticket metadata', err);
       }
@@ -229,6 +214,53 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
     loadWorkflows();
   }, [workspaceId]);
 
+  useEffect(() => {
+    const handleTicketStatusChanged = (event: TicketStatusChangedEvent) => {
+      setTickets(prevTickets => {
+        const ticketIndex = prevTickets.findIndex(t => t.id === event.ticketId);
+        if (ticketIndex === -1) return prevTickets;
+
+        const updated = [...prevTickets];
+        const ticket = { ...updated[ticketIndex] };
+        if (ticket.status) {
+          ticket.status = { ...ticket.status, name: event.newStatus };
+        }
+        updated[ticketIndex] = ticket;
+        return updated;
+      });
+
+      updateSelectedTicketStatus(event);
+      flashHighlight(event.ticketId);
+      showStatusChangeToast(event.newStatus);
+    };
+
+    onTicketStatusChanged(handleTicketStatusChanged);
+    onReconnected(loadInitialTickets);
+
+    return () => {
+      offTicketStatusChanged();
+      offReconnected();
+    };
+  }, [workspaceId]);
+
+  const updateSelectedTicketStatus = (event: TicketStatusChangedEvent) => {
+    if (selectedTicketRef.current?.id !== event.ticketId) return;
+    setSelectedTicket(prev => {
+      if (!prev?.status) return prev;
+      return { ...prev, status: { ...prev.status, name: event.newStatus } };
+    });
+  };
+
+  const flashHighlight = (ticketId: string) => {
+    setHighlightedTicketId(ticketId);
+    setTimeout(() => setHighlightedTicketId(null), 1500);
+  };
+
+  const showStatusChangeToast = (newStatus: string) => {
+    setSuccessToast(`Ticket status changed to "${newStatus}"`);
+    setTimeout(() => setSuccessToast(null), 5000);
+  };
+
   const updateReadCount = (ticketId: string, count: number) => {
       localStorage.setItem(`nexus_read_count_${ticketId}`, count.toString());
       setLastReadCounts(prev => ({ ...prev, [ticketId]: count }));
@@ -236,6 +268,7 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
 
   const handleOpenTicket = (ticket: Ticket) => {
     setSelectedTicket(ticket);
+    setUpdateError(null);
     setEditForm({ 
         assignedAgentId: ticket.assignedAgentId || '',
         assignedWorkflowId: ticket.assignedWorkflowId || '',
@@ -250,13 +283,13 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
   const handleUpdateTicket = async () => {
     if (!selectedTicket) return;
     setIsUpdating(true);
+    setUpdateError(null);
     try {
         const updates: any = {
             assignedAgentId: editForm.assignedAgentId || undefined,
             assignedWorkflowId: editForm.assignedWorkflowId || undefined
         };
 
-        // Allow status/priority updates for internal tickets and materialized external tickets
         const isMaterializedExternal = !selectedTicket.internal && (selectedTicket.assignedAgentId || selectedTicket.assignedWorkflowId);
         if (selectedTicket.internal || isMaterializedExternal) {
            const statusObj = statuses.find(s => s.name === editForm.status);
@@ -268,11 +301,21 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
 
         const updatedTicket = await updateTicket(selectedTicket.id, updates);
         setTickets(prev => prev.map(t => t.id === selectedTicket.id ? updatedTicket : t));
-        setSelectedTicket(updatedTicket);
+
+        if (updatedTicket.assignedAgentId && updatedTicket.assignedAgentId !== selectedTicket.assignedAgentId) {
+            const assignedAgent = agents.find(a => a.id === updatedTicket.assignedAgentId);
+            if (assignedAgent) {
+                setSuccessToast(`${assignedAgent.name} assigned to ticket.`);
+                setTimeout(() => setSuccessToast(null), 5000);
+            }
+        }
+
+        setSelectedTicket(null);
+        setHighlightedTicketId(selectedTicket.id);
+        setTimeout(() => setHighlightedTicketId(null), 300);
     } catch (error) {
-        console.error("Failed to update ticket", error);
-        // Show error feedback to user
-        const errorMessage = error instanceof Error ? error.message : "Failed to update ticket. Please try again.";
+        const errorMessage = error instanceof Error ? error.message : 'Failed to update ticket. Please try again.';
+        setUpdateError(errorMessage);
     } finally {
         setIsUpdating(false);
     }
@@ -411,44 +454,6 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
     }
   };
 
-  const handleCreateTicket = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTicketData.title || !newTicketData.description) return;
-
-    setIsCreating(true);
-    try {
-        const createdTicket = await createTicket(workspaceId, {
-            title: newTicketData.title,
-            description: newTicketData.description,
-            statusId: newTicketData.statusId,
-            priorityId: newTicketData.priorityId,
-            assignedAgentId: newTicketData.assignedAgentId,
-            assignedWorkflowId: newTicketData.assignedWorkflowId
-        });
-        // Ensure comments array exists
-        if (!createdTicket.comments) {
-            createdTicket.comments = [];
-        }
-        setTickets(prev => [createdTicket, ...prev]);
-        onNavigateToTickets?.();
-        setIsCreateModalOpen(false);
-        const defaultStatus = statuses[0]?.id || '';
-        const defaultPriority = priorities.find(p => p.name === 'Medium')?.id || priorities[0]?.id || '';
-        setNewTicketData({ 
-            title: '', 
-            description: '', 
-            assignedAgentId: '', 
-            assignedWorkflowId: '',
-            priorityId: defaultPriority,
-            statusId: defaultStatus
-        });
-    } catch (error) {
-        console.error("Failed to create ticket", error);
-    } finally {
-        setIsCreating(false);
-    }
-  };
-
   const getSatisfactionColor = (score: number) => {
     if (score >= 80) return 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]';
     if (score >= 50) return 'bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.3)]';
@@ -483,6 +488,9 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
       {toastError && (
         <Toast message={toastError} type="error" onClose={() => setToastError(null)} />
       )}
+      {successToast && (
+        <Toast message={successToast} type="success" onClose={() => setSuccessToast(null)} />
+      )}
       {/* Header Actions */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <h2 className="text-xl md:text-2xl font-bold text-text">Tickets</h2>
@@ -495,7 +503,7 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
               />
            </div>
            <button 
-              onClick={() => setIsCreateModalOpen(true)}
+              onClick={() => navigate('new')}
               className="bg-primary hover:bg-primaryHover text-white px-4 py-2 rounded-md flex items-center gap-2 text-sm transition-all shadow-lg shadow-primary/20 shrink-0 active:scale-95"
             >
               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Ticket</span><span className="sm:hidden">New</span>
@@ -541,7 +549,8 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
                       return (
                         <tr 
                           key={ticket.id} 
-                          className="hover:bg-surfaceHighlight/50 transition-colors group cursor-pointer"
+                          data-ticket-id={ticket.id}
+                          className={`hover:bg-surfaceHighlight/50 transition-all group cursor-pointer ${highlightedTicketId === ticket.id ? 'animate-pulse ring-2 ring-primary/50 bg-primary/5 duration-500' : ''}`}
                           onDoubleClick={() => handleOpenTicket(ticket)}
                           title={ticket.title}
                         >
@@ -555,7 +564,13 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
                           </td>
                           <td className="p-4 text-text font-medium max-w-xs">
                             <div className="flex items-center justify-between gap-4">
-                              <span className="truncate">{ticket.title}</span>
+                              <Link
+                                to={`/workspaces/${workspaceId}/tickets/${ticket.id}`}
+                                className="truncate text-text hover:text-primary transition-colors font-medium"
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleOpenTicket(ticket); }}
+                              >
+                                {ticket.title}
+                              </Link>
                               {hasUnread && (
                                 <div className="flex items-center gap-1.5 px-2 py-1 bg-primary/20 text-primary rounded-md border border-primary/30 shrink-0 animate-pulse">
                                   <MessageSquare className="w-3 h-3" />
@@ -634,8 +649,9 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
                   return (
                     <div 
                       key={ticket.id}
+                      data-ticket-id={ticket.id}
                       onClick={() => handleOpenTicket(ticket)}
-                      className="p-4 space-y-3 active:bg-surfaceHighlight transition-colors"
+                      className={`p-4 space-y-3 active:bg-surfaceHighlight transition-all ${highlightedTicketId === ticket.id ? 'animate-pulse ring-2 ring-primary/50 bg-primary/5 duration-500' : ''}`}
                       title={ticket.title}
                     >
                       <div className="flex justify-between items-start">
@@ -673,7 +689,15 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
                            <div className={`${getProviderInfo(ticket.source).color} mt-0.5 shrink-0`} title={`Tracked in ${getProviderInfo(ticket.source).name}`}>
                              {getProviderInfo(ticket.source).icon}
                            </div>
-                           <h3 className="text-sm font-semibold text-text leading-snug line-clamp-2">{ticket.title}</h3>
+                           <h3 className="text-sm font-semibold text-text leading-snug line-clamp-2">
+                             <Link
+                               to={`/workspaces/${workspaceId}/tickets/${ticket.id}`}
+                               className="text-text hover:text-primary transition-colors"
+                               onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleOpenTicket(ticket); }}
+                             >
+                               {ticket.title}
+                             </Link>
+                           </h3>
                         </div>
                         {workflowName && (
                             <div className="flex items-center gap-1.5 ml-7 text-[10px] text-primary font-bold">
@@ -730,7 +754,7 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
       {selectedTicket && (
         <div 
           className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm animate-fade-in"
-          onClick={() => setSelectedTicket(null)}
+          onClick={() => { setUpdateError(null); setSelectedTicket(null); }}
         >
           <div 
             className="bg-surface border border-border w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden flex flex-col h-[95vh] sm:h-[90vh] animate-scale-in"
@@ -771,7 +795,7 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
                 </div>
               </div>
               <button 
-                onClick={() => setSelectedTicket(null)} 
+                onClick={() => { setUpdateError(null); setSelectedTicket(null); }} 
                 className="p-1.5 hover:bg-surfaceHighlight rounded-full text-textMuted hover:text-white transition-colors shrink-0"
               >
                 <X className="w-6 h-6" />
@@ -1040,6 +1064,12 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
               </div>
             </div>
             
+            {updateError && (
+              <div className="mx-4 mb-3">
+                <ModalErrorBanner error={updateError} />
+              </div>
+            )}
+
             {/* Modal Footer */}
             <div className="p-4 border-t border-border bg-surfaceHighlight/20 shrink-0">
                 {selectedTicket.internal && showConversionForm ? (
@@ -1110,7 +1140,7 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
                 ) : null}
                 
                 <div className="flex justify-between items-center">
-                    <button onClick={() => setSelectedTicket(null)} className="px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-textMuted hover:text-text transition-colors">Dismiss</button>
+                    <button onClick={() => { setUpdateError(null); setSelectedTicket(null); }} className="px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-textMuted hover:text-text transition-colors">Close</button>
                     <div className="flex items-center gap-3">
                         {selectedTicket.internal && (
                             <>
@@ -1140,7 +1170,7 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
                             disabled={isUpdating || isConverting}
                             className="px-8 py-2.5 bg-primary hover:bg-primaryHover text-white text-xs font-bold uppercase tracking-widest rounded-lg transition-all shadow-lg shadow-primary/20 flex items-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            {isUpdating ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Apply Updates'}
+                            {isUpdating ? <Loader2 className="w-4 h-4 animate-spin" /> : updateError ? 'Retry' : 'Save Changes'}
                           </button>
                         )}
                     </div>
@@ -1181,140 +1211,6 @@ const TicketList: React.FC<TicketListProps> = ({ workspaceId, onNavigateToTicket
         </div>
       )}
 
-      {/* Create Ticket Modal - Matched to provided mockup */}
-      {isCreateModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-          <div className="bg-surface border border-border w-full max-w-[480px] rounded-xl shadow-2xl overflow-hidden animate-scale-in flex flex-col max-h-[95vh]">
-                <div className="px-6 py-5 flex justify-between items-center bg-surface shrink-0">
-                    <h3 className="text-xl font-bold text-text">Create New Ticket</h3>
-                    <button onClick={() => setIsCreateModalOpen(false)} className="text-textMuted hover:text-text transition-colors">
-                        <X className="w-6 h-6" />
-                    </button>
-                </div>
-                
-                <form onSubmit={handleCreateTicket} className="px-6 pb-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
-                   <div className="space-y-1.5">
-                     <label className="text-[10px] font-bold text-textMuted uppercase tracking-wider">Title</label>
-                     <input 
-                       type="text" 
-                       value={newTicketData.title}
-                       onChange={(e) => setNewTicketData({...newTicketData, title: e.target.value})}
-                       placeholder="e.g., Fix login page styling"
-                       className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all shadow-sm placeholder:text-textMuted/40"
-                       autoFocus
-                       required
-                     />
-                   </div>
-
-                   <div className="space-y-1.5">
-                     <label className="text-[10px] font-bold text-textMuted uppercase tracking-wider">Description</label>
-                     <textarea 
-                       value={newTicketData.description}
-                       onChange={(e) => setNewTicketData({...newTicketData, description: e.target.value})}
-                       placeholder="Describe the issue in detail..."
-                       className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary min-h-[120px] resize-none shadow-sm placeholder:text-textMuted/40"
-                       required
-                     />
-                   </div>
-
-                   <div className="grid grid-cols-2 gap-4">
-                     <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-textMuted uppercase tracking-wider flex items-center gap-1.5">
-                            <Activity className="w-3.5 h-3.5" /> Status
-                        </label>
-                        <div className="relative">
-                            <select 
-                                value={newTicketData.statusId}
-                                onChange={(e) => setNewTicketData({...newTicketData, statusId: e.target.value})}
-                                className="w-full bg-background border border-border rounded-lg pl-3 pr-10 py-2.5 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary appearance-none transition-all shadow-sm"
-                            >
-                                {statuses.map(s => (
-                                    <option key={s.id} value={s.id}>{s.name}</option>
-                                ))}
-                            </select>
-                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-textMuted pointer-events-none" />
-                        </div>
-                     </div>
-                     <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-textMuted uppercase tracking-wider flex items-center gap-1.5">
-                            <Flag className="w-3.5 h-3.5" /> Priority
-                        </label>
-                        <div className="relative">
-                            <select 
-                                value={newTicketData.priorityId}
-                                onChange={(e) => setNewTicketData({...newTicketData, priorityId: e.target.value})}
-                                className="w-full bg-background border border-border rounded-lg pl-3 pr-10 py-2.5 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary appearance-none transition-all shadow-sm"
-                            >
-                                {priorities.map(p => (
-                                    <option key={p.id} value={p.id}>{p.name}</option>
-                                ))}
-                            </select>
-                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-textMuted pointer-events-none" />
-                        </div>
-                     </div>
-                   </div>
-
-                   <div className="grid grid-cols-2 gap-4">
-                     <div className="space-y-1.5">
-                       <label className="text-[10px] font-bold text-textMuted uppercase tracking-wider flex items-center gap-1.5">
-                            <Bot className="w-3.5 h-3.5" /> Assign Agent
-                       </label>
-                       <div className="relative">
-                            <select 
-                                value={newTicketData.assignedAgentId}
-                                onChange={(e) => setNewTicketData({...newTicketData, assignedAgentId: e.target.value})}
-                                className="w-full bg-background border border-border rounded-lg pl-3 pr-10 py-2.5 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary appearance-none transition-all shadow-sm"
-                            >
-                                <option value="">Unassigned</option>
-                                {agents.map(agent => (
-                                    <option key={agent.id} value={agent.id}>{agent.name}</option>
-                                ))}
-                            </select>
-                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-textMuted pointer-events-none" />
-                       </div>
-                     </div>
-                     <div className="space-y-1.5">
-                       <label className="text-[10px] font-bold text-textMuted uppercase tracking-wider flex items-center gap-1.5">
-                            <WorkflowIcon className="w-3.5 h-3.5" /> Assign Workflow
-                       </label>
-                       <div className="relative">
-                            <select 
-                                value={newTicketData.assignedWorkflowId}
-                                onChange={(e) => setNewTicketData({...newTicketData, assignedWorkflowId: e.target.value})}
-                                className="w-full bg-background border border-border rounded-lg pl-3 pr-10 py-2.5 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary appearance-none transition-all shadow-sm"
-                            >
-                                <option value="">No Workflow</option>
-                                {workflows.map(wf => (
-                                    <option key={wf.id} value={wf.id}>{wf.name}</option>
-                                ))}
-                            </select>
-                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-textMuted pointer-events-none" />
-                       </div>
-                     </div>
-                   </div>
-
-                   <div className="pt-4 flex gap-4">
-                      <button 
-                        type="button" 
-                        onClick={() => setIsCreateModalOpen(false)}
-                        className="flex-1 px-4 py-2.5 border border-border rounded-lg text-sm font-bold text-text hover:bg-surfaceHighlight transition-all active:scale-[0.98]"
-                        disabled={isCreating}
-                      >
-                        Cancel
-                      </button>
-                      <button 
-                        type="submit" 
-                        disabled={!newTicketData.title || !newTicketData.description || isCreating}
-                        className="flex-1 px-4 py-2.5 bg-primary hover:bg-primaryHover text-white rounded-lg text-sm font-bold transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 active:scale-[0.98]"
-                      >
-                        {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                        {isCreating ? 'Creating...' : 'Create Ticket'}
-                      </button>
-                   </div>
-                </form>
-            </div>
-          </div>
-        )}
       </div>
   );
 };

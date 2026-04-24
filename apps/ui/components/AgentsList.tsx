@@ -1,20 +1,22 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, X, Loader2, Bot, Brain, Sparkles, Pencil, AlertTriangle, Briefcase, Wrench, Search, CheckCircle2, Eye, FileText } from 'lucide-react';
+import ModalErrorBanner from './ModalErrorBanner';
+import { useParams, useNavigate } from 'react-router-dom';
 import { marked } from 'marked';
 import { Agent, Tool } from '../types';
-import { getAgents, createAgent, updateAgent, deleteAgent } from '../services/agentService';
+import { getAgents, updateAgent, deleteAgent } from '../services/agentService';
 import { getTools } from '../services/toolService';
 import { fetchWorkspaceModels } from '../services/workspaceService';
 import DeployMethodDialog from './DeployMethodDialog';
 import BuiltInCatalogue from './BuiltInCatalogue';
+import Toast from './Toast';
+import { useModalAction } from '../hooks/useModalAction';
 import LockedField from './agents/LockedField';
 import AgentCard from './agents/AgentCard';
 import { isBuiltInAgent } from '../utils/builtInAgentUtils';
 
-interface AgentsListProps {
-  workspaceId: string;
-}
+interface AgentsListProps {}
 
 // Markdown Preview Component
 const MarkdownPreview: React.FC<{ content: string; className?: string }> = ({ content, className = '' }) => {
@@ -47,7 +49,9 @@ const MarkdownPreview: React.FC<{ content: string; className?: string }> = ({ co
   }
 };
 
-const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
+const AgentsList: React.FC<AgentsListProps> = () => {
+  const { workspaceId } = useParams<{ workspaceId: string }>();
+  const navigate = useNavigate();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [availableTools, setAvailableTools] = useState<Tool[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -78,7 +82,7 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
 
   // Delete State
   const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
 
   // Action Configuration State
   const [configuringToolId, setConfiguringToolId] = useState<string | null>(null);
@@ -107,24 +111,6 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
       .then(models => setAvailableModels(models))
       .catch(() => setAvailableModels([]));
   }, [isModalOpen, workspaceId]);
-
-  const handleOpenCreate = () => {
-    setEditingId(null);
-    setInitialModel('Default');
-    setFormState({
-        name: '',
-        role: '',
-        currentCapability: '',
-        capabilities: [],
-        toolActionIds: [],
-        customInstructions: '',
-        projectPrinciples: '',
-        selectedModel: 'Default'
-    });
-    setToolSearch('');
-    setIsBuiltInEdit(false);
-    setIsModalOpen(true);
-  };
 
   const handleOpenEdit = (agent: Agent) => {
     const modelValue = agent.model ?? 'Default';
@@ -201,30 +187,17 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
 
       setIsSaving(true);
       try {
-          if (editingId) {
-              const modelChanged = formState.selectedModel !== initialModel;
-              const updated = await updateAgent(editingId, {
-                  name: formState.name,
-                  role: formState.role,
-                  capabilities: formState.capabilities,
-                  toolActionIds: formState.toolActionIds,
-                  customInstructions: isReviewAgent ? undefined : formState.customInstructions,
-                  projectPrinciples: isReviewAgent ? formState.projectPrinciples : undefined,
-                  ...(modelChanged && { model: formState.selectedModel === 'Default' ? null : formState.selectedModel })
-              });
-              setAgents(prev => prev.map(a => a.id === editingId ? { ...a, ...updated } : a));
-          } else {
-              const newAgent = await createAgent(workspaceId, {
-                  name: formState.name,
-                  role: formState.role,
-                  capabilities: formState.capabilities,
-                  toolActionIds: formState.toolActionIds,
-                  customInstructions: isReviewAgent ? undefined : formState.customInstructions,
-                  projectPrinciples: isReviewAgent ? formState.projectPrinciples : undefined,
-                  model: formState.selectedModel === 'Default' ? null : formState.selectedModel
-              });
-              setAgents(prev => [...prev, newAgent]);
-          }
+          const modelChanged = formState.selectedModel !== initialModel;
+          const updated = await updateAgent(editingId!, {
+              name: formState.name,
+              role: formState.role,
+              capabilities: formState.capabilities,
+              toolActionIds: formState.toolActionIds,
+              customInstructions: isReviewAgent ? undefined : formState.customInstructions,
+              projectPrinciples: isReviewAgent ? formState.projectPrinciples : undefined,
+              ...(modelChanged && { model: formState.selectedModel === 'Default' ? null : formState.selectedModel })
+          });
+          setAgents(prev => prev.map(a => a.id === editingId ? { ...a, ...updated } : a));
           setIsModalOpen(false);
       } catch (error) {
           console.error("Failed to save agent", error);
@@ -233,19 +206,23 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
       }
   };
 
-  const executeDelete = async () => {
-    if (!deleteConfirmationId) return;
-    
-    setIsDeleting(true);
-    try {
-        await deleteAgent(deleteConfirmationId);
-        setAgents(prev => prev.filter(a => a.id !== deleteConfirmationId));
-        setDeleteConfirmationId(null);
-    } catch (error) {
-        console.error("Failed to delete agent", error);
-    } finally {
-        setIsDeleting(false);
+  const { execute: executeDeleteAction, isLoading: isDeleting, error: deleteError, resetError: resetDeleteError } = useModalAction(
+    async () => {
+      if (!deleteConfirmationId) return;
+      await deleteAgent(deleteConfirmationId);
+    },
+    () => {
+      const deletedName = agents.find(a => a.id === deleteConfirmationId)?.name || 'Agent';
+      setAgents(prev => prev.filter(a => a.id !== deleteConfirmationId));
+      setDeleteConfirmationId(null);
+      setSuccessToast(`${deletedName} has been removed.`);
+      setTimeout(() => setSuccessToast(null), 5000);
     }
+  );
+
+  const cancelDelete = () => {
+    setDeleteConfirmationId(null);
+    resetDeleteError();
   };
 
   const cancelActionSelection = () => {
@@ -272,7 +249,7 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
     return (
       <BuiltInCatalogue
         workspaceId={workspaceId}
-        onViewAgent={() => {}}
+        onViewAgent={(agentId) => navigate(`/workspaces/${workspaceId}/agents/${agentId}/edit`)}
         onBack={() => setShowCatalogue(false)}
         onAgentDeployed={() => {
           setShowCatalogue(false);
@@ -329,7 +306,7 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
               openGuideId={openGuideId}
               onToggleGuide={(id) => setOpenGuideId(openGuideId === id ? null : id)}
               onDelete={setDeleteConfirmationId}
-              onEdit={handleOpenEdit}
+              onEdit={() => navigate(`/workspaces/${workspaceId}/agents/${agent.id}/edit`)}
             />
           ))}
         </div>
@@ -350,24 +327,31 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
                 Are you sure you want to remove <span className="font-semibold text-text">{agents.find(a => a.id === deleteConfirmationId)?.name}</span>? This action cannot be undone.
              </p>
 
+             <ModalErrorBanner error={deleteError} />
+
              <div className="flex gap-3 pt-2">
                 <button 
-                  onClick={() => setDeleteConfirmationId(null)}
+                  onClick={cancelDelete}
                   className="flex-1 px-4 py-2 border border-border rounded-md text-sm font-medium text-text hover:bg-surfaceHighlight transition-colors"
                   disabled={isDeleting}
                 >
                   Cancel
                 </button>
                 <button 
-                  onClick={executeDelete}
+                  onClick={executeDeleteAction}
                   className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 shadow-lg shadow-red-500/20"
                   disabled={isDeleting}
                 >
-                  {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Confirm'}
+                  {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : deleteError ? 'Retry' : 'Confirm'}
                 </button>
              </div>
           </div>
         </div>
+      )}
+
+      {/* Success Toast */}
+      {successToast && (
+        <Toast message={successToast} type="success" onClose={() => setSuccessToast(null)} />
       )}
 
       {/* Main Edit/Deploy Modal */}
@@ -378,12 +362,12 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
             <div className="px-4 sm:px-6 py-4 border-b border-border flex justify-between items-center bg-surfaceHighlight/50 shrink-0">
               <div className="flex items-center gap-3">
                  <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center shrink-0">
-                    {editingId ? <Pencil className="w-5 h-5 text-primary" /> : <Bot className="w-6 h-6 text-primary" />}
+                    <Pencil className="w-5 h-5 text-primary" />
                  </div>
                  <div className="min-w-0">
                     <div className="flex items-center gap-0">
                         <h3 className="text-base sm:text-lg font-bold text-text leading-tight truncate">
-                            {editingId ? 'Edit Agent Authorization' : 'Deploy New Agent'}
+                            {'Edit Agent Authorization'}
                         </h3>
                         {isBuiltInEdit && (
                             <span className="text-[10px] bg-primary/10 border border-primary/20 text-primary px-2 py-0.5 rounded flex items-center gap-1 ml-2">
@@ -504,7 +488,7 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
                                 onChange={(e) => setFormState({...formState, name: e.target.value})}
                                 placeholder="e.g., QA Bot Beta"
                                 className="w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-text focus:outline-none focus:border-primary shadow-sm"
-                                autoFocus={!editingId}
+                                autoFocus
                                 />
                             </div>
 
@@ -642,7 +626,7 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
                         }
                         className="flex-1 sm:flex-none px-6 py-2.5 bg-primary hover:bg-primaryHover text-white rounded-md text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-primary/20 active:scale-95"
                     >
-                        {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : (editingId ? 'Save Changes' : 'Authorize & Deploy')}
+                        {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Changes'}
                     </button>
                 </div>
             </div>
@@ -838,7 +822,7 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
         }}
         onSelectScratch={() => {
           setIsDeployDialogOpen(false);
-          handleOpenCreate();
+          navigate('new');
         }}
         onSelectBuiltIn={() => {
           setIsDeployDialogOpen(false);

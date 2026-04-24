@@ -128,20 +128,24 @@ public class TicketBuilder
                 _statusId ??= Guid.NewGuid();
             }
 
-            return Ticket.Create(
+            var ticket = Ticket.Create(
                 _workspaceId,
                 _title,
                 _description,
                 _priorityId,
                 _statusId,
                 _isInternal);
+
+            ApplyId(ticket);
+            ApplyAssignments(ticket);
+            return ticket;
         }
 
         // For external tickets
         if (_integrationId == null || _externalTicketId == null)
             throw new InvalidOperationException("External tickets require IntegrationId and ExternalTicketId.");
 
-        return Ticket.MaterializeFromExternal(
+        var externalTicket = Ticket.MaterializeFromExternal(
             _workspaceId,
             _integrationId.Value,
             _externalTicketId,
@@ -151,6 +155,26 @@ public class TicketBuilder
             _priorityId,
             _assignedAgentId,
             _assignedWorkflowId);
+
+        ApplyId(externalTicket);
+        return externalTicket;
+    }
+
+    private void ApplyId(Ticket ticket)
+    {
+        var idProperty = typeof(Ticket).GetProperty(nameof(Ticket.Id));
+        idProperty!.SetValue(ticket, _id);
+    }
+
+    private void ApplyAssignments(Ticket ticket)
+    {
+        if (_assignedAgentId.HasValue || _assignedWorkflowId.HasValue)
+        {
+            var agentProp = typeof(Ticket).GetProperty(nameof(Ticket.AssignedAgentId));
+            var workflowProp = typeof(Ticket).GetProperty(nameof(Ticket.AssignedWorkflowId));
+            agentProp!.SetValue(ticket, _assignedAgentId);
+            workflowProp!.SetValue(ticket, _assignedWorkflowId);
+        }
     }
 
     /// <summary>

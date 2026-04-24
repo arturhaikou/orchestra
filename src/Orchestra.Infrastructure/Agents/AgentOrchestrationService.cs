@@ -3,6 +3,7 @@ using Orchestra.Application.Agents.DTOs;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Integrations.DTOs;
+using Orchestra.Application.Tickets.DTOs;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
 
@@ -99,6 +100,14 @@ public class AgentOrchestrationService : IAgentOrchestrationService
             ticket.UpdateStatus(InProgressStatusId);
             await _ticketDataAccess.UpdateTicketAsync(ticket, cancellationToken);
 
+            await _notificationService.NotifyTicketStatusChangedAsync(
+                new TicketStatusChangedNotification(
+                    ticket.WorkspaceId,
+                    ticket.Id,
+                    "In Progress",
+                    "To Do"),
+                cancellationToken);
+
             // 5. Build context prompt with integrations (Phase 1: ticket, Phase 2: integrations, Phase 3: project principles)
             var contextPrompt = await _agentContextBuilder.BuildAgentContextWithIntegrationsAsync(
                 ticket,
@@ -133,6 +142,14 @@ public class AgentOrchestrationService : IAgentOrchestrationService
             ticket.UpdateStatus(CompletedStatusId);
             await _ticketDataAccess.UpdateTicketAsync(ticket, cancellationToken);
 
+            await _notificationService.NotifyTicketStatusChangedAsync(
+                new TicketStatusChangedNotification(
+                    ticket.WorkspaceId,
+                    ticket.Id,
+                    "Completed",
+                    "In Progress"),
+                cancellationToken);
+
             // 8. Log completion
             _logger.LogInformation(
                 "Agent {AgentName} completed execution on ticket {TicketId}",
@@ -166,6 +183,14 @@ public class AgentOrchestrationService : IAgentOrchestrationService
                     // Revert status to To Do for retry
                     ticket.UpdateStatus(ToDoStatusId);
                     await _ticketDataAccess.UpdateTicketAsync(ticket, cancellationToken);
+
+                    await _notificationService.NotifyTicketStatusChangedAsync(
+                        new TicketStatusChangedNotification(
+                            ticket.WorkspaceId,
+                            ticket.Id,
+                            "To Do",
+                            "In Progress"),
+                        cancellationToken);
                 }
                 catch (Exception innerEx)
                 {

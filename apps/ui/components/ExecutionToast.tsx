@@ -20,6 +20,8 @@ const ExecutionToast: React.FC<ExecutionToastProps> = ({ toast, onDismiss, onVie
   const progressBarColor = isSuccess ? 'bg-emerald-500' : 'bg-red-500';
   const avatarBg = isSuccess ? 'bg-emerald-500/20' : 'bg-red-500/20';
   const avatarText = isSuccess ? 'text-emerald-400' : 'text-red-400';
+  const ariaLive = isSuccess ? 'polite' : 'assertive';
+  const ariaRole = isSuccess ? 'status' : 'alert';
 
   const handleOpenReview = () => {
     if (isValidReviewUrl(toast.reviewUrl)) {
@@ -34,8 +36,8 @@ const ExecutionToast: React.FC<ExecutionToastProps> = ({ toast, onDismiss, onVie
 
   return (
     <div
-      role="alert"
-      aria-live="polite"
+      role={ariaRole}
+      aria-live={ariaLive}
       className={`bg-surface border ${borderColor} rounded-lg shadow-2xl overflow-hidden p-4 space-y-2 animate-scale-in`}
     >
       <div className="flex items-center gap-3">

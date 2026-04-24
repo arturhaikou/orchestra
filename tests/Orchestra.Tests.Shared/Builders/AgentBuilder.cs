@@ -125,7 +125,7 @@ public class AgentBuilder
     /// </summary>
     public Agent Build()
     {
-        return Agent.Create(
+        var agent = Agent.Create(
             workspaceId: _workspaceId,
             name: _name,
             role: _role,
@@ -135,6 +135,10 @@ public class AgentBuilder
             model: _model,
             templateIdentifier: _templateIdentifier,
             templateVersion: _templateVersion);
+
+        typeof(Agent).GetProperty(nameof(Agent.Id))!.SetValue(agent, _id);
+
+        return agent;
     }
 
     /// <summary>

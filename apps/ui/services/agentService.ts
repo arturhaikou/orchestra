@@ -28,6 +28,21 @@ export const getAgents = async (workspaceId: string): Promise<Agent[]> => {
   }
 };
 
+export const getAgent = async (agentId: string): Promise<Agent> => {
+  const response = await fetch(`${API_BASE_URL}/${agentId}`, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error('Agent not found');
+    }
+    throw new Error(`Backend error: ${response.statusText}`);
+  }
+
+  return await response.json();
+};
+
 export const getAgentTemplates = async (workspaceId: string): Promise<AgentTemplateDto[]> => {
   try {
     const response = await fetch(`${API_BASE_URL}/templates?workspaceId=${encodeURIComponent(workspaceId)}`, {

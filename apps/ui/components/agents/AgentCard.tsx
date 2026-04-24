@@ -95,7 +95,7 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, openGuideId, onToggleGuide
         <IntegrationWarningBadge integrationStatus={agent.integrationStatus} />
 
         {builtIn && (
-            <GuidePanel isOpen={openGuideId === agent.id} content={agent.usageGuide} />
+            <GuidePanel isOpen={openGuideId === agent.id} content={agent.guide} />
         )}
         
         <div className="flex-1 space-y-4">
@@ -113,7 +113,7 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, openGuideId, onToggleGuide
             <button 
                 onClick={() => onDelete(agent.id)}
                 className="text-textMuted hover:text-red-500 transition-colors p-1.5 rounded hover:bg-surfaceHighlight"
-                title="Remove Agent"
+                title="Delete Agent"
             >
                 <Trash2 className="w-4 h-4" />
             </button>

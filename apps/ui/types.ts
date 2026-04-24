@@ -51,6 +51,8 @@ export interface Ticket {
   assignedAgentId?: string;
   assignedWorkflowId?: string;
   integrationId?: string; // Link to the integration that sourced this ticket
+  externalTicketId?: string;
+  externalUrl?: string;
   comments: Comment[];
   summary?: string; // AI Generated
 }
@@ -107,7 +109,7 @@ export interface Agent {
   templateId?: string | null;
   templateVersion?: number | null;
   isBuiltIn?: boolean;
-  usageGuide?: string | null;
+  guide?: string | null;
   integrationStatus?: IntegrationStatus | null;
 }
 
@@ -257,6 +259,13 @@ export interface AgentExecutionCompletedEvent {
   ticketTitle: string;
   status: 'success' | 'failed';
   reviewUrl: string | null;
+}
+
+export interface TicketStatusChangedEvent {
+  workspaceId: string;
+  ticketId: string;
+  newStatus: string;
+  previousStatus: string | null;
 }
 
 export type ConnectionStatus = 'connected' | 'reconnecting' | 'disconnected';

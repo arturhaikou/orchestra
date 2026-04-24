@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { 
   Layers, 
   Ticket as TicketIcon, 
@@ -21,50 +21,49 @@ import { Workspace, User } from '../types';
 import { getUser } from '../services/authService';
 
 interface SidebarProps {
-  activeView: string;
-  setActiveView: (view: string) => void;
   workspaces: Workspace[];
   activeWorkspaceId: string;
   onSwitchWorkspace: (id: string) => void;
   onDeleteWorkspace: (ws: Workspace) => void;
-  onEditProfile: () => void;
   onLogout: () => void;
   isOpen: boolean;
   onClose: () => void;
 }
 
-const SidebarItem: React.FC<{ 
-  icon: React.FC<any>; 
-  label: string; 
-  active: boolean; 
-  onClick: () => void 
-}> = ({ icon: Icon, label, active, onClick }) => (
-  <button 
+const SidebarItem: React.FC<{
+  icon: React.FC<any>;
+  label: string;
+  to: string;
+  active: boolean;
+  onClick?: () => void;
+}> = ({ icon: Icon, label, to, active, onClick }) => (
+  <Link
+    to={to}
     onClick={onClick}
     className={`w-full flex items-center gap-3 px-4 py-3 rounded-md transition-all duration-200 group
-      ${active 
-        ? 'bg-primary/10 text-primary border-r-2 border-primary' 
+      ${active
+        ? 'bg-primary/10 text-primary border-r-2 border-primary'
         : 'text-textMuted hover:bg-surfaceHighlight hover:text-text'
       }`}
   >
     <Icon className={`w-5 h-5 ${active ? 'text-primary' : 'text-textMuted group-hover:text-text'}`} />
     <span className="font-medium text-sm">{label}</span>
-  </button>
+  </Link>
 );
 
 const Sidebar: React.FC<SidebarProps> = ({ 
-  activeView, 
-  setActiveView, 
   workspaces, 
   activeWorkspaceId, 
   onSwitchWorkspace, 
   onDeleteWorkspace,
-  onEditProfile,
   onLogout,
   isOpen,
   onClose
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const isActive = (view: string) => location.pathname.endsWith(`/${view}`);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
@@ -186,32 +185,33 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-          <SidebarItem icon={GitBranch} label="Integrations" active={activeView === 'integrations'} onClick={() => { setActiveView('integrations'); onClose(); }} />
-          <SidebarItem icon={TicketIcon} label="Tickets" active={activeView === 'tickets'} onClick={() => { setActiveView('tickets'); onClose(); }} />
-          <SidebarItem icon={Bot} label="Agents" active={activeView === 'agents'} onClick={() => { setActiveView('agents'); onClose(); }} />
-          {/* <SidebarItem icon={Layers} label="Workflows" active={activeView === 'workflows'} onClick={() => { setActiveView('workflows'); onClose(); }} /> */}
+          <SidebarItem icon={GitBranch} label="Integrations" to={`/workspaces/${activeWorkspaceId}/integrations`} active={isActive('integrations')} onClick={onClose} />
+          <SidebarItem icon={TicketIcon} label="Tickets" to={`/workspaces/${activeWorkspaceId}/tickets`} active={isActive('tickets')} onClick={onClose} />
+          <SidebarItem icon={Bot} label="Agents" to={`/workspaces/${activeWorkspaceId}/agents`} active={isActive('agents')} onClick={onClose} />
         </nav>
 
         <div className="p-4 border-t border-border">
           <div className="flex items-center gap-3 px-2 py-2 rounded-md hover:bg-surfaceHighlight cursor-default transition-colors group">
-            <div 
+            <Link 
+                to={`/workspaces/${activeWorkspaceId}/profile`}
                 className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-purple-500 flex items-center justify-center text-[10px] font-bold text-white shadow-lg cursor-pointer"
-                onClick={onEditProfile}
+                onClick={onClose}
             >
               {getInitials(currentUser?.name || 'User')}
-            </div>
+            </Link>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-text truncate">{currentUser?.name}</p>
               <p className="text-[10px] text-textMuted truncate">Account Settings</p>
             </div>
             <div className="flex gap-1">
-               <button 
-                onClick={onEditProfile}
+               <Link 
+                to={`/workspaces/${activeWorkspaceId}/profile`}
+                onClick={onClose}
                 className="text-textMuted hover:text-primary transition-colors p-1" 
                 title="Edit Profile"
                >
                   <Pencil className="w-4 h-4" />
-               </button>
+               </Link>
                <button onClick={onLogout} className="text-textMuted hover:text-red-400 transition-colors p-1" title="Log Out">
                   <LogOut className="w-4 h-4" />
                </button>

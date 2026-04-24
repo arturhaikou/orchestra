@@ -134,7 +134,6 @@ export const changePassword = async (currentPassword: string, newPassword: strin
 export const logout = () => {
   localStorage.removeItem('nexus_token');
   localStorage.removeItem('nexus_user');
-  localStorage.removeItem('nexus_active_view');
   localStorage.removeItem('nexus_active_workspace');
 };
 

@@ -31,6 +31,7 @@ public class TicketCommandServiceTests : ServiceTestFixture<TicketCommandService
     private readonly IUserDataAccess _userDataAccess = Substitute.For<IUserDataAccess>();
     private readonly ITicketMaterializationService _materializationService = Substitute.For<ITicketMaterializationService>();
     private readonly ITicketQueryService _queryService = Substitute.For<ITicketQueryService>();
+    private readonly INotificationService _notificationService = Substitute.For<INotificationService>();
     private readonly ILogger<TicketCommandService> _logger;
     private readonly TicketCommandService _sut;
 
@@ -48,7 +49,8 @@ public class TicketCommandServiceTests : ServiceTestFixture<TicketCommandService
             _userDataAccess,
             _materializationService,
             _queryService,
-            _logger);
+            _logger,
+            _notificationService);
     }
 
     [Fact]
@@ -487,5 +489,125 @@ public class TicketCommandServiceTests : ServiceTestFixture<TicketCommandService
         // Act & Assert
         await Assert.ThrowsAsync<InvalidTicketOperationException>(() =>
             _sut.UpdateTicketAsync(compositeId, userId, request, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task UpdateTicketAsync_DispatchesStatusChangeNotification_WhenStatusChanged()
+    {
+        var userId = Guid.NewGuid();
+        var ticketId = Guid.NewGuid();
+        var previousStatusId = Guid.NewGuid();
+        var newStatusId = Guid.NewGuid();
+
+        var ticket = new TicketBuilder()
+            .WithId(ticketId)
+            .WithStatusId(previousStatusId)
+            .Build();
+
+        var previousStatus = new TicketStatus { Id = previousStatusId, Name = "To Do", Color = "#ccc" };
+        var newStatus = new TicketStatus { Id = newStatusId, Name = "In Progress", Color = "#00f" };
+        var request = new UpdateTicketRequest(
+            StatusId: newStatusId,
+            PriorityId: null,
+            AssignedAgentId: null,
+            AssignedWorkflowId: null,
+            Description: null);
+
+        _ticketIdParsingService.Parse(ticketId.ToString())
+            .Returns(new TicketIdParseResult(TicketIdType.Internal, ticketId, null, null));
+        _ticketDataAccess.GetTicketByIdAsync(ticketId, Arg.Any<CancellationToken>())
+            .Returns(ticket);
+        _workspaceAuthorizationService.IsMemberAsync(userId, ticket.WorkspaceId, Arg.Any<CancellationToken>())
+            .Returns(true);
+        _ticketDataAccess.GetStatusByIdAsync(previousStatusId, Arg.Any<CancellationToken>())
+            .Returns(previousStatus);
+        _ticketDataAccess.GetStatusByIdAsync(newStatusId, Arg.Any<CancellationToken>())
+            .Returns(newStatus);
+        _ticketDataAccess.UpdateTicketAsync(Arg.Any<Ticket>(), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        _queryService.GetTicketByIdAsync(ticketId.ToString(), userId, Arg.Any<CancellationToken>())
+            .Returns(new TicketDtoBuilder().Build());
+
+        await _sut.UpdateTicketAsync(ticketId.ToString(), userId, request);
+
+        await _notificationService.Received(1).NotifyTicketStatusChangedAsync(
+            Arg.Is<TicketStatusChangedNotification>(n =>
+                n.TicketId == ticketId &&
+                n.NewStatus == "In Progress" &&
+                n.PreviousStatus == "To Do" &&
+                n.WorkspaceId == ticket.WorkspaceId),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task UpdateTicketAsync_DoesNotDispatchNotification_WhenStatusUnchanged()
+    {
+        var userId = Guid.NewGuid();
+        var ticketId = Guid.NewGuid();
+        var statusId = Guid.NewGuid();
+
+        var ticket = new TicketBuilder()
+            .WithId(ticketId)
+            .WithStatusId(statusId)
+            .Build();
+
+        var request = new UpdateTicketRequest(
+            StatusId: statusId,
+            PriorityId: null,
+            AssignedAgentId: null,
+            AssignedWorkflowId: null,
+            Description: null);
+
+        _ticketIdParsingService.Parse(ticketId.ToString())
+            .Returns(new TicketIdParseResult(TicketIdType.Internal, ticketId, null, null));
+        _ticketDataAccess.GetTicketByIdAsync(ticketId, Arg.Any<CancellationToken>())
+            .Returns(ticket);
+        _workspaceAuthorizationService.IsMemberAsync(userId, ticket.WorkspaceId, Arg.Any<CancellationToken>())
+            .Returns(true);
+        _ticketDataAccess.UpdateTicketAsync(Arg.Any<Ticket>(), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        _queryService.GetTicketByIdAsync(ticketId.ToString(), userId, Arg.Any<CancellationToken>())
+            .Returns(new TicketDtoBuilder().Build());
+
+        await _sut.UpdateTicketAsync(ticketId.ToString(), userId, request);
+
+        await _notificationService.DidNotReceive().NotifyTicketStatusChangedAsync(
+            Arg.Any<TicketStatusChangedNotification>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task UpdateTicketAsync_DoesNotDispatchNotification_WhenNoStatusInRequest()
+    {
+        var userId = Guid.NewGuid();
+        var ticketId = Guid.NewGuid();
+
+        var ticket = new TicketBuilder()
+            .WithId(ticketId)
+            .Build();
+
+        var request = new UpdateTicketRequest(
+            StatusId: null,
+            PriorityId: null,
+            AssignedAgentId: null,
+            AssignedWorkflowId: null,
+            Description: "Updated description");
+
+        _ticketIdParsingService.Parse(ticketId.ToString())
+            .Returns(new TicketIdParseResult(TicketIdType.Internal, ticketId, null, null));
+        _ticketDataAccess.GetTicketByIdAsync(ticketId, Arg.Any<CancellationToken>())
+            .Returns(ticket);
+        _workspaceAuthorizationService.IsMemberAsync(userId, ticket.WorkspaceId, Arg.Any<CancellationToken>())
+            .Returns(true);
+        _ticketDataAccess.UpdateTicketAsync(Arg.Any<Ticket>(), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        _queryService.GetTicketByIdAsync(ticketId.ToString(), userId, Arg.Any<CancellationToken>())
+            .Returns(new TicketDtoBuilder().Build());
+
+        await _sut.UpdateTicketAsync(ticketId.ToString(), userId, request);
+
+        await _notificationService.DidNotReceive().NotifyTicketStatusChangedAsync(
+            Arg.Any<TicketStatusChangedNotification>(),
+            Arg.Any<CancellationToken>());
     }
 }
