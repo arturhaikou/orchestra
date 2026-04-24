@@ -87,6 +87,40 @@ public class AgentsController : ControllerBase
         }
     }
 
+    [HttpGet("templates")]
+    [ProducesResponseType(typeof(List<AgentTemplateDto>), 200)]
+    [ProducesResponseType(typeof(ErrorResponse), 400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(403)]
+    [ProducesResponseType(typeof(ErrorResponse), 500)]
+    public async Task<IActionResult> GetAgentTemplates(
+        [FromQuery] Guid workspaceId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var validationResult = ValidateAndExtractUserId(out var userId);
+            if (validationResult != null)
+                return validationResult;
+
+            if (workspaceId == Guid.Empty)
+                return BadRequest(new ErrorResponse("Workspace ID is required"));
+
+            var templates = await _agentService.GetAgentTemplatesAsync(userId, workspaceId, cancellationToken);
+            return Ok(templates);
+        }
+        catch (UnauthorizedWorkspaceAccessException ex)
+        {
+            _logger.LogWarning(ex, "User attempted to access workspace {WorkspaceId} templates without authorization", workspaceId);
+            return StatusCode(403, new ErrorResponse(ex.Message));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving agent templates for workspace {WorkspaceId}", workspaceId);
+            return StatusCode(500, new ErrorResponse("An unexpected error occurred"));
+        }
+    }
+
     /// <summary>
     /// Get agent by ID
     /// </summary>
@@ -167,6 +201,53 @@ public class AgentsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating agent in workspace {WorkspaceId}", request.WorkspaceId);
+            return StatusCode(500, new ErrorResponse("An unexpected error occurred"));
+        }
+    }
+
+    [HttpPost("from-template")]
+    [ProducesResponseType(typeof(AgentDto), 201)]
+    [ProducesResponseType(typeof(ErrorResponse), 400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(typeof(ErrorResponse), 403)]
+    [ProducesResponseType(typeof(ErrorResponse), 404)]
+    [ProducesResponseType(typeof(ErrorResponse), 409)]
+    public async Task<IActionResult> CreateAgentFromTemplate(
+        [FromBody] CreateAgentFromTemplateRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var validationResult = ValidateAndExtractUserId(out var userId);
+            if (validationResult != null)
+                return validationResult;
+
+            var agent = await _agentService.CreateFromTemplateAsync(userId, request, cancellationToken);
+            return StatusCode(201, agent);
+        }
+        catch (UnauthorizedWorkspaceAccessException)
+        {
+            return StatusCode(403, new ErrorResponse("Access denied."));
+        }
+        catch (TemplateNotFoundException ex)
+        {
+            return NotFound(new ErrorResponse(ex.Message));
+        }
+        catch (IntegrationRequiredException ex)
+        {
+            return BadRequest(new ErrorResponse(ex.Message));
+        }
+        catch (TemplateAlreadyDeployedException ex)
+        {
+            return Conflict(new ErrorResponse(ex.Message));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new ErrorResponse(ex.Message));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating agent from template");
             return StatusCode(500, new ErrorResponse("An unexpected error occurred"));
         }
     }

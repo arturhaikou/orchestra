@@ -17,5 +17,9 @@ public record AgentDto(
     string AvatarUrl,
     string? CustomInstructions,
     string? ProjectPrinciples,
-    string? Model
+    string? Model,
+    string? TemplateIdentifier,
+    int? TemplateVersion,
+    bool IsBuiltIn,
+    string? Guide = null
 );

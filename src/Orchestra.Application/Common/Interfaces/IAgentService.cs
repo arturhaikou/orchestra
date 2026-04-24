@@ -63,4 +63,8 @@ public interface IAgentService
     /// <exception cref="AgentNotFoundException">Thrown when agent is not found.</exception>
     /// <exception cref="UnauthorizedWorkspaceAccessException">Thrown when user lacks access to agent's workspace.</exception>
     Task DeleteAgentAsync(Guid userId, Guid agentId, CancellationToken cancellationToken = default);
+
+    Task<List<AgentTemplateDto>> GetAgentTemplatesAsync(Guid userId, Guid workspaceId, CancellationToken cancellationToken = default);
+
+    Task<AgentDto> CreateFromTemplateAsync(Guid userId, CreateAgentFromTemplateRequest request, CancellationToken cancellationToken = default);
 }

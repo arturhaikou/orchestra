@@ -9,6 +9,7 @@ using Orchestra.Application.Integrations.Services;
 using Orchestra.Application.Workspaces.Services;
 using Orchestra.Application.Tickets.Services;
 using Orchestra.Application.Agents.Services;
+using Orchestra.Application.Agents.Templates;
 using Orchestra.Application.Tools.Services;
 using Orchestra.Domain.Interfaces;
 using Orchestra.Infrastructure.CodeReview;
@@ -41,7 +42,9 @@ public static class Extensions
     public static IHostApplicationBuilder AddInfrastructureServices(this IHostApplicationBuilder builder)
     {
         builder.AddNpgsqlDbContext<AppDbContext>("Orchestra");
-        builder.Services.AddDataProtection();
+        builder.Services.AddDataProtection()
+            .SetApplicationName("Orchestra")
+            .PersistKeysToDbContext<AppDbContext>();
         
         // Register a no-op hub context only if SignalR infrastructure isn't present.
         // The API will call AddSignalR() which registers the real hub context.
@@ -78,6 +81,9 @@ public static class Extensions
         builder.Services.AddScoped<IWorkspaceAuthorizationService, WorkspaceAuthorizationService>();
         builder.Services.AddScoped<IAgentService, AgentService>();
         builder.Services.AddSingleton<ICredentialEncryptionService, CredentialEncryptionService>();
+        builder.Services.AddSingleton<IBuiltInAgentTemplateRegistry, BuiltInAgentTemplateRegistry>();
+        builder.Services.AddSingleton<ITemplateRegistry, TemplateRegistry>();
+        builder.Services.AddScoped<ITemplateAvailabilityResolver, TemplateAvailabilityResolver>();
         builder.Services.AddScoped<IIntegrationDataAccess, IntegrationDataAccess>();
         builder.Services.AddScoped<IIntegrationResolver, IntegrationResolver>();
         builder.Services.AddScoped<IIntegrationService, IntegrationService>();
@@ -179,6 +185,7 @@ public static class Extensions
         builder.Services.AddScoped<IAgentOrchestrationService, AgentOrchestrationService>();
         builder.Services.AddScoped<IAgentContextBuilder, AgentContextBuilder>();
         builder.Services.AddScoped<ITicketAgentExecutionDataAccess, TicketAgentExecutionDataAccess>();
+        builder.Services.AddScoped<INotificationService, NotificationService>();
 
         return builder;
     }

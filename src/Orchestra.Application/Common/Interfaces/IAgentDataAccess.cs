@@ -34,6 +34,16 @@ public interface IAgentDataAccess
     Task<bool> ExistsAsync(Guid agentId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Finds an agent in a workspace by its template identifier.
+    /// Used for duplicate detection — ensures at most one agent per template per workspace.
+    /// </summary>
+    /// <param name="workspaceId">The workspace identifier.</param>
+    /// <param name="templateId">The template identifier string.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>The agent if found; otherwise, null.</returns>
+    Task<Agent?> GetByWorkspaceAndTemplateIdAsync(Guid workspaceId, string templateId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Adds a new agent to the data store.
     /// </summary>
     /// <param name="agent">The agent to add.</param>
@@ -53,4 +63,19 @@ public interface IAgentDataAccess
     /// <param name="agentId">The unique identifier of the agent to delete.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     Task DeleteAsync(Guid agentId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves agents that were deployed from templates in the specified workspace.
+    /// Returns only agents where TemplateIdentifier is not null.
+    /// </summary>
+    /// <param name="workspaceId">The workspace ID.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>Agents with non-null TemplateIdentifier in the workspace.</returns>
+    Task<List<Agent>> GetTemplateAgentsByWorkspaceIdAsync(
+        Guid workspaceId,
+        CancellationToken cancellationToken = default);
+
+    Task<Dictionary<string, Guid>> GetDeployedTemplateAgentsAsync(
+        Guid workspaceId,
+        CancellationToken cancellationToken = default);
 }

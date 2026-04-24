@@ -1,9 +1,10 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Orchestra.Domain.Entities;
 
 namespace Orchestra.Infrastructure.Persistence
 {
-    public class AppDbContext : DbContext
+    public class AppDbContext : DbContext, IDataProtectionKeyContext
     {
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
@@ -32,6 +33,8 @@ namespace Orchestra.Infrastructure.Persistence
         public DbSet<ToolAction> ToolActions { get; set; } = null!;
 
         public DbSet<AIProviderConfiguration> AIProviderConfigurations { get; set; } = null!;
+
+        public DbSet<DataProtectionKey> DataProtectionKeys { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

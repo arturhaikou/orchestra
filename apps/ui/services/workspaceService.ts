@@ -195,7 +195,7 @@ export const deleteWorkspace = async (id: string): Promise<void> => {
 export const fetchWorkspaceModels = async (workspaceId: string): Promise<string[]> => {
   try {
     const response = await fetch(
-      `${API_BASE_URL}/${workspaceId}/ai/models`,
+      `${API_BASE_URL}/${workspaceId}/provider/models`,
       {
         method: 'GET',
         headers: getAuthHeaders(),

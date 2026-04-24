@@ -1,7 +1,9 @@
 using Orchestra.Application.Agents.DTOs;
+using Orchestra.Application.Agents.Templates;
 using Orchestra.Application.Common.Exceptions;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Domain.Entities;
+using Orchestra.Domain.Enums;
 
 namespace Orchestra.Application.Agents.Services;
 
@@ -11,17 +13,29 @@ public class AgentService : IAgentService
     private readonly IAgentToolActionDataAccess _agentToolActionDataAccess;
     private readonly IWorkspaceAuthorizationService _workspaceAuthorizationService;
     private readonly IToolValidationService _toolValidationService;
+    private readonly IBuiltInAgentTemplateRegistry _templateRegistry;
+    private readonly ITemplateAvailabilityResolver _availabilityResolver;
+    private readonly IToolActionDataAccess _toolActionDataAccess;
+    private readonly IIntegrationDataAccess _integrationDataAccess;
 
     public AgentService(
         IAgentDataAccess agentDataAccess,
         IAgentToolActionDataAccess agentToolActionDataAccess,
         IWorkspaceAuthorizationService workspaceAuthorizationService,
-        IToolValidationService toolValidationService)
+        IToolValidationService toolValidationService,
+        IBuiltInAgentTemplateRegistry templateRegistry,
+        ITemplateAvailabilityResolver availabilityResolver,
+        IToolActionDataAccess toolActionDataAccess,
+        IIntegrationDataAccess integrationDataAccess)
     {
         _agentDataAccess = agentDataAccess ?? throw new ArgumentNullException(nameof(agentDataAccess));
         _agentToolActionDataAccess = agentToolActionDataAccess ?? throw new ArgumentNullException(nameof(agentToolActionDataAccess));
         _workspaceAuthorizationService = workspaceAuthorizationService ?? throw new ArgumentNullException(nameof(workspaceAuthorizationService));
         _toolValidationService = toolValidationService ?? throw new ArgumentNullException(nameof(toolValidationService));
+        _templateRegistry = templateRegistry ?? throw new ArgumentNullException(nameof(templateRegistry));
+        _availabilityResolver = availabilityResolver ?? throw new ArgumentNullException(nameof(availabilityResolver));
+        _toolActionDataAccess = toolActionDataAccess ?? throw new ArgumentNullException(nameof(toolActionDataAccess));
+        _integrationDataAccess = integrationDataAccess ?? throw new ArgumentNullException(nameof(integrationDataAccess));
     }
 
     public async Task<AgentDto> CreateAgentAsync(Guid userId, CreateAgentRequest request, CancellationToken cancellationToken = default)
@@ -113,11 +127,16 @@ public class AgentService : IAgentService
             workspaceId, 
             cancellationToken);
 
-        // 3. Map to DTOs and return (with tool actions)
+        // 3. Pre-resolve provider label once for the entire workspace
+        var hasTemplateAgents = agents.Any(a => a.TemplateIdentifier is not null);
+        string? preResolvedLabel = null;
+        if (hasTemplateAgents)
+            preResolvedLabel = await ResolveProviderLabelAsync(workspaceId, cancellationToken);
+
         var agentDtos = new List<AgentDto>();
         foreach (var agent in agents)
         {
-            var dto = await MapToDtoAsync(agent, cancellationToken);
+            var dto = await MapToDtoAsync(agent, cancellationToken, preResolvedLabel);
             agentDtos.Add(dto);
         }
         return agentDtos;
@@ -161,7 +180,9 @@ public class AgentService : IAgentService
             agent.WorkspaceId, 
             cancellationToken);
 
-        // 4. Determine instructions mode for updated profile
+        EnsureNoLockedFieldViolations(agent, request);
+
+        // 5. Determine instructions mode for updated profile
         var updatedName = request.Name ?? agent.Name;
         var updatedRole = request.Role ?? agent.Role;
         var updatedCapabilities = request.Capabilities ?? agent.Capabilities;
@@ -223,7 +244,7 @@ public class AgentService : IAgentService
             }
         }
 
-        // 5. Apply profile update with named parameters
+        // 6. Apply profile update with named parameters
         agent.UpdateProfile(
             updatedName,
             updatedRole,
@@ -231,16 +252,16 @@ public class AgentService : IAgentService
             customInstructions: customInstructionsForEntity,
             projectPrinciples: projectPrinciplesForEntity);
 
-        // 5b. Apply model update if the field was explicitly included in the request
+        // 6b. Apply model update if the field was explicitly included in the request
         if (request.Model.HasValue)
         {
             agent.SetModel(request.Model.Value);
         }
 
-        // 6. Persist changes using data access layer
+        // 7. Persist changes using data access layer
         await _agentDataAccess.UpdateAsync(agent, cancellationToken);
 
-        // 7. Update tool action assignments if provided
+        // 8. Update tool action assignments if provided
         if (request.ToolActionIds != null)
         {
             // Remove all existing tool actions
@@ -269,7 +290,7 @@ public class AgentService : IAgentService
             }
         }
 
-        // 8. Map to DTO and return
+        // 9. Map to DTO and return
         return await MapToDtoAsync(agent, cancellationToken);
     }
 
@@ -294,17 +315,121 @@ public class AgentService : IAgentService
         await _agentDataAccess.DeleteAsync(agentId, cancellationToken);
     }
 
-    private async Task<AgentDto> MapToDtoAsync(Agent agent, CancellationToken cancellationToken)
+    public async Task<AgentDto> CreateFromTemplateAsync(Guid userId, CreateAgentFromTemplateRequest request, CancellationToken cancellationToken = default)
     {
-        // Query tool action IDs using explicit join
-        var toolActionIds = await _agentToolActionDataAccess.GetToolActionIdsByAgentIdAsync(
-            agent.Id,
-            cancellationToken);
+        await _workspaceAuthorizationService.EnsureUserIsMemberAsync(userId, request.WorkspaceId, cancellationToken);
 
-        // Query unique category names for display
+        var template = _templateRegistry.GetByIdentifier(request.TemplateId)
+            ?? throw new TemplateNotFoundException(request.TemplateId);
+
+        ValidateProjectPrinciples(request.ProjectPrinciples);
+
+        await _availabilityResolver.ValidatePrerequisitesAsync(request.WorkspaceId, template, cancellationToken);
+
+        var toolActionIds = await ResolveToolActionIdsFromProviders(request.WorkspaceId, template, cancellationToken);
+
+        var agent = CreateAgentFromTemplate(request, template);
+
+        await _agentDataAccess.AddAsync(agent, cancellationToken);
+
+        await ValidateAndAssignToolActions(request.WorkspaceId, agent.Id, toolActionIds, cancellationToken);
+
+        return await MapToDtoAsync(agent, cancellationToken);
+    }
+
+    private static void EnsureNoLockedFieldViolations(Agent agent, UpdateAgentRequest request)
+    {
+        if (agent.TemplateIdentifier is null)
+            return;
+
+        var lockedViolations = new List<string>();
+
+        if (request.Name is not null && !string.Equals(request.Name.Trim(), agent.Name, StringComparison.Ordinal))
+            lockedViolations.Add("name");
+
+        if (request.Role is not null && !string.Equals(request.Role.Trim(), agent.Role, StringComparison.Ordinal))
+            lockedViolations.Add("role");
+
+        if (request.Capabilities is not null)
+        {
+            var currentSet = agent.Capabilities.OrderBy(c => c).ToList();
+            var requestSet = request.Capabilities.OrderBy(c => c).ToList();
+            if (!currentSet.SequenceEqual(requestSet))
+                lockedViolations.Add("capabilities");
+        }
+
+        if (request.ToolActionIds is not null)
+            lockedViolations.Add("tools");
+
+        if (lockedViolations.Count > 0)
+        {
+            var fieldList = string.Join(", ", lockedViolations);
+            throw new ArgumentException(
+                $"Cannot modify locked fields on a template-based agent. Locked fields: {fieldList}.");
+        }
+    }
+
+    private static void ValidateProjectPrinciples(string projectPrinciples)
+    {
+        if (string.IsNullOrWhiteSpace(projectPrinciples))
+            throw new ArgumentException("Project principles are required.");
+    }
+
+    private async Task<List<Guid>> ResolveToolActionIdsFromProviders(Guid workspaceId, BuiltInAgentTemplate template, CancellationToken cancellationToken)
+    {
+        var integrations = await _integrationDataAccess.GetByWorkspaceIdAsync(workspaceId, cancellationToken);
+        var codeSourceIntegrations = integrations.Where(i => i.Types.Contains(IntegrationType.CODE_SOURCE)).ToList();
+
+        var methodNames = ResolveMethodNames(codeSourceIntegrations, template);
+        var toolActions = await _toolActionDataAccess.GetByNamesAsync(methodNames, cancellationToken);
+
+        return toolActions.Select(ta => ta.Id).ToList();
+    }
+
+    private static List<string> ResolveMethodNames(List<Integration> codeSourceIntegrations, BuiltInAgentTemplate template)
+    {
+        return codeSourceIntegrations
+            .Where(i => template.ProviderToolMethodMap.ContainsKey(i.Provider))
+            .Select(i => template.ProviderToolMethodMap[i.Provider])
+            .Distinct()
+            .ToList();
+    }
+
+    private static Agent CreateAgentFromTemplate(CreateAgentFromTemplateRequest request, BuiltInAgentTemplate template)
+    {
+        return Agent.Create(
+            workspaceId: request.WorkspaceId,
+            name: template.DisplayName,
+            role: template.Role,
+            capabilities: template.Capabilities,
+            customInstructions: null,
+            projectPrinciples: request.ProjectPrinciples,
+            model: request.Model,
+            templateIdentifier: template.Identifier,
+            templateVersion: template.Version);
+    }
+
+    private async Task ValidateAndAssignToolActions(Guid workspaceId, Guid agentId, List<Guid> toolActionIds, CancellationToken cancellationToken)
+    {
+        if (toolActionIds.Count == 0)
+            return;
+
+        await _toolValidationService.ValidateToolActionsForWorkspaceAsync(workspaceId, toolActionIds, cancellationToken);
+        await _agentToolActionDataAccess.AssignToolActionsAsync(agentId, toolActionIds, cancellationToken);
+    }
+
+    private async Task<AgentDto> MapToDtoAsync(
+        Agent agent,
+        CancellationToken cancellationToken,
+        string? preResolvedLabel = null)
+    {
+        var toolActionIds = await _agentToolActionDataAccess.GetToolActionIdsByAgentIdAsync(
+            agent.Id, cancellationToken);
+
         var toolCategories = await _agentToolActionDataAccess.GetUniqueCategoryNamesByAgentIdAsync(
-            agent.Id,
-            cancellationToken);
+            agent.Id, cancellationToken);
+
+        var guide = await ResolveGuideAsync(agent, cancellationToken, preResolvedLabel);
 
         return new AgentDto(
             Id: agent.Id.ToString(),
@@ -324,7 +449,101 @@ public class AgentService : IAgentService
             AvatarUrl: agent.AvatarUrl,
             CustomInstructions: agent.CustomInstructions,
             ProjectPrinciples: agent.ProjectPrinciples,
-            Model: agent.Model
+            Model: agent.Model,
+            TemplateIdentifier: agent.TemplateIdentifier,
+            TemplateVersion: agent.TemplateVersion,
+            IsBuiltIn: agent.TemplateIdentifier != null,
+            Guide: guide
         );
+    }
+
+    private async Task<string?> ResolveGuideAsync(
+        Agent agent,
+        CancellationToken cancellationToken,
+        string? preResolvedLabel = null)
+    {
+        if (agent.TemplateIdentifier is null)
+            return null;
+
+        var template = _templateRegistry.GetByIdentifier(agent.TemplateIdentifier);
+        if (template?.GuideTemplate is null)
+            return null;
+
+        var label = preResolvedLabel ?? await ResolveProviderLabelAsync(agent.WorkspaceId, cancellationToken);
+        return template.GuideTemplate.Replace("{providerLabel}", label);
+    }
+
+    private async Task<string> ResolveProviderLabelAsync(Guid workspaceId, CancellationToken cancellationToken)
+    {
+        var integrations = await _integrationDataAccess.GetByWorkspaceIdAsync(workspaceId, cancellationToken);
+
+        var codeSourceIntegration = integrations.FirstOrDefault(
+            i => i.Types.Contains(IntegrationType.CODE_SOURCE));
+
+        if (codeSourceIntegration is null)
+            return "Pull Request";
+
+        return codeSourceIntegration.Provider == ProviderType.GITLAB
+            ? "Merge Request"
+            : "Pull Request";
+    }
+
+    public async Task<List<AgentTemplateDto>> GetAgentTemplatesAsync(Guid userId, Guid workspaceId, CancellationToken cancellationToken = default)
+    {
+        await _workspaceAuthorizationService.EnsureUserIsMemberAsync(userId, workspaceId, cancellationToken);
+
+        var resolvedTemplates = await _availabilityResolver.ResolveAvailabilityAsync(userId, workspaceId, cancellationToken);
+
+        return resolvedTemplates.Select(MapToTemplateDto).ToList();
+    }
+
+    private AgentTemplateDto MapToTemplateDto(ResolvedTemplate resolved)
+    {
+        var template = _templateRegistry.GetByIdentifier(resolved.TemplateId);
+
+        var toolLabel = resolved.ProviderLabels.Count > 0
+            ? string.Join(" / ", resolved.ProviderLabels.Select(p => p.Label).Distinct())
+            : template != null
+                ? string.Join(" / ", template.ProviderLabelMap.Values.Distinct())
+                : string.Empty;
+
+        return new AgentTemplateDto(
+            TemplateId: resolved.TemplateId,
+            Name: template?.DisplayName ?? resolved.TemplateId,
+            Role: template?.Role ?? string.Empty,
+            Description: string.Empty,
+            Prerequisites: MapPrerequisites(resolved),
+            Availability: MapAvailability(resolved),
+            Capabilities: template?.Capabilities ?? Array.Empty<string>(),
+            ToolLabel: toolLabel,
+            UsageGuide: resolved.ResolvedGuide ?? string.Empty,
+            TemplateVersion: template?.Version ?? 0);
+    }
+
+    private static IReadOnlyList<TemplatePrerequisiteDto> MapPrerequisites(ResolvedTemplate resolved)
+    {
+        return resolved.ProviderLabels
+            .Select(p => new TemplatePrerequisiteDto(
+                IntegrationType: p.ProviderType.ToString(),
+                ProviderName: p.Label,
+                Satisfied: true))
+            .ToList();
+    }
+
+    private static TemplateAvailabilityDto MapAvailability(ResolvedTemplate resolved)
+    {
+        var status = resolved.Status switch
+        {
+            TemplateAvailabilityStatus.Available => "AVAILABLE",
+            TemplateAvailabilityStatus.Unavailable => "UNAVAILABLE",
+            TemplateAvailabilityStatus.AlreadyDeployed => "ALREADY_DEPLOYED",
+            TemplateAvailabilityStatus.Error => "ERROR",
+            _ => resolved.Status.ToString().ToUpperInvariant()
+        };
+
+        return new TemplateAvailabilityDto(
+            Status: status,
+            Reason: resolved.UnavailabilityReason,
+            ExistingAgentId: resolved.ExistingAgentId);
     }
 }

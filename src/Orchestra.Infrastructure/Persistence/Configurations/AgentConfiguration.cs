@@ -55,6 +55,18 @@ public class AgentConfiguration : IEntityTypeConfiguration<Agent>
         builder.Property(a => a.Model)
             .HasMaxLength(500);
 
+        builder.Property(a => a.TemplateIdentifier)
+            .IsRequired(false)
+            .HasMaxLength(200);
+
+        builder.Property(a => a.TemplateVersion)
+            .IsRequired(false);
+
+        builder.HasIndex(a => new { a.WorkspaceId, a.TemplateIdentifier })
+            .IsUnique()
+            .HasFilter("\"TemplateIdentifier\" IS NOT NULL")
+            .HasDatabaseName("IX_Agents_WorkspaceId_TemplateIdentifier");
+
         builder.HasIndex(a => a.WorkspaceId);
     }
 }

@@ -17,6 +17,8 @@ public class AgentBuilder
     private List<string> _capabilities = new() { "code_execution", "document_analysis" };
     private string? _model = null;
     private string? _projectPrinciples = null;
+    private string? _templateIdentifier = null;
+    private int? _templateVersion = null;
 
     /// <summary>
     /// Sets the agent ID.
@@ -101,6 +103,24 @@ public class AgentBuilder
     }
 
     /// <summary>
+    /// Sets the template identifier for a built-in agent.
+    /// </summary>
+    public AgentBuilder WithTemplateIdentifier(string? templateIdentifier)
+    {
+        _templateIdentifier = templateIdentifier;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the template version for a built-in agent.
+    /// </summary>
+    public AgentBuilder WithTemplateVersion(int? templateVersion)
+    {
+        _templateVersion = templateVersion;
+        return this;
+    }
+
+    /// <summary>
     /// Builds the Agent entity.
     /// </summary>
     public Agent Build()
@@ -112,7 +132,9 @@ public class AgentBuilder
             capabilities: _capabilities,
             customInstructions: _projectPrinciples == null ? _customInstructions : null,
             projectPrinciples: _projectPrinciples,
-            model: _model);
+            model: _model,
+            templateIdentifier: _templateIdentifier,
+            templateVersion: _templateVersion);
     }
 
     /// <summary>

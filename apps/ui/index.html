@@ -72,6 +72,35 @@
       ::-webkit-scrollbar-thumb:hover {
         background: rgb(var(--border)); 
       }
+
+      @keyframes shrink {
+        from { width: 100%; }
+        to { width: 0%; }
+      }
+
+      @keyframes scale-in {
+        from {
+          opacity: 0;
+          transform: scale(0.95) translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1) translateY(0);
+        }
+      }
+
+      @keyframes fade-out {
+        from { opacity: 1; }
+        to { opacity: 0; }
+      }
+
+      .animate-scale-in {
+        animation: scale-in 200ms ease-out;
+      }
+
+      .animate-fade-out {
+        animation: fade-out 300ms ease-in forwards;
+      }
     </style>
   <script type="importmap">
 {

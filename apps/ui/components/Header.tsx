@@ -1,15 +1,17 @@
 
 import React from 'react';
 import { Search, Bell, Sun, Moon, Menu } from 'lucide-react';
+import ConnectionStatusBadge from './ConnectionStatusBadge';
 
 interface HeaderProps {
     activeView: string;
     isDarkMode: boolean;
     toggleTheme: () => void;
     toggleSidebar: () => void;
+    workspaceId: string;
 }
 
-const Header: React.FC<HeaderProps> = ({ activeView, isDarkMode, toggleTheme, toggleSidebar }) => {
+const Header: React.FC<HeaderProps> = ({ activeView, isDarkMode, toggleTheme, toggleSidebar, workspaceId }) => {
     return (
         <header className="h-16 bg-surface/50 backdrop-blur border-b border-border flex items-center justify-between px-4 md:px-6 shrink-0 z-20">
           <div className="flex items-center gap-3 md:gap-4 text-sm text-textMuted">
@@ -27,6 +29,7 @@ const Header: React.FC<HeaderProps> = ({ activeView, isDarkMode, toggleTheme, to
           </div>
 
           <div className="flex items-center gap-2 md:gap-4">
+             <ConnectionStatusBadge workspaceId={workspaceId} />
              <div className="relative hidden sm:block">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-textMuted" />
                 <input 

@@ -40,7 +40,11 @@ public class AgentServiceUpdateModelTests
             agentDataAccess,
             toolActionDataAccess,
             authService,
-            toolValidationService);
+            toolValidationService,
+            Substitute.For<IBuiltInAgentTemplateRegistry>(),
+            Substitute.For<ITemplateAvailabilityResolver>(),
+            Substitute.For<IToolActionDataAccess>(),
+            Substitute.For<IIntegrationDataAccess>());
 
         return (service, agentDataAccess, authService, toolActionDataAccess, toolValidationService);
     }

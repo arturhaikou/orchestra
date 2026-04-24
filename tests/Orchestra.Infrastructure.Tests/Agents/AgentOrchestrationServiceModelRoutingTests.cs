@@ -31,6 +31,7 @@ public class AgentOrchestrationServiceModelRoutingTests
         var agentDataAccess = Substitute.For<IAgentDataAccess>();
         var ticketDataAccess = Substitute.For<ITicketDataAccess>();
         var contextBuilder = Substitute.For<IAgentContextBuilder>();
+        var notificationService = Substitute.For<INotificationService>();
         var logger = Substitute.For<ILogger<AgentOrchestrationService>>();
 
         // Default stub: runtime service returns a successful response text
@@ -56,6 +57,7 @@ public class AgentOrchestrationServiceModelRoutingTests
             agentDataAccess,
             ticketDataAccess,
             contextBuilder,
+            notificationService,
             logger);
 
         return (sut, runtimeService, agentDataAccess, ticketDataAccess, contextBuilder);

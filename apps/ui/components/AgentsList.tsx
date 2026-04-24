@@ -1,11 +1,16 @@
 
-import React, { useState, useEffect } from 'react';
-import { Plus, Settings, X, Loader2, Bot, Brain, Sparkles, Pencil, Trash2, AlertTriangle, Briefcase, Wrench, Search, CheckCircle2, GripVertical, User, Eye, FileText } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Plus, X, Loader2, Bot, Brain, Sparkles, Pencil, AlertTriangle, Briefcase, Wrench, Search, CheckCircle2, Eye, FileText } from 'lucide-react';
 import { marked } from 'marked';
 import { Agent, Tool } from '../types';
 import { getAgents, createAgent, updateAgent, deleteAgent } from '../services/agentService';
 import { getTools } from '../services/toolService';
 import { fetchWorkspaceModels } from '../services/workspaceService';
+import DeployMethodDialog from './DeployMethodDialog';
+import BuiltInCatalogue from './BuiltInCatalogue';
+import LockedField from './agents/LockedField';
+import AgentCard from './agents/AgentCard';
+import { isBuiltInAgent } from '../utils/builtInAgentUtils';
 
 interface AgentsListProps {
   workspaceId: string;
@@ -65,6 +70,11 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [toolSearch, setToolSearch] = useState('');
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [openGuideId, setOpenGuideId] = useState<string | null>(null);
+  const [isBuiltInEdit, setIsBuiltInEdit] = useState(false);
+  const [isDeployDialogOpen, setIsDeployDialogOpen] = useState(false);
+  const [showCatalogue, setShowCatalogue] = useState(false);
+  const deployButtonRef = useRef<HTMLButtonElement>(null);
 
   // Delete State
   const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
@@ -75,18 +85,19 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
   const [selectedActionIds, setSelectedActionIds] = useState<string[]>([]);
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
 
+  const fetchAgentsData = async () => {
+    setIsLoading(true);
+    const [agentData, toolData] = await Promise.all([
+      getAgents(workspaceId),
+      getTools(workspaceId)
+    ]);
+    setAgents(agentData);
+    setAvailableTools(toolData);
+    setIsLoading(false);
+  };
+
   useEffect(() => {
-      const fetchData = async () => {
-          setIsLoading(true);
-          const [agentData, toolData] = await Promise.all([
-              getAgents(workspaceId),
-              getTools(workspaceId)
-          ]);
-          setAgents(agentData);
-          setAvailableTools(toolData);
-          setIsLoading(false);
-      };
-      if (workspaceId) fetchData();
+    if (workspaceId) fetchAgentsData();
   }, [workspaceId]);
 
   useEffect(() => {
@@ -111,6 +122,7 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
         selectedModel: 'Default'
     });
     setToolSearch('');
+    setIsBuiltInEdit(false);
     setIsModalOpen(true);
   };
 
@@ -129,6 +141,7 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
         selectedModel: modelValue
     });
     setToolSearch('');
+    setIsBuiltInEdit(isBuiltInAgent(agent));
     setIsModalOpen(true);
   };
 
@@ -255,6 +268,20 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
     tool.description.toLowerCase().includes(toolSearch.toLowerCase())
   );
 
+  if (showCatalogue) {
+    return (
+      <BuiltInCatalogue
+        workspaceId={workspaceId}
+        onViewAgent={() => {}}
+        onBack={() => setShowCatalogue(false)}
+        onAgentDeployed={() => {
+          setShowCatalogue(false);
+          fetchAgentsData();
+        }}
+      />
+    );
+  }
+
   if (isLoading) {
       return (
           <div className="flex h-full items-center justify-center">
@@ -271,7 +298,8 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
             <p className="text-textMuted text-sm mt-1">Manage autonomous agents deployed in this workspace.</p>
         </div>
         <button 
-            onClick={handleOpenCreate}
+            ref={deployButtonRef}
+            onClick={() => setIsDeployDialogOpen(true)}
             className="w-full sm:w-auto bg-primary hover:bg-primaryHover text-white px-4 py-2 rounded-md flex items-center justify-center gap-2 text-sm transition-colors shadow-lg shadow-primary/20 shrink-0"
         >
           <Plus className="w-4 h-4" /> Deploy Agent
@@ -286,7 +314,7 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
           <p className="text-lg font-medium text-text">No agents deployed</p>
           <p className="text-sm">Create your first AI teammate to start automating tasks.</p>
           <button 
-             onClick={handleOpenCreate}
+             onClick={() => setIsDeployDialogOpen(true)}
              className="mt-4 text-primary hover:underline text-sm"
           >
              Deploy now
@@ -295,90 +323,14 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {agents.map(agent => (
-            <div key={agent.id} className="bg-surface border border-border p-6 rounded-lg relative overflow-hidden group hover:border-primary/50 transition-all duration-300 hover:shadow-lg flex flex-col h-full">
-                <div className="absolute top-0 left-0 w-1 h-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-                
-                <div className="flex justify-between items-start mb-4">
-                    <div className="flex items-center gap-4">
-                        <img src={agent.avatarUrl} alt={agent.name} className="w-12 h-12 rounded-full border border-border object-cover bg-surfaceHighlight" />
-                        <div>
-                            <h3 className="font-semibold text-text leading-tight">{agent.name}</h3>
-                            <p className="text-xs text-textMuted">{agent.role}</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <div className="flex-1 space-y-4">
-                  <div className="space-y-2">
-                    <div className="text-[10px] font-bold text-textMuted uppercase tracking-widest flex items-center gap-1.5">
-                        <Brain className="w-3 h-3" /> Capabilities
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                        {agent.capabilities.length > 0 ? agent.capabilities.map(cap => (
-                          <span key={cap} className="text-[10px] bg-surfaceHighlight border border-border text-textMuted px-2 py-0.5 rounded">
-                            {cap}
-                          </span>
-                        )) : <span className="text-[10px] text-textMuted italic">None assigned</span>}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="text-[10px] font-bold text-textMuted uppercase tracking-widest flex items-center gap-1.5">
-                        <Wrench className="w-3 h-3" /> Tooling
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                        {agent.toolCategories && agent.toolCategories.length > 0 ? agent.toolCategories.map(category => {
-                            return (
-                                <span key={category} className="text-[10px] bg-primary/10 border border-primary/20 text-primary px-2 py-0.5 rounded flex items-center gap-1">
-                                    <Sparkles className="w-2.5 h-2.5" /> {category}
-                                </span>
-                            );
-                        }) : <span className="text-[10px] text-textMuted italic">No tools authorized</span>}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="text-[10px] font-bold text-textMuted uppercase tracking-widest flex items-center gap-1.5">
-                        <Bot className="w-3 h-3" /> Model
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                        <span className="text-[10px] bg-surfaceHighlight border border-border text-textMuted px-2 py-0.5 rounded">
-                            {agent.model ?? 'Default'}
-                        </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-4 mt-4 border-t border-border flex items-center justify-between">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex items-center gap-1.5
-                      ${agent.status === 'BUSY' ? 'bg-orange-500/20 text-orange-400' : ''}
-                      ${agent.status === 'IDLE' ? 'bg-emerald-500/20 text-emerald-400' : ''}
-                      ${agent.status === 'OFFLINE' ? 'bg-gray-500/20 text-gray-400' : ''}
-                  `}>
-                      <span className="relative flex h-2 w-2">
-                        {agent.status === 'BUSY' && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>}
-                        <span className={`relative inline-flex rounded-full h-2 w-2 ${agent.status === 'BUSY' ? 'bg-orange-500' : agent.status === 'IDLE' ? 'bg-emerald-500' : 'bg-gray-500'}`}></span>
-                      </span>
-                      {agent.status}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <button 
-                        onClick={() => setDeleteConfirmationId(agent.id)}
-                        className="text-textMuted hover:text-red-500 transition-colors p-1.5 rounded hover:bg-surfaceHighlight"
-                        title="Remove Agent"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                    </button>
-                    <button 
-                        onClick={() => handleOpenEdit(agent)}
-                        className="text-textMuted hover:text-primary transition-colors p-1.5 rounded hover:bg-surfaceHighlight"
-                        title="Edit Configuration"
-                    >
-                        <Settings className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-            </div>
+            <AgentCard
+              key={agent.id}
+              agent={agent}
+              openGuideId={openGuideId}
+              onToggleGuide={(id) => setOpenGuideId(openGuideId === id ? null : id)}
+              onDelete={setDeleteConfirmationId}
+              onEdit={handleOpenEdit}
+            />
           ))}
         </div>
       )}
@@ -429,9 +381,16 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
                     {editingId ? <Pencil className="w-5 h-5 text-primary" /> : <Bot className="w-6 h-6 text-primary" />}
                  </div>
                  <div className="min-w-0">
-                    <h3 className="text-base sm:text-lg font-bold text-text leading-tight truncate">
-                        {editingId ? 'Edit Agent Authorization' : 'Deploy New Agent'}
-                    </h3>
+                    <div className="flex items-center gap-0">
+                        <h3 className="text-base sm:text-lg font-bold text-text leading-tight truncate">
+                            {editingId ? 'Edit Agent Authorization' : 'Deploy New Agent'}
+                        </h3>
+                        {isBuiltInEdit && (
+                            <span className="text-[10px] bg-primary/10 border border-primary/20 text-primary px-2 py-0.5 rounded flex items-center gap-1 ml-2">
+                                <Sparkles className="w-3 h-3" /> Built-In
+                            </span>
+                        )}
+                    </div>
                     <p className="text-[10px] sm:text-xs text-textMuted mt-0.5 truncate">Configure identity, capabilities and tool access.</p>
                  </div>
               </div>
@@ -444,6 +403,7 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
             <form onSubmit={handleSave} className="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden bg-background/30">
               
               {/* Tool Library Sidebar (Now on the Left) */}
+              {!isBuiltInEdit && (
               <div className="w-full lg:w-80 p-4 sm:p-6 border-b lg:border-b-0 lg:border-r border-border lg:overflow-y-auto space-y-6 bg-surface shrink-0">
                  <div className="flex flex-col gap-3">
                     <h4 className="text-[10px] font-bold text-textMuted uppercase tracking-widest flex items-center gap-2">
@@ -519,6 +479,7 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
                     )}
                  </div>
               </div>
+              )}
 
               {/* Identity & Logic Section (Now on the Right, Flex-1) */}
               <div className="flex-1 p-4 sm:p-6 lg:overflow-y-auto space-y-8 bg-surfaceHighlight/5">
@@ -528,6 +489,13 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
                             <h4 className="text-[10px] font-bold text-textMuted uppercase tracking-widest flex items-center gap-2">
                                 <Briefcase className="w-3.5 h-3.5" /> Identity
                             </h4>
+                            {isBuiltInEdit ? (
+                                <>
+                                    <LockedField label="Agent Name" value={formState.name} />
+                                    <LockedField label="Role / Persona" value={formState.role} />
+                                </>
+                            ) : (
+                                <>
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-semibold text-textMuted uppercase">Agent Name</label>
                                 <input 
@@ -550,6 +518,8 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
                                 className="w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-text focus:outline-none focus:border-primary shadow-sm"
                                 />
                             </div>
+                                </>
+                            )}
 
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-semibold text-textMuted uppercase">LLM Model</label>
@@ -568,8 +538,17 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
 
                         <div className="space-y-4 pt-6 border-t border-border/50">
                             <h4 className="text-[10px] font-bold text-textMuted uppercase tracking-widest flex items-center gap-2">
-                                <Brain className="w-3.5 h-3.5" /> Logical Boundary
+                                <Brain className="w-3.5 h-3.5" /> {isBuiltInEdit ? 'Capabilities (Locked)' : 'Logical Boundary'}
                             </h4>
+                            {isBuiltInEdit ? (
+                                <div className="flex flex-wrap gap-1.5">
+                                    {formState.capabilities.map(cap => (
+                                        <span key={cap} className="text-[10px] bg-surfaceHighlight border border-border text-textMuted px-2 py-0.5 rounded">
+                                            {cap}
+                                        </span>
+                                    ))}
+                                </div>
+                            ) : (
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-semibold text-textMuted uppercase">Capabilities (Tags)</label>
                                 <div className="w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-text focus-within:border-primary flex flex-wrap gap-1.5 min-h-[60px] content-start shadow-sm">
@@ -589,6 +568,7 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
                                     />
                                 </div>
                             </div>
+                            )}
                         </div>
                     </div>
 
@@ -653,10 +633,12 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
                     <button 
                         onClick={handleSave}
                         disabled={
-                          !formState.name ||
+                          isBuiltInEdit
+                            ? (!formState.projectPrinciples.trim() || isSaving)
+                            : (!formState.name ||
                           !formState.role ||
                           (isReviewAgent ? !formState.projectPrinciples.trim() : !formState.customInstructions.trim()) ||
-                          isSaving
+                          isSaving)
                         }
                         className="flex-1 sm:flex-none px-6 py-2.5 bg-primary hover:bg-primaryHover text-white rounded-md text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-primary/20 active:scale-95"
                     >
@@ -848,6 +830,21 @@ const AgentsList: React.FC<AgentsListProps> = ({ workspaceId }) => {
         </div>
       )}
 
+      <DeployMethodDialog
+        isOpen={isDeployDialogOpen}
+        onClose={() => {
+          setIsDeployDialogOpen(false);
+          deployButtonRef.current?.focus();
+        }}
+        onSelectScratch={() => {
+          setIsDeployDialogOpen(false);
+          handleOpenCreate();
+        }}
+        onSelectBuiltIn={() => {
+          setIsDeployDialogOpen(false);
+          setShowCatalogue(true);
+        }}
+      />
     </div>
   );
 };

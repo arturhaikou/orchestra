@@ -58,4 +58,26 @@ public interface IToolActionDataAccess
     Task UpdateAsync(
         ToolAction toolAction, 
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves tool actions matching the given method names.
+    /// Used by the template availability resolver to map method names to database IDs.
+    /// </summary>
+    /// <param name="methodNames">The method names to look up.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>Tool actions matching the provided method names.</returns>
+    Task<List<ToolAction>> GetByMethodNamesAsync(
+        List<string> methodNames,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves tool actions matching the given action names (snake_case identifiers).
+    /// Used by the template availability resolver to look up actions by their public name.
+    /// </summary>
+    /// <param name="names">The action names to look up (e.g., "review_merge_request").</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>Tool actions matching the provided names.</returns>
+    Task<List<ToolAction>> GetByNamesAsync(
+        List<string> names,
+        CancellationToken cancellationToken = default);
 }

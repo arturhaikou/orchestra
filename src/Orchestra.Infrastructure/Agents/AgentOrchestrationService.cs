@@ -18,6 +18,7 @@ public class AgentOrchestrationService : IAgentOrchestrationService
     private readonly IAgentDataAccess _agentDataAccess;
     private readonly ITicketDataAccess _ticketDataAccess;
     private readonly IAgentContextBuilder _agentContextBuilder;
+    private readonly INotificationService _notificationService;
     private readonly ILogger<AgentOrchestrationService> _logger;
 
     // Status GUIDs from seeding
@@ -30,12 +31,14 @@ public class AgentOrchestrationService : IAgentOrchestrationService
         IAgentDataAccess agentDataAccess,
         ITicketDataAccess ticketDataAccess,
         IAgentContextBuilder agentContextBuilder,
+        INotificationService notificationService,
         ILogger<AgentOrchestrationService> logger)
     {
         _agentRuntimeService = agentRuntimeService;
         _agentDataAccess = agentDataAccess;
         _ticketDataAccess = ticketDataAccess;
         _agentContextBuilder = agentContextBuilder;
+        _notificationService = notificationService;
         _logger = logger;
     }
 
@@ -136,7 +139,12 @@ public class AgentOrchestrationService : IAgentOrchestrationService
                 agentEntity.Name,
                 ticketId);
 
-            return AgentExecutionResult.Success(responseText);
+            var successResult = AgentExecutionResult.Success(responseText);
+
+            await DispatchNotificationAsync(
+                ticket, agentEntity, successResult, cancellationToken);
+
+            return successResult;
         }
         catch (Exception ex)
         {
@@ -168,7 +176,12 @@ public class AgentOrchestrationService : IAgentOrchestrationService
                 }
             }
 
-            return AgentExecutionResult.Failure(ex.Message);
+            var failureResult = AgentExecutionResult.Failure(ex.Message);
+
+            await DispatchNotificationAsync(
+                ticket, agentEntity, failureResult, cancellationToken);
+
+            return failureResult;
         }
         finally
         {
@@ -188,6 +201,38 @@ public class AgentOrchestrationService : IAgentOrchestrationService
                         agentEntity.Id);
                 }
             }
+        }
+    }
+
+    private async Task DispatchNotificationAsync(
+        Ticket? ticket,
+        Agent? agentEntity,
+        AgentExecutionResult result,
+        CancellationToken cancellationToken)
+    {
+        if (ticket is null || agentEntity is null)
+            return;
+
+        try
+        {
+            var notification = new AgentExecutionCompletedNotification(
+                WorkspaceId: ticket.WorkspaceId,
+                AgentId: agentEntity.Id,
+                AgentName: agentEntity.Name,
+                TicketId: ticket.Id,
+                TicketTitle: ticket.Title,
+                Status: result.IsSuccess ? "success" : "failed",
+                Summary: result.IsSuccess ? result.Message ?? string.Empty : result.ErrorMessage ?? string.Empty,
+                ReviewUrl: result.ReviewUrl);
+
+            await _notificationService.NotifyAgentExecutionCompletedAsync(notification, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Failed to send execution completion notification for ticket {TicketId}",
+                ticket.Id);
         }
     }
 }

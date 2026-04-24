@@ -23,6 +23,25 @@ namespace Orchestra.Infrastructure.Migrations
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "citext");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("FriendlyName")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Xml")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DataProtectionKeys");
+                });
+
             modelBuilder.Entity("Orchestra.Domain.Entities.AIProviderConfiguration", b =>
                 {
                     b.Property<Guid>("Id")
@@ -105,6 +124,13 @@ namespace Orchestra.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("TemplateIdentifier")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("TemplateVersion")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -114,6 +140,11 @@ namespace Orchestra.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("WorkspaceId");
+
+                    b.HasIndex("WorkspaceId", "TemplateIdentifier")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Agents_WorkspaceId_TemplateIdentifier")
+                        .HasFilter("\"TemplateIdentifier\" IS NOT NULL");
 
                     b.ToTable("Agents", (string)null);
                 });

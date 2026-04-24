@@ -73,6 +73,18 @@ public class Agent
     public string? Model { get; private set; }
 
     /// <summary>
+    /// Gets the slug identifier of the built-in template this agent was created from.
+    /// Null for custom (non-template) agents. Immutable after creation.
+    /// </summary>
+    public string? TemplateIdentifier { get; private set; }
+
+    /// <summary>
+    /// Gets the template version at the time of agent creation.
+    /// Null for custom (non-template) agents. Immutable after creation.
+    /// </summary>
+    public int? TemplateVersion { get; private set; }
+
+    /// <summary>
     /// Private constructor to enforce factory method usage.
     /// </summary>
     private Agent() { }
@@ -99,7 +111,9 @@ public class Agent
         IEnumerable<string>? capabilities,
         string? customInstructions,
         string? projectPrinciples = null,
-        string? model = null)
+        string? model = null,
+        string? templateIdentifier = null,
+        int? templateVersion = null)
     {
         if (workspaceId == Guid.Empty)
             throw new ArgumentException("WorkspaceId cannot be empty.", nameof(workspaceId));
@@ -132,6 +146,12 @@ public class Agent
                 throw new ArgumentException("ProjectPrinciples cannot exceed 5000 characters.", nameof(projectPrinciples));
         }
 
+        if ((templateIdentifier is null) != (templateVersion is null))
+            throw new ArgumentException("TemplateIdentifier and TemplateVersion must both be null or both be non-null.");
+
+        if (templateIdentifier != null && templateIdentifier.Length > 200)
+            throw new ArgumentException("TemplateIdentifier cannot exceed 200 characters.", nameof(templateIdentifier));
+
         var agent = new Agent
         {
             Id = Guid.NewGuid(),
@@ -143,7 +163,9 @@ public class Agent
             ProjectPrinciples = projectPrinciples?.Trim(),
             Capabilities = capabilities?.ToList() ?? new List<string>(),
             CreatedAt = DateTime.UtcNow,
-            Model = model
+            Model = model,
+            TemplateIdentifier = templateIdentifier,
+            TemplateVersion = templateVersion
         };
 
         agent.AvatarUrl = $"https://api.dicebear.com/7.x/bottts/svg?seed={agent.Id}";

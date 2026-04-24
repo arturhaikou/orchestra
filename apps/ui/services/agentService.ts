@@ -1,5 +1,5 @@
 
-import { Agent } from '../types';
+import { Agent, AgentTemplateDto, CreateAgentFromTemplateRequest } from '../types';
 import { getToken } from './authService';
 
 const API_BASE_URL = `${import.meta.env.VITE_API_URL}/v1/agents`;
@@ -26,6 +26,42 @@ export const getAgents = async (workspaceId: string): Promise<Agent[]> => {
     console.error('Failed to fetch agents:', error);
     return [];
   }
+};
+
+export const getAgentTemplates = async (workspaceId: string): Promise<AgentTemplateDto[]> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/templates?workspaceId=${encodeURIComponent(workspaceId)}`, {
+      headers: getAuthHeaders()
+    });
+
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("text/html")) throw new Error("Not JSON");
+
+    if (!response.ok) {
+      throw new Error(`Backend error: ${response.statusText}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to fetch agent templates:', error);
+    throw error;
+  }
+};
+
+export const createAgentFromTemplate = async (
+  request: CreateAgentFromTemplateRequest
+): Promise<Agent> => {
+  const response = await fetch(`${API_BASE_URL}/from-template`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({ message: 'Failed to deploy agent. Please try again.' }));
+    throw new Error(errorBody.detail || errorBody.message || `Backend error: ${response.statusText}`);
+  }
+
+  return await response.json();
 };
 
 export const createAgent = async (workspaceId: string, data: { name: string; role: string; capabilities: string[]; toolActionIds: string[]; customInstructions?: string; projectPrinciples?: string; model?: string | null }): Promise<Agent> => {

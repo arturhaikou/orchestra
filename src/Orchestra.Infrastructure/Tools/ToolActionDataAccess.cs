@@ -64,4 +64,24 @@ public class ToolActionDataAccess : IToolActionDataAccess
         _context.Set<ToolAction>().Update(toolAction);
         await _context.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task<List<ToolAction>> GetByMethodNamesAsync(
+        List<string> methodNames,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.Set<ToolAction>()
+            .AsNoTracking()
+            .Where(ta => methodNames.Contains(ta.MethodName))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<List<ToolAction>> GetByNamesAsync(
+        List<string> names,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.Set<ToolAction>()
+            .AsNoTracking()
+            .Where(ta => names.Contains(ta.Name))
+            .ToListAsync(cancellationToken);
+    }
 }

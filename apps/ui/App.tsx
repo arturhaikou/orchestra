@@ -17,6 +17,8 @@ import WorkspaceModals from './components/WorkspaceModals/WorkspaceModals';
 import { Workspace, User } from './types';
 import { getWorkspaces, deleteWorkspace } from './services/workspaceService';
 import { getToken, logout, getUser, updateUser, changePassword } from './services/authService';
+import ExecutionToastContainer from './components/ExecutionToastContainer';
+import { connect as signalRConnect, disconnect as signalRDisconnect, switchWorkspace as signalRSwitchWorkspace } from './services/signalRService';
 import { validatePassword } from './utils/passwordValidator';
 import { X, Loader2, AlertTriangle, Pencil, Save, Trash2, Mail, User as UserIcon, Lock, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 
@@ -88,6 +90,35 @@ const App: React.FC = () => {
       localStorage.setItem('nexus_active_workspace', activeWorkspaceId);
     }
   }, [activeWorkspaceId]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !activeWorkspaceId) return;
+
+    let previousWorkspaceId: string | null = null;
+
+    const connectToWorkspace = async () => {
+      try {
+        if (previousWorkspaceId && previousWorkspaceId !== activeWorkspaceId) {
+          await signalRSwitchWorkspace(previousWorkspaceId, activeWorkspaceId);
+        } else {
+          await signalRConnect(activeWorkspaceId);
+        }
+        previousWorkspaceId = activeWorkspaceId;
+      } catch (err) {
+        console.error('Failed to establish SignalR connection:', err);
+      }
+    };
+
+    connectToWorkspace();
+
+    return () => {
+      if (activeWorkspaceId) {
+        signalRDisconnect(activeWorkspaceId).catch((err) =>
+          console.error('Failed to disconnect SignalR:', err),
+        );
+      }
+    };
+  }, [isAuthenticated, activeWorkspaceId]);
 
   // Check authentication status on mount
   useEffect(() => {
@@ -258,7 +289,8 @@ const App: React.FC = () => {
             activeView={activeView} 
             isDarkMode={isDarkMode} 
             toggleTheme={toggleTheme} 
-            toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} 
+            toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+            workspaceId={activeWorkspaceId}
         />
 
         <div className="flex-1 overflow-auto p-4 md:p-6 scroll-smooth">
@@ -296,6 +328,10 @@ const App: React.FC = () => {
            </div>
         </div>
       </main>
+
+      {activeWorkspaceId && (
+        <ExecutionToastContainer workspaceId={activeWorkspaceId} activeView={activeView} />
+      )}
 
       {/* Profile Settings Modal - Expanded */}
       {isProfileModalOpen && (

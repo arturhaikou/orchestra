@@ -85,6 +85,12 @@ export interface Tool {
   actions?: ToolAction[];  // Optional: Array of specific actions this tool can perform
 }
 
+export interface IntegrationStatus {
+  integrationMissing: boolean;
+  integrationTypeLabel: string;
+  warningMessage: string;
+}
+
 export interface Agent {
   id: string;
   workspaceId: string;
@@ -98,6 +104,43 @@ export interface Agent {
   customInstructions?: string;
   projectPrinciples?: string; // Non-null only for agents with a review tool assigned
   model?: string | null; // LLM model override; null means system default
+  templateId?: string | null;
+  templateVersion?: number | null;
+  isBuiltIn?: boolean;
+  usageGuide?: string | null;
+  integrationStatus?: IntegrationStatus | null;
+}
+
+export interface TemplatePrerequisiteDto {
+  integrationType: string;
+  providerName: string;
+  satisfied: boolean;
+}
+
+export interface TemplateAvailabilityDto {
+  status: 'AVAILABLE' | 'UNAVAILABLE' | 'ALREADY_DEPLOYED' | 'ERROR';
+  reason?: string | null;
+  existingAgentId?: string | null;
+}
+
+export interface AgentTemplateDto {
+  templateId: string;
+  name: string;
+  role: string;
+  description: string;
+  prerequisites: TemplatePrerequisiteDto[];
+  availability: TemplateAvailabilityDto;
+  templateVersion: number;
+  capabilities: string[];
+  toolLabel: string;
+  usageGuide: string;
+}
+
+export interface CreateAgentFromTemplateRequest {
+  workspaceId: string;
+  templateId: string;
+  projectPrinciples: string;
+  model?: string;
 }
 
 export interface Job {
@@ -204,6 +247,29 @@ export interface OllamaPullStatus {
   status: 'Pulling' | 'Available' | 'Failed';
   progress: number;
   errorMessage: string | null;
+}
+
+export interface AgentExecutionCompletedEvent {
+  workspaceId: string;
+  agentId: string;
+  agentName: string;
+  ticketId: string;
+  ticketTitle: string;
+  status: 'success' | 'failed';
+  reviewUrl: string | null;
+}
+
+export type ConnectionStatus = 'connected' | 'reconnecting' | 'disconnected';
+
+export interface ExecutionToastData {
+  id: string;
+  agentId: string;
+  agentName: string;
+  ticketId: string;
+  ticketTitle: string;
+  status: 'success' | 'failed';
+  reviewUrl: string | null;
+  createdAt: number;
 }
 
 /**

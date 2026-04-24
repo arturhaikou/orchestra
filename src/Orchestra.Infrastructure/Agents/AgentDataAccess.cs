@@ -60,4 +60,28 @@ public class AgentDataAccess : IAgentDataAccess
             await _context.SaveChangesAsync(cancellationToken);
         }
     }
+
+    public async Task<List<Agent>> GetTemplateAgentsByWorkspaceIdAsync(
+        Guid workspaceId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.Set<Agent>()
+            .Where(a => a.WorkspaceId == workspaceId && a.TemplateIdentifier != null)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<Agent?> GetByWorkspaceAndTemplateIdAsync(Guid workspaceId, string templateId, CancellationToken cancellationToken = default)
+    {
+        return await _context.Set<Agent>()
+            .FirstOrDefaultAsync(a => a.WorkspaceId == workspaceId && a.TemplateIdentifier == templateId, cancellationToken);
+    }
+
+    public async Task<Dictionary<string, Guid>> GetDeployedTemplateAgentsAsync(
+        Guid workspaceId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.Set<Agent>()
+            .Where(a => a.WorkspaceId == workspaceId && a.TemplateIdentifier != null)
+            .ToDictionaryAsync(a => a.TemplateIdentifier!, a => a.Id, cancellationToken);
+    }
 }
