@@ -21,14 +21,14 @@ builder.AddServiceDefaults();
 //        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
 //        opt.QueueLimit = 0; // No queuing - immediate rejection
 //    });
-    
+
 //    options.OnRejected = async (context, cancellationToken) =>
 //    {
 //        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
 //        {
 //            context.HttpContext.Response.Headers.RetryAfter = retryAfter.TotalSeconds.ToString();
 //        }
-        
+
 //        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
 //        await context.HttpContext.Response.WriteAsJsonAsync(
 //            new { error = "Too many requests. Please try again later." },
@@ -57,7 +57,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
         var jwtSettings = builder.Configuration.GetSection("Jwt");
-        
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -69,7 +69,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             IssuerSigningKey = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(jwtSettings["SecretKey"]!))
         };
-        
+
         options.Events = new JwtBearerEvents
         {
             OnAuthenticationFailed = context =>

@@ -26,7 +26,7 @@ public class GitHubTicketProvider : ITicketProvider
         try
         {
             var client = _apiClientFactory.CreateClient(integration);
-            
+
             // GitHub uses page-based pagination (1-indexed)
             var page = string.IsNullOrEmpty(pageToken) ? 1 : int.Parse(pageToken);
             var (issues, hasNextPage) = await client.GetRepositoryIssuesAsync(page, maxResults, cancellationToken);
@@ -83,12 +83,12 @@ public class GitHubTicketProvider : ITicketProvider
         try
         {
             var client = _apiClientFactory.CreateClient(integration);
-            
+
             if (!int.TryParse(externalTicketId, out var issueNumber))
                 return null;
 
             var issue = await client.GetIssueAsync(issueNumber, cancellationToken);
-            
+
             var comments = await client.GetIssueCommentsAsync(issueNumber, cancellationToken);
             var commentDtos = comments.Select(c => new CommentDto(
                 Id: c.Id.ToString(),
@@ -130,7 +130,7 @@ public class GitHubTicketProvider : ITicketProvider
         try
         {
             var client = _apiClientFactory.CreateClient(integration);
-            
+
             if (!int.TryParse(externalTicketId, out var issueNumber))
                 throw new InvalidOperationException($"Invalid issue number: {externalTicketId}");
 
@@ -160,7 +160,7 @@ public class GitHubTicketProvider : ITicketProvider
         try
         {
             var client = _apiClientFactory.CreateClient(integration);
-            
+
             var labels = new List<string>();
             if (!string.IsNullOrEmpty(issueTypeName) && issueTypeName.ToLower() != "task")
             {
@@ -194,7 +194,7 @@ public class GitHubTicketProvider : ITicketProvider
 
     private string GetPriorityFromLabels(List<Orchestra.Infrastructure.Integrations.Providers.GitHub.Models.GitHubLabel> labels)
     {
-        var priorityLabel = labels.FirstOrDefault(l => 
+        var priorityLabel = labels.FirstOrDefault(l =>
             l.Name.Contains("priority", StringComparison.OrdinalIgnoreCase) ||
             l.Name.Contains("urgent", StringComparison.OrdinalIgnoreCase) ||
             l.Name.Contains("critical", StringComparison.OrdinalIgnoreCase) ||
@@ -207,7 +207,7 @@ public class GitHubTicketProvider : ITicketProvider
     private string GetPriorityColor(List<Orchestra.Infrastructure.Integrations.Providers.GitHub.Models.GitHubLabel> labels)
     {
         var priorityName = GetPriorityFromLabels(labels).ToLower();
-        
+
         return priorityName switch
         {
             var p when p.Contains("critical") || p.Contains("urgent") => "bg-red-100 text-red-800",
@@ -220,7 +220,7 @@ public class GitHubTicketProvider : ITicketProvider
     private int GetPriorityValue(List<Orchestra.Infrastructure.Integrations.Providers.GitHub.Models.GitHubLabel> labels)
     {
         var priorityName = GetPriorityFromLabels(labels).ToLower();
-        
+
         return priorityName switch
         {
             var p when p.Contains("critical") || p.Contains("urgent") => 1,

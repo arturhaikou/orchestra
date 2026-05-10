@@ -23,7 +23,7 @@ public interface ITicketMappingService
     /// Fallback value ensures graceful handling of unknown statuses.
     /// </remarks>
     string MapStatusToDisplay(string externalStatus, ProviderType providerType);
-    
+
     /// <summary>
     /// Maps external priority name to display string with fallback.
     /// </summary>
@@ -38,7 +38,7 @@ public interface ITicketMappingService
     /// Fallback value ensures graceful handling of unknown priorities.
     /// </remarks>
     string MapPriorityToDisplay(string externalPriority, ProviderType providerType);
-    
+
     /// <summary>
     /// Constructs external ticket URL from integration base URL and ticket ID.
     /// </summary>

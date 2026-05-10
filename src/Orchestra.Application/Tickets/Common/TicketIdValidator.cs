@@ -45,8 +45,8 @@ public static class TicketIdValidator
     /// </summary>
     public static bool IsGuidFormat(string ticketId)
     {
-        return !string.IsNullOrWhiteSpace(ticketId) 
-            && !ticketId.Contains(':') 
+        return !string.IsNullOrWhiteSpace(ticketId)
+            && !ticketId.Contains(':')
             && Guid.TryParse(ticketId, out _);
     }
 
@@ -71,7 +71,7 @@ public static class TicketIdValidator
     {
         // Split at first colon (limit to 2 parts)
         var parts = ticketId.Split(':', 2);
-        
+
         if (parts.Length != 2)
         {
             throw new ArgumentException(

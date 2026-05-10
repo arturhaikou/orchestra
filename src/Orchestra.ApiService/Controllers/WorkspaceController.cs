@@ -145,11 +145,11 @@ public class WorkspaceController : ControllerBase
             }
 
             var result = await _workspaceService.UpdateWorkspaceAsync(
-                userId, 
-                id, 
-                request, 
+                userId,
+                id,
+                request,
                 cancellationToken);
-            
+
             return Ok(result);
         }
         catch (InvalidAIModelIdentifierException ex)
@@ -473,7 +473,7 @@ public class WorkspaceController : ControllerBase
         var violations = string.Join(
             " | ",
             invalidModelsByFeature.Select(kvp => $"The model '{kvp.Value}' specified for {kvp.Key} is not available."));
-        
+
         return violations;
     }
 }

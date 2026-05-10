@@ -28,7 +28,7 @@ public class JiraTicketProvider : ITicketProvider
         _contentConverter = contentConverter;
     }
 
-    public async Task<(List<ExternalTicketDto> Tickets, bool IsLast, string? NextPageToken)> 
+    public async Task<(List<ExternalTicketDto> Tickets, bool IsLast, string? NextPageToken)>
         FetchTicketsAsync(
             Integration integration,
             int startAt = 0,
@@ -38,8 +38,8 @@ public class JiraTicketProvider : ITicketProvider
     {
         var apiClient = _apiClientFactory.CreateClient(integration);
         var filter = integration.FilterQuery;
-        var jql = !string.IsNullOrWhiteSpace(filter) 
-            ? $"{filter} ORDER BY priority DESC, updated DESC" 
+        var jql = !string.IsNullOrWhiteSpace(filter)
+            ? $"{filter} ORDER BY priority DESC, updated DESC"
             : "ORDER BY priority DESC, updated DESC";
         try
         {
@@ -61,7 +61,7 @@ public class JiraTicketProvider : ITicketProvider
             }
             _logger.LogDebug("Fetched {TicketCount} tickets, IsLast={IsLast}",
                 searchResponse.Tickets?.Count ?? 0, searchResponse.IsLast);
-            var tickets = (await Task.WhenAll(searchResponse.Tickets?.Select(async jiraTicket => 
+            var tickets = (await Task.WhenAll(searchResponse.Tickets?.Select(async jiraTicket =>
                 await MapJiraTicketToDtoAsync(jiraTicket, integration, cancellationToken)) ?? Array.Empty<Task<ExternalTicketDto>>())).ToList();
             return (tickets, searchResponse.IsLast, searchResponse.NextPageToken);
         }
@@ -102,18 +102,18 @@ public class JiraTicketProvider : ITicketProvider
     {
         var apiClient = _apiClientFactory.CreateClient(integration);
         var fields = "key,status,priority,summary,description,comment,created,updated";
-        
+
         try
         {
             var jiraTicket = await apiClient.GetIssueAsync(externalTicketId, fields, cancellationToken);
-            
+
             if (jiraTicket == null)
             {
                 _logger.LogWarning("Jira ticket {TicketId} not found in integration {IntegrationId}",
                     externalTicketId, integration.Id);
                 return null;
             }
-            
+
             return await MapJiraTicketToDtoAsync(jiraTicket, integration, cancellationToken);
         }
         catch (HttpRequestException ex)
@@ -132,17 +132,17 @@ public class JiraTicketProvider : ITicketProvider
         CancellationToken cancellationToken = default)
     {
         var apiClient = _apiClientFactory.CreateClient(integration);
-        
+
         // Convert markdown to appropriate format (ADF for Cloud, HTML for On-Premise)
         var commentBody = await _contentConverter.ConvertMarkdownToCommentBodyAsync(
-            content, 
-            IntegrationTypeDetector.DetectJiraType(integration.Url), 
+            content,
+            IntegrationTypeDetector.DetectJiraType(integration.Url),
             cancellationToken);
-        
+
         try
         {
             await apiClient.AddCommentAsync(externalTicketId, commentBody, cancellationToken);
-            
+
             return new CommentDto(
                 Guid.NewGuid().ToString(),
                 author,
@@ -165,7 +165,7 @@ public class JiraTicketProvider : ITicketProvider
         CancellationToken cancellationToken = default)
     {
         var apiClient = _apiClientFactory.CreateClient(integration);
-        
+
         try
         {
             _logger.LogInformation(
@@ -173,19 +173,19 @@ public class JiraTicketProvider : ITicketProvider
                 integration.Id,
                 summary,
                 issueTypeName);
-            
+
             // Step 1: Get project ID from filter query
             var projectId = await GetProjectIdFromFilterQueryAsync(apiClient, integration, cancellationToken);
-            
+
             // Step 2: Resolve issue type name to ID
             var issueTypeId = await GetIssueTypeIdAsync(apiClient, issueTypeName, cancellationToken);
-            
+
             // Step 3: Convert markdown description to appropriate format
             var descriptionBody = await _contentConverter.ConvertMarkdownToDescriptionAsync(
                 description,
                 IntegrationTypeDetector.DetectJiraType(integration.Url),
                 cancellationToken);
-            
+
             // Step 4: Build create issue request
             var request = new CreateIssueRequest
             {
@@ -197,29 +197,29 @@ public class JiraTicketProvider : ITicketProvider
                     Project = new ProjectField { Id = projectId }
                 }
             };
-            
+
             _logger.LogDebug(
-                "Creating JIRA issue in project {ProjectId} with type {IssueTypeId} for integration {IntegrationId}", 
-                projectId, 
-                issueTypeId, 
+                "Creating JIRA issue in project {ProjectId} with type {IssueTypeId} for integration {IntegrationId}",
+                projectId,
+                issueTypeId,
                 integration.Id);
-            
+
             var response = await apiClient.CreateIssueAsync(request, cancellationToken);
-            
+
             if (string.IsNullOrEmpty(response.Key))
             {
                 _logger.LogError("JIRA returned null or empty issue key for integration {IntegrationId}", integration.Id);
                 throw new InvalidOperationException("Failed to create JIRA issue: No issue key returned.");
             }
-            
+
             var baseUrl = integration.Url?.TrimEnd('/') ?? string.Empty;
             var issueUrl = $"{baseUrl}/browse/{response.Key}";
-            
+
             _logger.LogInformation(
                 "Successfully created JIRA issue {IssueKey} in integration {IntegrationId}",
                 response.Key,
                 integration.Id);
-            
+
             return new ExternalTicketCreationResult(
                 IssueKey: response.Key,
                 IssueUrl: issueUrl,
@@ -244,19 +244,19 @@ public class JiraTicketProvider : ITicketProvider
         CancellationToken cancellationToken = default)
     {
         // Build JQL query from FilterQuery (or use default if empty)
-        var jql = string.IsNullOrEmpty(integration.FilterQuery) 
-            ? "ORDER BY updated DESC" 
+        var jql = string.IsNullOrEmpty(integration.FilterQuery)
+            ? "ORDER BY updated DESC"
             : integration.FilterQuery;
-        
+
         _logger.LogDebug(
-            "Fetching project ID from JIRA integration {IntegrationId} using JQL: {Jql}", 
-            integration.Id, 
+            "Fetching project ID from JIRA integration {IntegrationId} using JQL: {Jql}",
+            integration.Id,
             jql);
-        
+
         var searchResponse = await apiClient.SearchIssuesAsync(jql, "project", 0, 1, null, cancellationToken);
-        
+
         var projectId = searchResponse?.Tickets?.FirstOrDefault()?.Fields?.Project?.Id;
-        
+
         if (string.IsNullOrEmpty(projectId))
         {
             _logger.LogError("No project found in FilterQuery results for integration {IntegrationId}", integration.Id);
@@ -264,7 +264,7 @@ public class JiraTicketProvider : ITicketProvider
                 $"No project found in FilterQuery results for integration {integration.Id}. " +
                 $"Ensure FilterQuery returns at least one issue.");
         }
-        
+
         _logger.LogDebug("Resolved project ID {ProjectId} for integration {IntegrationId}", projectId, integration.Id);
         return projectId;
     }
@@ -275,14 +275,14 @@ public class JiraTicketProvider : ITicketProvider
         CancellationToken cancellationToken = default)
     {
         _logger.LogDebug(
-            "Fetching issue type ID for '{IssueTypeName}'", 
+            "Fetching issue type ID for '{IssueTypeName}'",
             issueTypeName);
-        
+
         var issueTypes = await apiClient.GetIssueTypesAsync(cancellationToken);
-        
-        var issueType = issueTypes?.FirstOrDefault(it => 
+
+        var issueType = issueTypes?.FirstOrDefault(it =>
             string.Equals(it.Name, issueTypeName, StringComparison.OrdinalIgnoreCase));
-        
+
         if (issueType == null)
         {
             _logger.LogError("Issue type '{IssueTypeName}' not found", issueTypeName);
@@ -290,12 +290,12 @@ public class JiraTicketProvider : ITicketProvider
                 $"Issue type '{issueTypeName}' not found in JIRA. " +
                 $"Available types: {string.Join(", ", issueTypes?.Select(it => it.Name) ?? new List<string>())}");
         }
-        
+
         _logger.LogDebug(
-            "Resolved issue type '{IssueTypeName}' to ID {IssueTypeId}", 
-            issueTypeName, 
+            "Resolved issue type '{IssueTypeName}' to ID {IssueTypeId}",
+            issueTypeName,
             issueType.Id);
-        
+
         return issueType.Id;
     }
 
@@ -364,7 +364,7 @@ public class JiraTicketProvider : ITicketProvider
         {
             return new List<CommentDto>();
         }
-        
+
         try
         {
             var comments = new List<CommentDto>();
@@ -374,20 +374,20 @@ public class JiraTicketProvider : ITicketProvider
                     comment.Body,
                     jiraType,
                     cancellationToken);
-                
+
                 comments.Add(new CommentDto(
                     comment.Id ?? Guid.NewGuid().ToString(),
                     comment.Author?.DisplayName ?? "Unknown",
                     markdown ?? string.Empty
                 ));
             }
-            
+
             _logger.LogDebug("Successfully converted {Count} comments to Markdown", comments.Count);
             return comments;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to convert {Count} comments to Markdown. Sync operation will fail.", 
+            _logger.LogError(ex, "Failed to convert {Count} comments to Markdown. Sync operation will fail.",
                 jiraComments.Count());
             throw;
         }
@@ -401,21 +401,21 @@ public class JiraTicketProvider : ITicketProvider
         Domain.Enums.JiraType jiraType,
         CancellationToken cancellationToken = default)
     {
-        if (!description.HasValue || 
-            description.Value.ValueKind == JsonValueKind.Undefined || 
+        if (!description.HasValue ||
+            description.Value.ValueKind == JsonValueKind.Undefined ||
             description.Value.ValueKind == JsonValueKind.Null)
         {
             return string.Empty;
         }
-        
+
         try
         {
             var markdown = await _contentConverter.ConvertDescriptionToMarkdownAsync(
                 description.Value,
                 jiraType,
                 cancellationToken);
-            
-            _logger.LogDebug("Successfully converted description to Markdown: {MarkdownLength} characters", 
+
+            _logger.LogDebug("Successfully converted description to Markdown: {MarkdownLength} characters",
                 markdown?.Length ?? 0);
             return markdown ?? string.Empty;
         }

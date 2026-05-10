@@ -110,11 +110,11 @@ public class WorkspaceProviderServiceTests
         // Assert — the repository staged exactly one entity with encrypted credentials
         await _repository.Received(1).AddAsync(
             Arg.Is<AIProviderConfiguration>(c =>
-                c.WorkspaceId    == workspaceId &&
-                c.ProviderType   == AIProviderType.AzureOpenAI &&
-                c.Endpoint       == "ENC_ENDPOINT" &&
-                c.ApiKey         == "ENC_APIKEY" &&
-                c.CreatedAt      != default),
+                c.WorkspaceId == workspaceId &&
+                c.ProviderType == AIProviderType.AzureOpenAI &&
+                c.Endpoint == "ENC_ENDPOINT" &&
+                c.ApiKey == "ENC_APIKEY" &&
+                c.CreatedAt != default),
             Arg.Any<CancellationToken>());
     }
 
@@ -147,11 +147,11 @@ public class WorkspaceProviderServiceTests
         // Assert — entity has Endpoint (Ollama base URL) and DefaultModelId set; ApiKey is null
         await _repository.Received(1).AddAsync(
             Arg.Is<AIProviderConfiguration>(c =>
-                c.WorkspaceId    == workspaceId &&
-                c.ProviderType   == AIProviderType.Ollama &&
-                c.Endpoint       == "http://localhost:11434" &&
+                c.WorkspaceId == workspaceId &&
+                c.ProviderType == AIProviderType.Ollama &&
+                c.Endpoint == "http://localhost:11434" &&
                 c.DefaultModelId == "llama3:latest" &&
-                c.ApiKey         == null),
+                c.ApiKey == null),
             Arg.Any<CancellationToken>());
 
         // Assert — encryption service was never called for Ollama
@@ -322,12 +322,12 @@ public class WorkspaceProviderServiceTests
         // Assert — UpdateAsync was called with the mutated entity including the new DefaultModelId
         await _repository.Received(1).UpdateAsync(
             Arg.Is<AIProviderConfiguration>(c =>
-                c.WorkspaceId    == workspaceId &&
-                c.ProviderType   == AIProviderType.AzureOpenAI &&
-                c.Endpoint       == "NEW_ENC_ENDPOINT" &&
-                c.ApiKey         == "NEW_ENC_KEY" &&
+                c.WorkspaceId == workspaceId &&
+                c.ProviderType == AIProviderType.AzureOpenAI &&
+                c.Endpoint == "NEW_ENC_ENDPOINT" &&
+                c.ApiKey == "NEW_ENC_KEY" &&
                 c.DefaultModelId == "gpt-4o" &&
-                c.UpdatedAt      != null),
+                c.UpdatedAt != null),
             Arg.Any<CancellationToken>());
 
         // Assert — new ciphertext differs from the original stored values
@@ -437,7 +437,7 @@ public class WorkspaceProviderServiceTests
         // Assert — DefaultModelId is updated to the new value
         await _repository.Received(1).UpdateAsync(
             Arg.Is<AIProviderConfiguration>(c =>
-                c.WorkspaceId    == workspaceId &&
+                c.WorkspaceId == workspaceId &&
                 c.DefaultModelId == "gpt-4o"),
             Arg.Any<CancellationToken>());
     }
@@ -475,8 +475,8 @@ public class WorkspaceProviderServiceTests
         // Assert — DefaultModelId is explicitly null after the update
         await _repository.Received(1).UpdateAsync(
             Arg.Is<AIProviderConfiguration>(c =>
-                c.WorkspaceId    == workspaceId &&
-                c.ProviderType   == AIProviderType.AzureOpenAI &&
+                c.WorkspaceId == workspaceId &&
+                c.ProviderType == AIProviderType.AzureOpenAI &&
                 c.DefaultModelId == null),
             Arg.Any<CancellationToken>());
     }
@@ -499,7 +499,7 @@ public class WorkspaceProviderServiceTests
             workspaceId,
             AIProviderType.AzureOpenAI,
             endpoint: "ENC_ENDPOINT",
-            apiKey:   "ENC_APIKEY");
+            apiKey: "ENC_APIKEY");
 
         _repository
             .GetByWorkspaceIdAsync(workspaceId, Arg.Any<CancellationToken>())
@@ -639,7 +639,7 @@ public class WorkspaceProviderServiceTests
             workspaceId,
             AIProviderType.AzureOpenAI,
             endpoint: "ENC_ENDPOINT",
-            apiKey:   "ENC_APIKEY");
+            apiKey: "ENC_APIKEY");
 
         _repository
             .GetByWorkspaceIdAsync(workspaceId, Arg.Any<CancellationToken>())
@@ -905,7 +905,7 @@ public class WorkspaceProviderServiceTests
         await _repository.Received(1).AddAsync(
             Arg.Is<AIProviderConfiguration>(c =>
                 c.DefaultModelId == "llama3:latest" &&
-                c.ProviderType   == AIProviderType.Ollama),
+                c.ProviderType == AIProviderType.Ollama),
             Arg.Any<CancellationToken>());
     }
 
@@ -988,7 +988,7 @@ public class WorkspaceProviderServiceTests
         // Assert — AIProviderConfiguration is updated with the new DefaultModelId
         await _repository.Received(1).UpdateAsync(
             Arg.Is<AIProviderConfiguration>(c =>
-                c.WorkspaceId    == workspaceId &&
+                c.WorkspaceId == workspaceId &&
                 c.DefaultModelId == newModelId),
             Arg.Any<CancellationToken>());
 

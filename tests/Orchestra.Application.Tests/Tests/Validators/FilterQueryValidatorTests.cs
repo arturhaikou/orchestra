@@ -54,7 +54,7 @@ public class FilterQueryValidatorTests
         string filterQuery = null;
 
         // Act & Assert
-        var ex = Assert.Throws<ArgumentException>(() => 
+        var ex = Assert.Throws<ArgumentException>(() =>
             FilterQueryValidator.ValidateJiraFilterQuery(filterQuery));
         Assert.Contains("required and cannot be empty", ex.Message);
     }
@@ -66,7 +66,7 @@ public class FilterQueryValidatorTests
         var filterQuery = "";
 
         // Act & Assert
-        var ex = Assert.Throws<ArgumentException>(() => 
+        var ex = Assert.Throws<ArgumentException>(() =>
             FilterQueryValidator.ValidateJiraFilterQuery(filterQuery));
         Assert.Contains("required and cannot be empty", ex.Message);
     }
@@ -78,7 +78,7 @@ public class FilterQueryValidatorTests
         var filterQuery = "   ";
 
         // Act & Assert
-        var ex = Assert.Throws<ArgumentException>(() => 
+        var ex = Assert.Throws<ArgumentException>(() =>
             FilterQueryValidator.ValidateJiraFilterQuery(filterQuery));
         Assert.Contains("required and cannot be empty", ex.Message);
     }
@@ -90,7 +90,7 @@ public class FilterQueryValidatorTests
         var filterQuery = "assignee = currentUser() AND status = Open";
 
         // Act & Assert
-        var ex = Assert.Throws<ArgumentException>(() => 
+        var ex = Assert.Throws<ArgumentException>(() =>
             FilterQueryValidator.ValidateJiraFilterQuery(filterQuery));
         Assert.Contains("'project' keyword exactly once", ex.Message);
     }
@@ -102,7 +102,7 @@ public class FilterQueryValidatorTests
         var filterQuery = "project = PROJ1 AND project = PROJ2";
 
         // Act & Assert
-        var ex = Assert.Throws<ArgumentException>(() => 
+        var ex = Assert.Throws<ArgumentException>(() =>
             FilterQueryValidator.ValidateJiraFilterQuery(filterQuery));
         Assert.Contains("'project' keyword exactly once", ex.Message);
     }
@@ -114,7 +114,7 @@ public class FilterQueryValidatorTests
         var filterQuery = "myproject = PROJ";
 
         // Act & Assert
-        var ex = Assert.Throws<ArgumentException>(() => 
+        var ex = Assert.Throws<ArgumentException>(() =>
             FilterQueryValidator.ValidateJiraFilterQuery(filterQuery));
         Assert.Contains("'project' keyword exactly once", ex.Message);
     }
@@ -126,7 +126,7 @@ public class FilterQueryValidatorTests
         var filterQuery = "PROJECT = PROJ";
 
         // Act & Assert - should fail strict case-sensitive matching
-        var ex = Assert.Throws<ArgumentException>(() => 
+        var ex = Assert.Throws<ArgumentException>(() =>
             FilterQueryValidator.ValidateJiraFilterQuery(filterQuery));
         Assert.Contains("'project' keyword exactly once", ex.Message);
     }
@@ -138,7 +138,7 @@ public class FilterQueryValidatorTests
         var filterQuery = "PROJECT = WEB AND assignee = currentUser()";
 
         // Act & Assert - should fail due to uppercase PROJECT
-        var ex = Assert.Throws<ArgumentException>(() => 
+        var ex = Assert.Throws<ArgumentException>(() =>
             FilterQueryValidator.ValidateJiraFilterQuery(filterQuery));
         Assert.Contains("'project' keyword exactly once", ex.Message);
     }
@@ -192,7 +192,7 @@ public class FilterQueryValidatorTests
         string filterQuery = null;
 
         // Act & Assert
-        var ex = Assert.Throws<ArgumentException>(() => 
+        var ex = Assert.Throws<ArgumentException>(() =>
             FilterQueryValidator.ValidateConfluenceFilterQuery(filterQuery));
         Assert.Contains("required and cannot be empty", ex.Message);
     }
@@ -204,7 +204,7 @@ public class FilterQueryValidatorTests
         var filterQuery = "";
 
         // Act & Assert
-        var ex = Assert.Throws<ArgumentException>(() => 
+        var ex = Assert.Throws<ArgumentException>(() =>
             FilterQueryValidator.ValidateConfluenceFilterQuery(filterQuery));
         Assert.Contains("required and cannot be empty", ex.Message);
     }
@@ -216,7 +216,7 @@ public class FilterQueryValidatorTests
         var filterQuery = "  \t\n  ";
 
         // Act & Assert
-        var ex = Assert.Throws<ArgumentException>(() => 
+        var ex = Assert.Throws<ArgumentException>(() =>
             FilterQueryValidator.ValidateConfluenceFilterQuery(filterQuery));
         Assert.Contains("required and cannot be empty", ex.Message);
     }
@@ -228,7 +228,7 @@ public class FilterQueryValidatorTests
         var filterQuery = "type = page AND title ~ documentation";
 
         // Act & Assert
-        var ex = Assert.Throws<ArgumentException>(() => 
+        var ex = Assert.Throws<ArgumentException>(() =>
             FilterQueryValidator.ValidateConfluenceFilterQuery(filterQuery));
         Assert.Contains("'space' keyword exactly once", ex.Message);
     }
@@ -240,7 +240,7 @@ public class FilterQueryValidatorTests
         var filterQuery = "space = SPACE1 AND space = SPACE2";
 
         // Act & Assert
-        var ex = Assert.Throws<ArgumentException>(() => 
+        var ex = Assert.Throws<ArgumentException>(() =>
             FilterQueryValidator.ValidateConfluenceFilterQuery(filterQuery));
         Assert.Contains("'space' keyword exactly once", ex.Message);
     }
@@ -252,7 +252,7 @@ public class FilterQueryValidatorTests
         var filterQuery = "myspace = DOCS";
 
         // Act & Assert
-        var ex = Assert.Throws<ArgumentException>(() => 
+        var ex = Assert.Throws<ArgumentException>(() =>
             FilterQueryValidator.ValidateConfluenceFilterQuery(filterQuery));
         Assert.Contains("'space' keyword exactly once", ex.Message);
     }
@@ -264,7 +264,7 @@ public class FilterQueryValidatorTests
         var filterQuery = "SPACE = ENGINEERING AND type = page";
 
         // Act & Assert - should fail due to uppercase SPACE
-        var ex = Assert.Throws<ArgumentException>(() => 
+        var ex = Assert.Throws<ArgumentException>(() =>
             FilterQueryValidator.ValidateConfluenceFilterQuery(filterQuery));
         Assert.Contains("'space' keyword exactly once", ex.Message);
     }
@@ -278,7 +278,7 @@ public class FilterQueryValidatorTests
         var filterQuery = "customproject = VALUE";
 
         // Act & Assert
-        var ex = Assert.Throws<ArgumentException>(() => 
+        var ex = Assert.Throws<ArgumentException>(() =>
             FilterQueryValidator.ValidateJiraFilterQuery(filterQuery));
         Assert.Contains("'project' keyword exactly once", ex.Message);
     }
@@ -310,7 +310,7 @@ public class FilterQueryValidatorTests
         var filterQuery = "myspace.key = DOCS";
 
         // Act & Assert
-        var ex = Assert.Throws<ArgumentException>(() => 
+        var ex = Assert.Throws<ArgumentException>(() =>
             FilterQueryValidator.ValidateConfluenceFilterQuery(filterQuery));
         Assert.Contains("'space' keyword exactly once", ex.Message);
     }
@@ -322,7 +322,7 @@ public class FilterQueryValidatorTests
         var filterQuery = "(space = DOCS OR space = ENG) AND type = page";
 
         // Act & Assert - should fail because space appears twice
-        var ex = Assert.Throws<ArgumentException>(() => 
+        var ex = Assert.Throws<ArgumentException>(() =>
             FilterQueryValidator.ValidateConfluenceFilterQuery(filterQuery));
         Assert.Contains("'space' keyword exactly once", ex.Message);
     }
@@ -334,7 +334,7 @@ public class FilterQueryValidatorTests
         var filterQuery = "project in (PROJ1, PROJ2)";
 
         // Act & Assert
-        var ex = Assert.Throws<ArgumentException>(() => 
+        var ex = Assert.Throws<ArgumentException>(() =>
             FilterQueryValidator.ValidateJiraFilterQuery(filterQuery));
         Assert.Contains("'in' or 'not in' operators", ex.Message);
     }
@@ -346,7 +346,7 @@ public class FilterQueryValidatorTests
         var filterQuery = "project in (PROJ)";
 
         // Act & Assert
-        var ex = Assert.Throws<ArgumentException>(() => 
+        var ex = Assert.Throws<ArgumentException>(() =>
             FilterQueryValidator.ValidateJiraFilterQuery(filterQuery));
         Assert.Contains("'in' or 'not in' operators", ex.Message);
     }
@@ -358,7 +358,7 @@ public class FilterQueryValidatorTests
         var filterQuery = "project not in (PROJ1, PROJ2)";
 
         // Act & Assert
-        var ex = Assert.Throws<ArgumentException>(() => 
+        var ex = Assert.Throws<ArgumentException>(() =>
             FilterQueryValidator.ValidateJiraFilterQuery(filterQuery));
         Assert.Contains("'in' or 'not in' operators", ex.Message);
     }
@@ -370,7 +370,7 @@ public class FilterQueryValidatorTests
         var filterQuery = "project in (PROJ)";
 
         // Act & Assert
-        var ex = Assert.Throws<ArgumentException>(() => 
+        var ex = Assert.Throws<ArgumentException>(() =>
             FilterQueryValidator.ValidateJiraFilterQuery(filterQuery));
         Assert.Contains("'in' or 'not in' operators", ex.Message);
     }
@@ -382,7 +382,7 @@ public class FilterQueryValidatorTests
         var filterQuery = "project IN (PROJ)";
 
         // Act & Assert
-        var ex = Assert.Throws<ArgumentException>(() => 
+        var ex = Assert.Throws<ArgumentException>(() =>
             FilterQueryValidator.ValidateJiraFilterQuery(filterQuery));
         Assert.Contains("'in' or 'not in' operators", ex.Message);
     }
@@ -394,7 +394,7 @@ public class FilterQueryValidatorTests
         var filterQuery = "project In (PROJ)";
 
         // Act & Assert
-        var ex = Assert.Throws<ArgumentException>(() => 
+        var ex = Assert.Throws<ArgumentException>(() =>
             FilterQueryValidator.ValidateJiraFilterQuery(filterQuery));
         Assert.Contains("'in' or 'not in' operators", ex.Message);
     }
@@ -408,7 +408,7 @@ public class FilterQueryValidatorTests
         var filterQuery = "space in (SPACE1, SPACE2)";
 
         // Act & Assert
-        var ex = Assert.Throws<ArgumentException>(() => 
+        var ex = Assert.Throws<ArgumentException>(() =>
             FilterQueryValidator.ValidateConfluenceFilterQuery(filterQuery));
         Assert.Contains("'in' or 'not in' operators", ex.Message);
     }
@@ -420,7 +420,7 @@ public class FilterQueryValidatorTests
         var filterQuery = "space in (MYSPACE)";
 
         // Act & Assert
-        var ex = Assert.Throws<ArgumentException>(() => 
+        var ex = Assert.Throws<ArgumentException>(() =>
             FilterQueryValidator.ValidateConfluenceFilterQuery(filterQuery));
         Assert.Contains("'in' or 'not in' operators", ex.Message);
     }
@@ -432,7 +432,7 @@ public class FilterQueryValidatorTests
         var filterQuery = "space not in (SPACE1, SPACE2)";
 
         // Act & Assert
-        var ex = Assert.Throws<ArgumentException>(() => 
+        var ex = Assert.Throws<ArgumentException>(() =>
             FilterQueryValidator.ValidateConfluenceFilterQuery(filterQuery));
         Assert.Contains("'in' or 'not in' operators", ex.Message);
     }
@@ -444,7 +444,7 @@ public class FilterQueryValidatorTests
         var filterQuery = "space IN (MYSPACE)";
 
         // Act & Assert
-        var ex = Assert.Throws<ArgumentException>(() => 
+        var ex = Assert.Throws<ArgumentException>(() =>
             FilterQueryValidator.ValidateConfluenceFilterQuery(filterQuery));
         Assert.Contains("'in' or 'not in' operators", ex.Message);
     }
@@ -456,7 +456,7 @@ public class FilterQueryValidatorTests
         var filterQuery = "space NOT IN (MYSPACE)";
 
         // Act & Assert
-        var ex = Assert.Throws<ArgumentException>(() => 
+        var ex = Assert.Throws<ArgumentException>(() =>
             FilterQueryValidator.ValidateConfluenceFilterQuery(filterQuery));
         Assert.Contains("'in' or 'not in' operators", ex.Message);
     }

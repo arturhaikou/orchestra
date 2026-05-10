@@ -51,7 +51,7 @@ public class JiraApiClientFactory
         }
 
         var httpClient = CreateAndConfigureHttpClient(integration);
-        
+
         // Detect type from URL: Cloud = *.atlassian.net, otherwise OnPremise
         var jiraType = IntegrationTypeDetector.DetectJiraType(integration.Url);
 

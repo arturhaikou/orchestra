@@ -2,6 +2,7 @@ using NSubstitute;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Agents.Templates;
 using Orchestra.Application.Common.Interfaces;
+using Orchestra.Application.McpServers.Interfaces;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
 using Orchestra.Tests.Shared.Builders;
@@ -34,6 +35,7 @@ public class AgentServiceTemplateDataTests
         var service = new AgentService(
             agentDataAccess,
             toolActionDataAccess,
+            Substitute.For<IAgentMcpToolDataAccess>(),
             authService,
             toolValidationService,
             templateRegistry,

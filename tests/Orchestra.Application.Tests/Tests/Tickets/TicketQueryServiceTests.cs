@@ -77,7 +77,7 @@ public class TicketQueryServiceTests
             Substitute.For<ISummarizationService>(),
             Substitute.For<ILogger<TicketEnrichmentService>>()
         );
-        
+
         _ticketEnrichmentService
             .CalculateSentimentAsync(Arg.Any<List<TicketDto>>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(x => enrichmentService.CalculateSentimentAsync(
@@ -459,15 +459,19 @@ public class TicketQueryServiceTests
             Arg.Any<int>(),
             null,
             Arg.Any<CancellationToken>())
-            .Returns(callInfo => {
+            .Returns(callInfo =>
+            {
                 var limit = callInfo.ArgAt<int>(1);
                 List<Orchestra.Application.Tickets.DTOs.TicketDto> page;
                 bool hasMore;
-                if (fetchCallCount == 0) {
+                if (fetchCallCount == 0)
+                {
                     // First call: return first 4 external, more remain
                     page = externalTicketDtosAsTicketDtos.Take(4).ToList();
                     hasMore = true;
-                } else {
+                }
+                else
+                {
                     // Second call: return remaining 3 external, no more remain
                     page = externalTicketDtosAsTicketDtos.Skip(4).Take(3).ToList();
                     hasMore = false;
@@ -1082,7 +1086,7 @@ public class TicketQueryServiceCSATModelResolutionTests
         var workspaceId = Guid.NewGuid();
         var userId = Guid.NewGuid();
         const string workspaceModelId = "gpt-4-turbo";
-        
+
         var workspace = new WorkspaceBuilder()
             .WithId(workspaceId)
             .WithIsCustomerSatisfactionAnalysisEnabled(true)
@@ -1136,7 +1140,7 @@ public class TicketQueryServiceCSATModelResolutionTests
         // Arrange
         var workspaceId = Guid.NewGuid();
         var userId = Guid.NewGuid();
-        
+
         var workspace = new WorkspaceBuilder()
             .WithId(workspaceId)
             .WithIsCustomerSatisfactionAnalysisEnabled(true)

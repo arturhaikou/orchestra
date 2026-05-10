@@ -16,7 +16,11 @@ public interface IIntegrationDataAccess
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of active integrations ordered by Type and Name.</returns>
     Task<List<Integration>> GetByWorkspaceIdAsync(
-        Guid workspaceId, 
+        Guid workspaceId,
+        CancellationToken cancellationToken = default);
+
+    Task<List<Integration>> GetMcpServersByWorkspaceIdAsync(
+        Guid workspaceId,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -26,7 +30,7 @@ public interface IIntegrationDataAccess
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The integration entity or null if not found.</returns>
     Task<Integration?> GetByIdAsync(
-        Guid integrationId, 
+        Guid integrationId,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -57,9 +61,9 @@ public interface IIntegrationDataAccess
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>True if a duplicate name exists, false otherwise.</returns>
     Task<bool> ExistsByNameInWorkspaceAsync(
-        string name, 
-        Guid workspaceId, 
-        Guid? excludeIntegrationId = null, 
+        string name,
+        Guid workspaceId,
+        Guid? excludeIntegrationId = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -109,4 +113,6 @@ public interface IIntegrationDataAccess
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     Task UpdateAsync(Integration integration, CancellationToken cancellationToken = default);
+
+    Task SoftDeleteAsync(Guid integrationId, CancellationToken cancellationToken = default);
 }

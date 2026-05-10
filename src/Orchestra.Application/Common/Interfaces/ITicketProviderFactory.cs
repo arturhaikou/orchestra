@@ -22,7 +22,7 @@ public interface ITicketProviderFactory
     /// The application can log a warning and continue with other providers.
     /// </remarks>
     ITicketProvider? CreateProvider(ProviderType providerType);
-    
+
     /// <summary>
     /// Gets all currently supported provider types.
     /// </summary>

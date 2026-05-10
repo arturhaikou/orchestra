@@ -44,7 +44,7 @@ const CapabilitiesSection: React.FC<{ capabilities: string[] }> = ({ capabilitie
   </div>
 );
 
-const ToolingSection: React.FC<{ toolCategories?: string[] }> = ({ toolCategories }) => (
+const ToolingSection: React.FC<{ toolCategories?: string[]; mcpServerNames?: string[] }> = ({ toolCategories, mcpServerNames }) => (
   <div className="space-y-2">
     <div className="text-[10px] font-bold text-textMuted uppercase tracking-widest flex items-center gap-1.5">
         <Wrench className="w-3 h-3" /> Tooling
@@ -54,7 +54,13 @@ const ToolingSection: React.FC<{ toolCategories?: string[] }> = ({ toolCategorie
             <span key={category} className="text-[10px] bg-primary/10 border border-primary/20 text-primary px-2 py-0.5 rounded flex items-center gap-1">
                 <Sparkles className="w-2.5 h-2.5" /> {category}
             </span>
-        )) : <span className="text-[10px] text-textMuted italic">No tools authorized</span>}
+        )) : null}
+        {mcpServerNames && mcpServerNames.length > 0 ? mcpServerNames.map(serverName => (
+            <span key={serverName} className="text-[10px] bg-violet-500/10 border border-violet-500/20 text-violet-400 px-2 py-0.5 rounded flex items-center gap-1">
+                <Sparkles className="w-2.5 h-2.5" /> {serverName}
+            </span>
+        )) : null}
+        {(!toolCategories || toolCategories.length === 0) && (!mcpServerNames || mcpServerNames.length === 0) ? <span className="text-[10px] text-textMuted italic">No tools authorized</span> : null}
     </div>
   </div>
 );
@@ -100,7 +106,7 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, openGuideId, onToggleGuide
         
         <div className="flex-1 space-y-4">
           <CapabilitiesSection capabilities={agent.capabilities} />
-          <ToolingSection toolCategories={agent.toolCategories} />
+          <ToolingSection toolCategories={agent.toolCategories} mcpServerNames={agent.mcpServerNames} />
           <ModelSection model={agent.model} />
         </div>
 

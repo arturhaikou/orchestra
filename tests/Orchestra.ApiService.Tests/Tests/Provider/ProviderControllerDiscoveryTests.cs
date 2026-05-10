@@ -96,7 +96,7 @@ public class ProviderControllerDiscoveryTests
         // Arrange
         _mockDiscoveryService
             .DiscoverModelsAsync(ValidEndpoint, ValidApiKey, Arg.Any<CancellationToken>())
-            .Throws(new AIProviderCommunicationException(
+.ThrowsAsync(new AIProviderCommunicationException(
                 "Azure OpenAI returned HTTP 401 when listing models."));
 
         var request = new DiscoverAzureModelsRequest

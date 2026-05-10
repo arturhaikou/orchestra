@@ -74,10 +74,10 @@ internal sealed class IntegrationResolver : IIntegrationResolver
 
     private static string GetProviderFriendlyName(ProviderType providerType) => providerType switch
     {
-        ProviderType.JIRA       => "Jira",
-        ProviderType.GITHUB     => "GitHub",
-        ProviderType.GITLAB     => "GitLab",
+        ProviderType.JIRA => "Jira",
+        ProviderType.GITHUB => "GitHub",
+        ProviderType.GITLAB => "GitLab",
         ProviderType.CONFLUENCE => "Confluence",
-        _                       => providerType.ToString()
+        _ => providerType.ToString()
     };
 }

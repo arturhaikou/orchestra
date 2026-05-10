@@ -46,7 +46,7 @@ public class JiraOnPremiseApiClient : IJiraApiClient
             EnsureSuccessOrThrowAuthError(response);
 
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
-            
+
             JiraSearchResponse searchResponse;
             try
             {
@@ -246,7 +246,7 @@ public class JiraOnPremiseApiClient : IJiraApiClient
             EnsureSuccessOrThrowAuthError(response);
 
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
-            
+
             // On-Premise v2 API returns a direct array of projects
             var projects = JsonSerializer.Deserialize<List<Project>>(
                 content,

@@ -47,8 +47,8 @@ public sealed class AIProviderResolver : IAIProviderResolver
                                              config.Endpoint!,
                                              config.ApiKey!,
                                              modelId),
-            AIProviderType.Ollama      => BuildOllamaClient(config.Endpoint!, modelId),
-            _                          => throw new InvalidOperationException(
+            AIProviderType.Ollama => BuildOllamaClient(config.Endpoint!, modelId),
+            _ => throw new InvalidOperationException(
                                              $"Unsupported AI provider type: {config.ProviderType}")
         };
     }

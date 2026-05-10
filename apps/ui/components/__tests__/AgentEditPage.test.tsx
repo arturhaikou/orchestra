@@ -7,6 +7,7 @@ import AgentEditPage from '../pages/AgentEditPage';
 import * as agentService from '../../services/agentService';
 import * as toolService from '../../services/toolService';
 import * as workspaceService from '../../services/workspaceService';
+import * as mcpServerService from '../../services/mcpServerService';
 import { Agent, Tool } from '../../types';
 
 vi.mock('../../services/agentService', () => ({
@@ -23,6 +24,10 @@ vi.mock('../../services/toolService', () => ({
   getTools: vi.fn(),
 }));
 
+vi.mock('../../services/mcpServerService', () => ({
+  getMcpServers: vi.fn(),
+}));
+
 vi.mock('../../services/workspaceService', () => ({
   fetchWorkspaceModels: vi.fn(),
   getWorkspaces: vi.fn(),
@@ -34,6 +39,10 @@ vi.mock('../../services/workspaceService', () => ({
   fetchPlatformModels: vi.fn(),
   getWorkspaceProviderConfig: vi.fn(),
   updateWorkspaceProvider: vi.fn(),
+}));
+
+vi.mock('../../utils/markdownRenderer', () => ({
+  renderMarkdown: vi.fn((input: string) => `<p>${input}</p>`),
 }));
 
 const mockAgent: Agent = {
@@ -70,6 +79,26 @@ const mockBuiltInAgent: Agent = {
   templateId: 'code-review-template',
   templateVersion: 1,
   isBuiltIn: true,
+};
+
+const codeReviewActionIds = ['cr-a1', 'cr-a2', 'cr-a3', 'cr-a4', 'cr-a5'];
+const selectedCodeReviewIds = ['cr-a1', 'cr-a2', 'cr-a3'];
+
+const codeReviewTool: Tool = {
+  id: 'tool-cr',
+  name: 'Code Review',
+  description: 'Code review tool',
+  category: 'CODE',
+  icon: 'code',
+  source: 'native',
+  actions: codeReviewActionIds.map(id => ({
+    id,
+    name: `action_${id}`,
+    description: `Action ${id}`,
+    dangerLevel: 'Safe' as const,
+    isMcpTool: false,
+    isEnabled: true,
+  })),
 };
 
 const mockTools: Tool[] = [
@@ -109,6 +138,7 @@ describe('AgentEditPage', () => {
     vi.mocked(agentService.updateAgent).mockResolvedValue({ ...mockAgent, role: 'Updated Role' });
     vi.mocked(toolService.getTools).mockResolvedValue(mockTools);
     vi.mocked(workspaceService.fetchWorkspaceModels).mockResolvedValue(['gpt-4', 'gpt-3.5-turbo']);
+    vi.mocked(mcpServerService.getMcpServers).mockResolvedValue([]);
   });
 
   describe('Scenario 1: Navigate to agent edit page', () => {
@@ -274,6 +304,37 @@ describe('AgentEditPage', () => {
     });
   });
 
+  describe('FR-005 — Scenario 7: Edit page loads existing selections as cards', () => {
+    beforeEach(() => {
+      vi.mocked(mcpServerService.getMcpServers).mockResolvedValue([]);
+      vi.mocked(toolService.getTools).mockResolvedValue([codeReviewTool]);
+      vi.mocked(agentService.getAgent).mockResolvedValue({
+        ...mockAgent,
+        toolActionIds: selectedCodeReviewIds,
+      });
+    });
+
+    it('shows_summary_card_for_pre_existing_tool_selections_on_page_load', async () => {
+      renderAgentEditPage();
+      await screen.findByText('Code Review');
+      expect(screen.getByText('Code Review')).toBeInTheDocument();
+    });
+
+    it('shows_correct_3_of_5_count_on_loaded_card', async () => {
+      renderAgentEditPage();
+      await screen.findByText('Code Review');
+      const badge = screen.getByTestId('selection-count');
+      expect(badge).toHaveTextContent('3');
+      expect(badge).toHaveTextContent('5');
+    });
+
+    it('renders_add_tools_button_alongside_pre_loaded_card', async () => {
+      renderAgentEditPage();
+      await screen.findByText('Code Review');
+      expect(screen.getByTestId('add-tools-button')).toBeInTheDocument();
+    });
+  });
+
   describe('Scenario 5: Built-in agent shows locked fields', () => {
     beforeEach(() => {
       vi.mocked(agentService.getAgent).mockResolvedValue(mockBuiltInAgent);
@@ -327,6 +388,73 @@ describe('AgentEditPage', () => {
       await waitFor(() => {
         expect(screen.getByText(/locked|built-in|cannot be modified/i)).toBeInTheDocument();
       });
+    });
+  });
+
+  describe('FR-007 — Custom Instructions Markdown Preview Toggle on Edit page', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      vi.mocked(agentService.getAgent).mockResolvedValue(mockAgent);
+      vi.mocked(agentService.updateAgent).mockResolvedValue({ ...mockAgent, role: 'Updated Role' });
+      vi.mocked(toolService.getTools).mockResolvedValue(mockTools);
+      vi.mocked(workspaceService.fetchWorkspaceModels).mockResolvedValue(['gpt-4', 'gpt-3.5-turbo']);
+      vi.mocked(mcpServerService.getMcpServers).mockResolvedValue([]);
+    });
+
+    it('renders_edit_write_and_preview_toggle_buttons_near_custom_instructions_field', async () => {
+      renderAgentEditPage();
+
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('Support Bot')).toBeInTheDocument();
+      });
+
+      const writeButton = screen.queryByRole('button', { name: /write|edit/i });
+      const previewButton = screen.queryByRole('button', { name: /preview/i });
+
+      expect(writeButton).toBeTruthy();
+      expect(previewButton).toBeTruthy();
+    });
+
+    it('custom_instructions_textarea_shows_preloaded_agent_value_in_edit_mode', async () => {
+      renderAgentEditPage();
+
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('Help customers with their issues')).toBeInTheDocument();
+      });
+
+      const textarea = screen.getByLabelText(/custom instructions/i);
+      expect(textarea).toHaveValue('Help customers with their issues');
+    });
+
+    it('switching_to_preview_mode_does_not_clear_the_loaded_custominstructions_value', async () => {
+      const user = userEvent.setup();
+      renderAgentEditPage();
+
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('Help customers with their issues')).toBeInTheDocument();
+      });
+
+      const textarea = screen.getByLabelText(/custom instructions/i);
+      const previewButton = screen.queryByRole('button', { name: /preview/i });
+
+      if (previewButton) {
+        await user.click(previewButton);
+        await user.click(screen.getByRole('button', { name: /write|edit/i }));
+      }
+
+      expect(textarea).toHaveValue('Help customers with their issues');
+    });
+
+    it('does_not_render_toggle_buttons_when_agent_is_builtin', async () => {
+      vi.mocked(agentService.getAgent).mockResolvedValue(mockBuiltInAgent);
+      renderAgentEditPage('agent-builtin');
+
+      await waitFor(() => {
+        expect(screen.getByText('Code Reviewer')).toBeInTheDocument();
+      });
+
+      const previewButton = screen.queryByRole('button', { name: /preview/i });
+      expect(previewButton).not.toBeInTheDocument();
     });
   });
 });

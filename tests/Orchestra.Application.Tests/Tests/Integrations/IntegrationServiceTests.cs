@@ -14,6 +14,7 @@ public class IntegrationServiceTests
     private readonly Mock<IIntegrationDataAccess> _integrationDataAccessMock;
     private readonly Mock<IWorkspaceAuthorizationService> _workspaceAuthorizationServiceMock;
     private readonly Mock<ICredentialEncryptionService> _credentialEncryptionServiceMock;
+    private readonly Mock<IMcpToolDiscoveryService> _mcpToolDiscoveryServiceMock;
     private readonly IntegrationService _sut;
 
     public IntegrationServiceTests()
@@ -21,6 +22,7 @@ public class IntegrationServiceTests
         _integrationDataAccessMock = new Mock<IIntegrationDataAccess>();
         _workspaceAuthorizationServiceMock = new Mock<IWorkspaceAuthorizationService>();
         _credentialEncryptionServiceMock = new Mock<ICredentialEncryptionService>();
+        _mcpToolDiscoveryServiceMock = new Mock<IMcpToolDiscoveryService>();
 
         // Default stubs
         _workspaceAuthorizationServiceMock
@@ -50,7 +52,8 @@ public class IntegrationServiceTests
         _sut = new IntegrationService(
             _integrationDataAccessMock.Object,
             _workspaceAuthorizationServiceMock.Object,
-            _credentialEncryptionServiceMock.Object);
+            _credentialEncryptionServiceMock.Object,
+            _mcpToolDiscoveryServiceMock.Object);
     }
 
     [Fact]

@@ -15,8 +15,8 @@ public interface IIntegrationService
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of integration DTOs with credentials excluded.</returns>
     Task<List<IntegrationDto>> GetWorkspaceIntegrationsAsync(
-        Guid userId, 
-        Guid workspaceId, 
+        Guid userId,
+        Guid workspaceId,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -27,8 +27,8 @@ public interface IIntegrationService
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The created integration DTO.</returns>
     Task<IntegrationDto> CreateIntegrationAsync(
-        Guid userId, 
-        CreateIntegrationRequest request, 
+        Guid userId,
+        CreateIntegrationRequest request,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -40,9 +40,9 @@ public interface IIntegrationService
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The updated integration DTO.</returns>
     Task<IntegrationDto> UpdateIntegrationAsync(
-        Guid userId, 
-        Guid integrationId, 
-        UpdateIntegrationRequest request, 
+        Guid userId,
+        Guid integrationId,
+        UpdateIntegrationRequest request,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -53,9 +53,14 @@ public interface IIntegrationService
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <exception cref="IntegrationNotFoundException">Thrown when the integration is not found.</exception>
     /// <exception cref="UnauthorizedWorkspaceAccessException">Thrown when the user is not a workspace member.</exception>
-    Task DeleteIntegrationAsync(
-        Guid userId, 
-        Guid integrationId, 
+    Task<DeleteIntegrationResult> DeleteIntegrationAsync(
+        Guid userId,
+        Guid integrationId,
+        CancellationToken cancellationToken = default);
+
+    Task<DeletionImpactDto> GetDeletionImpactAsync(
+        Guid userId,
+        Guid integrationId,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -66,5 +71,10 @@ public interface IIntegrationService
     /// <exception cref="ArgumentException">Thrown when provider is invalid or credentials are missing.</exception>
     Task ValidateConnectionAsync(
         ValidateIntegrationConnectionRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<SyncToolsResultDto> SyncToolsAsync(
+        Guid userId,
+        Guid integrationId,
         CancellationToken cancellationToken = default);
 }

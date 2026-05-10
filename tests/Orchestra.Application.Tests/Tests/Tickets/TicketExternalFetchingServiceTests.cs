@@ -96,7 +96,7 @@ public class TicketExternalFetchingServiceTests
         // Arrange
         var provider1Id = Guid.NewGuid();
         var provider2Id = Guid.NewGuid();
-        
+
         var integration1 = new IntegrationBuilder()
             .WithId(provider1Id)
             .WithProvider(ProviderType.GITHUB)
@@ -159,7 +159,7 @@ public class TicketExternalFetchingServiceTests
         Assert.NotNull(result.Tickets);
         // Should redistribute and reach target: 2 from P1 (round 1) + 5 from P2 (round 1) + 5 from P2 (round 2 after P1 marked exhausted) = 12
         // But may get exactly 10 if redistribution stops at target
-        Assert.True(result.Tickets.Count >= 7, 
+        Assert.True(result.Tickets.Count >= 7,
             $"Expected at least 7 tickets (2 from P1 + 5 from P2), got {result.Tickets.Count}");
         // One provider should be marked as exhausted (the one that returned 0)
         Assert.NotEmpty(result.State.ExhaustedProviderIds);
@@ -189,7 +189,7 @@ public class TicketExternalFetchingServiceTests
             new(provider1Id, "P1-1", "P1 Ticket 1", "Desc", "Open", "bg-blue-500", "High", "bg-red-500", 3, "https://p1.com", new()),
             new(provider1Id, "P1-2", "P1 Ticket 2", "Desc", "Open", "bg-blue-500", "High", "bg-red-500", 3, "https://p1.com", new())
         };
-        
+
         mockProvider1.FetchTicketsAsync(Arg.Any<Integration>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(
                 Task.FromResult((p1Tickets, false, (string?)null)),
@@ -284,8 +284,8 @@ public class TicketExternalFetchingServiceTests
 
         var state = new ExternalPaginationState
         {
-            ExhaustedProviderIds = new List<string> 
-            { 
+            ExhaustedProviderIds = new List<string>
+            {
                 provider1Id.ToString(),
                 provider2Id.ToString()
             }

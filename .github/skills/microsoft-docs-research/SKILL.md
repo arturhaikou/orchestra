@@ -1,6 +1,6 @@
 ---
 name: microsoft-docs-research
-description: Expert guidance for efficiently gathering information from official Microsoft/Azure documentation using MCP tools. Use when implementing Microsoft/Azure features, troubleshooting issues, learning SDKs, verifying API signatures, or finding official code samples. Ensures you work with current documentation rather than outdated cached knowledge.
+description: RESEARCH SKILL — Fetch authoritative, up-to-date information from Microsoft Learn via MCP tools. USE FOR: verifying .NET/Azure API signatures or package versions; finding official code samples; researching any Microsoft/Azure SDK or service; resolving compilation errors from API changes; answering 'how does X work in .NET/Azure?'. DO NOT USE FOR: tasks with no Microsoft/Azure documentation dependency. INVOKES: mcp_microsoft_doc_microsoft_docs_search, mcp_microsoft_doc_microsoft_code_sample_search, mcp_microsoft_doc_microsoft_docs_fetch.
 compatibility: Requires network access to Microsoft Learn and active MCP server for Microsoft documentation tools
 metadata:
   author: unified-ai-tracker

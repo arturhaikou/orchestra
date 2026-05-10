@@ -69,7 +69,7 @@ public class TicketServiceTests
         Assert.True(response.FeatureDisabled);
         Assert.Null(response.Ticket);
         Assert.Equal("Summarization is not enabled for this workspace. Go to workspace settings to enable it.", response.Message);
-        
+
         // Verify AI enrichment service was never called
         await _enrichmentServiceMock.DidNotReceive().GenerateSummaryAsync(Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
@@ -118,7 +118,7 @@ public class TicketServiceTests
         Assert.NotNull(response.Ticket);
         Assert.Null(response.Message);
         Assert.Equal(generatedSummary, response.Ticket.Summary);
-        
+
         // Verify AI enrichment service was called
         await _enrichmentServiceMock.Received(1).GenerateSummaryAsync("content", Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
@@ -149,7 +149,7 @@ public class TicketServiceTests
         Assert.True(response.FeatureDisabled);
         Assert.Null(response.Ticket);
         Assert.Equal("Summarization is not enabled for this workspace. Go to workspace settings to enable it.", response.Message);
-        
+
         // Verify AI enrichment service was not called
         await _enrichmentServiceMock.DidNotReceive().GenerateSummaryAsync(Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
@@ -167,7 +167,7 @@ public class TicketServiceTests
         // Act & Assert
         await Assert.ThrowsAsync<TicketNotFoundException>(
             () => _sut.GenerateSummaryAsync(ticketId, userId, CancellationToken.None));
-        
+
         // Verify workspace data access was never called (error thrown earlier)
         await _workspaceDataAccessMock.DidNotReceive().GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
@@ -185,7 +185,7 @@ public class TicketServiceTests
         // Act & Assert
         await Assert.ThrowsAsync<UnauthorizedTicketAccessException>(
             () => _sut.GenerateSummaryAsync(ticketId, userId, CancellationToken.None));
-        
+
         // Verify workspace data access was never called (error thrown earlier)
         await _workspaceDataAccessMock.DidNotReceive().GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }

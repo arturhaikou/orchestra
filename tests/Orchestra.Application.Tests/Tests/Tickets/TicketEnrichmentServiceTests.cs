@@ -159,8 +159,8 @@ namespace Orchestra.Application.Tests.Tests.Tickets
             var tickets = new List<TicketDto> { ticket };
 
             _sentimentMock.AnalyzeBatchSentimentAsync(
-                Arg.Any<List<TicketSentimentRequest>>(), 
-                Arg.Is(workspaceModelId), 
+                Arg.Any<List<TicketSentimentRequest>>(),
+                Arg.Is(workspaceModelId),
                 Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult(new List<TicketSentimentResult> { new("T-Valid-1", 85) }));
 

@@ -13,10 +13,10 @@ public static class ProviderTypeConstraints
     private static readonly IReadOnlyDictionary<ProviderType, IReadOnlySet<IntegrationType>> AllowedTypeMap =
         new Dictionary<ProviderType, IReadOnlySet<IntegrationType>>
         {
-            [ProviderType.JIRA]       = new HashSet<IntegrationType> { IntegrationType.TRACKER },
+            [ProviderType.JIRA] = new HashSet<IntegrationType> { IntegrationType.TRACKER },
             [ProviderType.CONFLUENCE] = new HashSet<IntegrationType> { IntegrationType.KNOWLEDGE_BASE },
-            [ProviderType.GITHUB]     = new HashSet<IntegrationType> { IntegrationType.TRACKER, IntegrationType.KNOWLEDGE_BASE, IntegrationType.CODE_SOURCE },
-            [ProviderType.GITLAB]     = new HashSet<IntegrationType> { IntegrationType.TRACKER, IntegrationType.KNOWLEDGE_BASE, IntegrationType.CODE_SOURCE },
+            [ProviderType.GITHUB] = new HashSet<IntegrationType> { IntegrationType.TRACKER, IntegrationType.KNOWLEDGE_BASE, IntegrationType.CODE_SOURCE },
+            [ProviderType.GITLAB] = new HashSet<IntegrationType> { IntegrationType.TRACKER, IntegrationType.KNOWLEDGE_BASE, IntegrationType.CODE_SOURCE },
         };
 
     /// <summary>

@@ -215,7 +215,7 @@ public class AuthServiceTests : IClassFixture<AuthTestFixture>
         // Assert
         _passwordHashingService.Received(1).HashPassword(request.NewPassword);
         await _userDataAccess.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
-            Assert.True(user.PasswordHash == "hashed_new_password");
+        Assert.True(user.PasswordHash == "hashed_new_password");
     }
     // RegisterAsync tests
     [Fact]

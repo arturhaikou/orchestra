@@ -67,89 +67,89 @@ public class TicketsController : ControllerBase
         }
     }
 
-/// <summary>
-/// Gets a single ticket by ID.
-/// </summary>
-/// <remarks>
-/// Supports two ticket ID formats:
-/// - **Internal tickets**: GUID format (e.g., "3fa85f64-5717-4562-b3fc-2c963f66afa6")
-/// - **External tickets**: Composite format {integrationId}:{externalTicketId} (e.g., "d7b3c8a2-1234-5678-90ab-cdef01234567:PROJ-123")
-/// 
-/// External tickets are fetched live from their source system (Jira, Azure DevOps, etc.) and merged with 
-/// any local assignments (agent/workflow). The composite ID format remains stable even if the ticket is 
-/// "materialized" (stored locally after assignment).
-/// 
-/// **Note:** Do not use database GUIDs for materialized external tickets. Always use the composite ID format.
-/// </remarks>
-/// <param name="id">Ticket identifier - GUID for internal tickets or composite format for external tickets</param>
-/// <param name="cancellationToken">Cancellation token</param>
-/// <returns>Ticket details with comments</returns>
-/// <response code="200">Returns the ticket details</response>
-/// <response code="400">Invalid ticket ID format</response>
-/// <response code="401">User is not authenticated</response>
-/// <response code="403">User does not have access to the ticket's workspace</response>
-/// <response code="404">Ticket not found</response>
-[HttpGet("{id}")]
-[ProducesResponseType(typeof(TicketDto), 200)]
-[ProducesResponseType(typeof(ErrorResponse), 400)]
-[ProducesResponseType(typeof(ErrorResponse), 401)]
-[ProducesResponseType(typeof(ErrorResponse), 403)]
-[ProducesResponseType(typeof(ErrorResponse), 404)]
-[ProducesResponseType(typeof(ErrorResponse), 500)]
-public async Task<IActionResult> GetTicketById(
-    string id,
-    CancellationToken cancellationToken)
-{
-    try
+    /// <summary>
+    /// Gets a single ticket by ID.
+    /// </summary>
+    /// <remarks>
+    /// Supports two ticket ID formats:
+    /// - **Internal tickets**: GUID format (e.g., "3fa85f64-5717-4562-b3fc-2c963f66afa6")
+    /// - **External tickets**: Composite format {integrationId}:{externalTicketId} (e.g., "d7b3c8a2-1234-5678-90ab-cdef01234567:PROJ-123")
+    /// 
+    /// External tickets are fetched live from their source system (Jira, Azure DevOps, etc.) and merged with 
+    /// any local assignments (agent/workflow). The composite ID format remains stable even if the ticket is 
+    /// "materialized" (stored locally after assignment).
+    /// 
+    /// **Note:** Do not use database GUIDs for materialized external tickets. Always use the composite ID format.
+    /// </remarks>
+    /// <param name="id">Ticket identifier - GUID for internal tickets or composite format for external tickets</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Ticket details with comments</returns>
+    /// <response code="200">Returns the ticket details</response>
+    /// <response code="400">Invalid ticket ID format</response>
+    /// <response code="401">User is not authenticated</response>
+    /// <response code="403">User does not have access to the ticket's workspace</response>
+    /// <response code="404">Ticket not found</response>
+    [HttpGet("{id}")]
+    [ProducesResponseType(typeof(TicketDto), 200)]
+    [ProducesResponseType(typeof(ErrorResponse), 400)]
+    [ProducesResponseType(typeof(ErrorResponse), 401)]
+    [ProducesResponseType(typeof(ErrorResponse), 403)]
+    [ProducesResponseType(typeof(ErrorResponse), 404)]
+    [ProducesResponseType(typeof(ErrorResponse), 500)]
+    public async Task<IActionResult> GetTicketById(
+        string id,
+        CancellationToken cancellationToken)
     {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+        try
         {
-            return Unauthorized(new ErrorResponse("Invalid user token"));
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+            {
+                return Unauthorized(new ErrorResponse("Invalid user token"));
+            }
+
+            var ticket = await _ticketService.GetTicketByIdAsync(id, userId, cancellationToken);
+            return Ok(ticket);
         }
+        catch (TicketNotFoundException ex)
+        {
+            return NotFound(new ErrorResponse(ex.Message));
+        }
+        catch (UnauthorizedTicketAccessException)
+        {
+            return StatusCode(403, new ErrorResponse("You do not have access to this ticket"));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new ErrorResponse(ex.Message));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving ticket {TicketId}", id);
+            return StatusCode(500, new ErrorResponse("An unexpected error occurred"));
+        }
+    }
 
-        var ticket = await _ticketService.GetTicketByIdAsync(id, userId, cancellationToken);
-        return Ok(ticket);
-    }
-    catch (TicketNotFoundException ex)
-    {
-        return NotFound(new ErrorResponse(ex.Message));
-    }
-    catch (UnauthorizedTicketAccessException)
-    {
-        return StatusCode(403, new ErrorResponse("You do not have access to this ticket"));
-    }
-    catch (ArgumentException ex)
-    {
-        return BadRequest(new ErrorResponse(ex.Message));
-    }
-    catch (Exception ex)
-    {
-        _logger.LogError(ex, "Error retrieving ticket {TicketId}", id);
-        return StatusCode(500, new ErrorResponse("An unexpected error occurred"));
-    }
-}
-
-/// <summary>
-/// Retrieves a paginated list of tickets for the specified workspace.
-/// Merges internal database tickets with external provider tickets.
-/// </summary>
-/// <remarks>
-/// This endpoint fetches tickets from both internal storage and external integration providers (e.g., Jira).
-/// External tickets are merged with internal tickets based on (IntegrationId, ExternalTicketId).
-/// Provider failures degrade gracefully, returning internal tickets only with logged warnings.
-/// Requires workspace membership authorization.
-/// </remarks>
-/// <param name="workspaceId">The workspace ID to retrieve tickets from (required)</param>
-/// <param name="pageToken">Continuation token for cursor-based pagination (optional)</param>
-/// <param name="pageSize">Number of items per page (default: 50, max: 100)</param>
-/// <param name="cancellationToken">Cancellation token</param>
-/// <returns>Paginated list of tickets with internal and external tickets merged</returns>
-/// <response code="200">Successfully retrieved ticket list</response>
-/// <response code="400">Invalid parameters (empty workspaceId or invalid pageSize)</response>
-/// <response code="401">Missing or invalid JWT token</response>
-/// <response code="403">User is not a member of the workspace</response>
-/// <response code="500">Unexpected server error</response>
+    /// <summary>
+    /// Retrieves a paginated list of tickets for the specified workspace.
+    /// Merges internal database tickets with external provider tickets.
+    /// </summary>
+    /// <remarks>
+    /// This endpoint fetches tickets from both internal storage and external integration providers (e.g., Jira).
+    /// External tickets are merged with internal tickets based on (IntegrationId, ExternalTicketId).
+    /// Provider failures degrade gracefully, returning internal tickets only with logged warnings.
+    /// Requires workspace membership authorization.
+    /// </remarks>
+    /// <param name="workspaceId">The workspace ID to retrieve tickets from (required)</param>
+    /// <param name="pageToken">Continuation token for cursor-based pagination (optional)</param>
+    /// <param name="pageSize">Number of items per page (default: 50, max: 100)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Paginated list of tickets with internal and external tickets merged</returns>
+    /// <response code="200">Successfully retrieved ticket list</response>
+    /// <response code="400">Invalid parameters (empty workspaceId or invalid pageSize)</response>
+    /// <response code="401">Missing or invalid JWT token</response>
+    /// <response code="403">User is not a member of the workspace</response>
+    /// <response code="500">Unexpected server error</response>
     [HttpGet]
     [ProducesResponseType(typeof(PaginatedTicketsResponse), 200)]
     [ProducesResponseType(typeof(ErrorResponse), 400)]
@@ -243,108 +243,108 @@ public async Task<IActionResult> GetTicketById(
         }
     }
 
-/// <summary>
-/// Updates a ticket's assignments and metadata (PATCH /v1/tickets/{id}).
-/// For materialized external tickets: can update status, priority, and assignments.
-/// For non-materialized external tickets: can only update assignments (which triggers materialization).
-/// For internal tickets: can update status, priority, assignments, and description.
-/// </summary>
-/// <remarks>
-/// **Materialized External Tickets:** Once an external ticket is materialized (assigned to an agent or workflow),
-/// you can independently manage its internal status and priority. The external provider's status/priority remains 
-/// separate and unchanged—this internal tracking allows agents to manage workflow state independently.
-/// 
-/// **Non-Materialized External Tickets:** Cannot update status/priority until materialized. Providing assignments
-/// will trigger materialization with optional initial status/priority values.
-/// </remarks>
-/// <param name="id">Internal ticket GUID or composite format {integrationId}:{externalTicketId}</param>
-/// <param name="request">Update request with nullable fields for partial updates</param>
-/// <param name="cancellationToken">Cancellation token</param>
-/// <returns>Updated ticket details</returns>
-/// <response code="200">Ticket updated successfully</response>
-/// <response code="400">Invalid request (e.g., attempting to update status/priority on non-materialized external ticket)</response>
-/// <response code="401">Unauthorized - missing or invalid JWT token</response>
-/// <response code="403">Forbidden - user lacks access to ticket's workspace</response>
-/// <response code="404">Ticket not found</response>
-[HttpPatch("{id}")]
-[ProducesResponseType(typeof(TicketDto), 200)]
-[ProducesResponseType(typeof(ErrorResponse), 400)]
-[ProducesResponseType(typeof(ProblemDetails), 400)]
-[ProducesResponseType(typeof(ErrorResponse), 401)]
-[ProducesResponseType(typeof(ErrorResponse), 403)]
-[ProducesResponseType(typeof(ErrorResponse), 404)]
-[ProducesResponseType(typeof(ErrorResponse), 500)]
-public async Task<IActionResult> UpdateTicket(
-    string id,
-    [FromBody] UpdateTicketRequest request,
-    CancellationToken cancellationToken)
-{
-    try
+    /// <summary>
+    /// Updates a ticket's assignments and metadata (PATCH /v1/tickets/{id}).
+    /// For materialized external tickets: can update status, priority, and assignments.
+    /// For non-materialized external tickets: can only update assignments (which triggers materialization).
+    /// For internal tickets: can update status, priority, assignments, and description.
+    /// </summary>
+    /// <remarks>
+    /// **Materialized External Tickets:** Once an external ticket is materialized (assigned to an agent or workflow),
+    /// you can independently manage its internal status and priority. The external provider's status/priority remains 
+    /// separate and unchanged—this internal tracking allows agents to manage workflow state independently.
+    /// 
+    /// **Non-Materialized External Tickets:** Cannot update status/priority until materialized. Providing assignments
+    /// will trigger materialization with optional initial status/priority values.
+    /// </remarks>
+    /// <param name="id">Internal ticket GUID or composite format {integrationId}:{externalTicketId}</param>
+    /// <param name="request">Update request with nullable fields for partial updates</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Updated ticket details</returns>
+    /// <response code="200">Ticket updated successfully</response>
+    /// <response code="400">Invalid request (e.g., attempting to update status/priority on non-materialized external ticket)</response>
+    /// <response code="401">Unauthorized - missing or invalid JWT token</response>
+    /// <response code="403">Forbidden - user lacks access to ticket's workspace</response>
+    /// <response code="404">Ticket not found</response>
+    [HttpPatch("{id}")]
+    [ProducesResponseType(typeof(TicketDto), 200)]
+    [ProducesResponseType(typeof(ErrorResponse), 400)]
+    [ProducesResponseType(typeof(ProblemDetails), 400)]
+    [ProducesResponseType(typeof(ErrorResponse), 401)]
+    [ProducesResponseType(typeof(ErrorResponse), 403)]
+    [ProducesResponseType(typeof(ErrorResponse), 404)]
+    [ProducesResponseType(typeof(ErrorResponse), 500)]
+    public async Task<IActionResult> UpdateTicket(
+        string id,
+        [FromBody] UpdateTicketRequest request,
+        CancellationToken cancellationToken)
     {
-        // Extract user ID from JWT claims
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+        try
         {
-            return Unauthorized(new ErrorResponse("Invalid user token"));
+            // Extract user ID from JWT claims
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+            {
+                return Unauthorized(new ErrorResponse("Invalid user token"));
+            }
+
+            // Call service method
+            var updatedTicket = await _ticketService.UpdateTicketAsync(
+                id,
+                userId,
+                request,
+                cancellationToken);
+
+            return Ok(updatedTicket);
         }
-
-        // Call service method
-        var updatedTicket = await _ticketService.UpdateTicketAsync(
-            id,
-            userId,
-            request,
-            cancellationToken);
-
-        return Ok(updatedTicket);
-    }
-    catch (InvalidWorkspaceAssignmentException ex)
-    {
-        _logger.LogWarning(ex,
-            "Invalid workspace assignment for ticket {TicketId}",
-            id);
-        return BadRequest(new ProblemDetails
+        catch (InvalidWorkspaceAssignmentException ex)
         {
-            Status = StatusCodes.Status400BadRequest,
-            Title = "Invalid Assignment",
-            Detail = ex.Message
-        });
+            _logger.LogWarning(ex,
+                "Invalid workspace assignment for ticket {TicketId}",
+                id);
+            return BadRequest(new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Invalid Assignment",
+                Detail = ex.Message
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning(ex,
+                "Bad request while updating ticket {TicketId}",
+                id);
+            return BadRequest(new ErrorResponse(ex.Message));
+        }
+        catch (InvalidTicketOperationException ex)
+        {
+            _logger.LogWarning(ex,
+                "Invalid operation attempted on ticket {TicketId}",
+                id);
+            return BadRequest(new ErrorResponse(ex.Message));
+        }
+        catch (TicketNotFoundException ex)
+        {
+            _logger.LogWarning(ex,
+                "Ticket {TicketId} not found for update",
+                id);
+            return NotFound(new ErrorResponse(ex.Message));
+        }
+        catch (UnauthorizedTicketAccessException ex)
+        {
+            _logger.LogWarning(ex,
+                "Unauthorized access to ticket {TicketId}",
+                id);
+            return StatusCode(403, new ErrorResponse(ex.Message));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Unexpected error updating ticket {TicketId}",
+                id);
+            return StatusCode(500, new ErrorResponse("An unexpected error occurred"));
+        }
     }
-    catch (ArgumentException ex)
-    {
-        _logger.LogWarning(ex,
-            "Bad request while updating ticket {TicketId}",
-            id);
-        return BadRequest(new ErrorResponse(ex.Message));
-    }
-    catch (InvalidTicketOperationException ex)
-    {
-        _logger.LogWarning(ex,
-            "Invalid operation attempted on ticket {TicketId}",
-            id);
-        return BadRequest(new ErrorResponse(ex.Message));
-    }
-    catch (TicketNotFoundException ex)
-    {
-        _logger.LogWarning(ex,
-            "Ticket {TicketId} not found for update",
-            id);
-        return NotFound(new ErrorResponse(ex.Message));
-    }
-    catch (UnauthorizedTicketAccessException ex)
-    {
-        _logger.LogWarning(ex,
-            "Unauthorized access to ticket {TicketId}",
-            id);
-        return StatusCode(403, new ErrorResponse(ex.Message));
-    }
-    catch (Exception ex)
-    {
-        _logger.LogError(ex,
-            "Unexpected error updating ticket {TicketId}",
-            id);
-        return StatusCode(500, new ErrorResponse("An unexpected error occurred"));
-    }
-}
 
     /// <summary>
     /// Converts an internal ticket to an external tracker ticket.
@@ -489,7 +489,7 @@ public async Task<IActionResult> UpdateTicket(
         {
             // Extract user ID from JWT claims
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            
+
             if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
             {
                 _logger.LogWarning("Invalid user ID claim in JWT token");
@@ -499,10 +499,10 @@ public async Task<IActionResult> UpdateTicket(
                     Status = StatusCodes.Status401Unauthorized
                 });
             }
-            
+
             // Call service to delete ticket
             await _ticketService.DeleteTicketAsync(id, userId, cancellationToken);
-            
+
             return NoContent();
         }
         catch (InvalidTicketOperationException ex)

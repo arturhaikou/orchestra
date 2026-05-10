@@ -5,6 +5,7 @@ using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Agents.Templates;
 using Orchestra.Application.Common.Exceptions;
 using Orchestra.Application.Common.Interfaces;
+using Orchestra.Application.McpServers.Interfaces;
 using Orchestra.Domain.Enums;
 
 namespace Orchestra.Application.Tests.Tests.Agents;
@@ -24,6 +25,7 @@ public class AgentServiceGetTemplatesTests
         _sut = new AgentService(
             _agentDataAccess,
             _agentToolActionDataAccess,
+            Substitute.For<IAgentMcpToolDataAccess>(),
             _authService,
             _toolValidationService,
             _templateRegistry,
@@ -123,7 +125,7 @@ public class AgentServiceGetTemplatesTests
         var workspaceId = Guid.NewGuid();
 
         _authService.EnsureUserIsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>())
-            .Throws(new UnauthorizedWorkspaceAccessException(userId, workspaceId));
+.ThrowsAsync(new UnauthorizedWorkspaceAccessException(userId, workspaceId));
 
         await Assert.ThrowsAsync<UnauthorizedWorkspaceAccessException>(
             () => _sut.GetAgentTemplatesAsync(userId, workspaceId));

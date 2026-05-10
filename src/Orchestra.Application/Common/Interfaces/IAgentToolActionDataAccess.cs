@@ -83,4 +83,14 @@ public interface IAgentToolActionDataAccess
     Task<bool> ContainsReviewToolActionAsync(
         IEnumerable<Guid> toolActionIds,
         CancellationToken cancellationToken = default);
+
+    Task RemoveByToolActionIdsAsync(
+        List<Guid> toolActionIds,
+        CancellationToken cancellationToken = default);
+
+    Task<int> CountByToolActionIdsAsync(
+        List<Guid> toolActionIds,
+        CancellationToken cancellationToken = default);
+
+    Task<int> DeleteByToolActionIdsAsync(IEnumerable<Guid> toolActionIds, CancellationToken cancellationToken = default);
 }

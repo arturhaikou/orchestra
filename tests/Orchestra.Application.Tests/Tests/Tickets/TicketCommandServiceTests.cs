@@ -386,11 +386,11 @@ public class TicketCommandServiceTests : ServiceTestFixture<TicketCommandService
         var request = new UpdateTicketRequest(statusId, null, null, null, null);
 
         var integration = new IntegrationBuilder().WithId(integrationId).WithWorkspaceId(workspaceId).Build();
-        
+
         // Mock the ID parsing service to recognize this as an external ticket
         var parseResult = new TicketIdParseResult(TicketIdType.External, null, integrationId, externalTicketId);
         _ticketIdParsingService.Parse(compositeId).Returns(parseResult);
-        
+
         _workspaceAuthorizationService.IsMemberAsync(userId, workspaceId, Arg.Any<CancellationToken>()).Returns(true);
         _integrationDataAccess.GetByIdAsync(integrationId, Arg.Any<CancellationToken>()).Returns(integration);
         _ticketDataAccess.GetTicketByExternalIdAsync(integrationId, externalTicketId, Arg.Any<CancellationToken>()).Returns((Ticket?)null);
@@ -425,10 +425,10 @@ public class TicketCommandServiceTests : ServiceTestFixture<TicketCommandService
 
         var integration = new IntegrationBuilder().WithId(integrationId).WithWorkspaceId(workspaceId).Build();
         var updatedDto = new TicketDto(
-            compositeId, workspaceId, "Title", "Desc", 
+            compositeId, workspaceId, "Title", "Desc",
             new TicketStatusDto(statusId, "In Progress", "#fff"),
             new TicketPriorityDto(priorityId, "High", "#f00", 2),
-            false, integrationId, externalTicketId, "http://external.url", "JIRA", 
+            false, integrationId, externalTicketId, "http://external.url", "JIRA",
             null, null, new List<CommentDto>(), null, null);
 
         // Mock the ID parsing service

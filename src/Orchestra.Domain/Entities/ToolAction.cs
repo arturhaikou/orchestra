@@ -37,6 +37,14 @@ public class ToolAction
     /// Gets the danger level of this tool action (Safe, Moderate, or Destructive).
     /// </summary>
     public DangerLevel DangerLevel { get; private set; } = DangerLevel.Safe;
+    public bool IsMcpTool { get; private set; }
+    public string? McpToolSchema { get; private set; }
+    public Guid? IntegrationId { get; private set; }
+    public bool IsEnabled { get; private set; } = true;
+
+    public bool IsActive { get; private set; } = true;
+
+    public DateTimeOffset? LastSyncedAt { get; private set; }
 
     /// <summary>
     /// Private constructor to enforce factory method usage.
@@ -80,6 +88,45 @@ public class ToolAction
         };
     }
 
+    public static ToolAction CreateMcpTool(
+        Guid toolCategoryId,
+        Guid integrationId,
+        string name,
+        string? description,
+        string methodName,
+        DangerLevel dangerLevel,
+        string? mcpToolSchemaJson,
+        bool enabled)
+    {
+        if (toolCategoryId == Guid.Empty)
+            throw new ArgumentException("Tool category ID is required.", nameof(toolCategoryId));
+
+        if (integrationId == Guid.Empty)
+            throw new ArgumentException("Integration ID is required.", nameof(integrationId));
+
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Name cannot be empty.", nameof(name));
+
+        if (string.IsNullOrWhiteSpace(methodName))
+            throw new ArgumentException("Method name cannot be empty.", nameof(methodName));
+
+        return new ToolAction
+        {
+            Id = Guid.NewGuid(),
+            ToolCategoryId = toolCategoryId,
+            IntegrationId = integrationId,
+            Name = name,
+            Description = description,
+            MethodName = methodName,
+            DangerLevel = dangerLevel,
+            IsMcpTool = true,
+            McpToolSchema = mcpToolSchemaJson,
+            IsEnabled = enabled,
+            IsActive = true,
+            LastSyncedAt = null
+        };
+    }
+
     /// <summary>
     /// Updates the tool action's metadata.
     /// </summary>
@@ -95,5 +142,34 @@ public class ToolAction
         Name = name;
         Description = description;
         DangerLevel = dangerLevel;
+    }
+
+    public void SetEnabled(bool isEnabled)
+    {
+        IsEnabled = isEnabled;
+    }
+
+    public void UpdateMcpSchema(string? schemaJson)
+    {
+        McpToolSchema = schemaJson;
+    }
+
+    public void Deactivate(DateTimeOffset syncedAt)
+    {
+        IsActive = false;
+        LastSyncedAt = syncedAt;
+    }
+
+    public void Reactivate(DateTimeOffset syncedAt)
+    {
+        IsActive = true;
+        LastSyncedAt = syncedAt;
+    }
+
+    public void UpdateFromSync(string? description, string? schemaJson, DateTimeOffset syncedAt)
+    {
+        Description = description;
+        McpToolSchema = schemaJson;
+        LastSyncedAt = syncedAt;
     }
 }

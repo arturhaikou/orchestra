@@ -23,7 +23,7 @@ public class TicketAuthorizationService : ITicketAuthorizationService
     public async Task EnsureTicketAccessAsync(Guid userId, Ticket ticket, CancellationToken cancellationToken = default)
     {
         var hasAccess = await _workspaceAuthorizationService.IsMemberAsync(userId, ticket.WorkspaceId, cancellationToken);
-        
+
         if (!hasAccess)
         {
             throw new UnauthorizedTicketAccessException(userId, ticket.Id.ToString());
@@ -36,7 +36,7 @@ public class TicketAuthorizationService : ITicketAuthorizationService
     public async Task EnsureExternalTicketAccessAsync(Guid userId, Integration integration, CancellationToken cancellationToken = default)
     {
         var hasAccess = await _workspaceAuthorizationService.IsMemberAsync(userId, integration.WorkspaceId, cancellationToken);
-        
+
         if (!hasAccess)
         {
             throw new UnauthorizedTicketAccessException(userId, $"integration:{integration.Id}");

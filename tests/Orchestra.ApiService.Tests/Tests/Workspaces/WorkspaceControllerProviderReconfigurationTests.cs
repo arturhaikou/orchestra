@@ -24,8 +24,8 @@ public class WorkspaceControllerProviderReconfigurationTests
     public WorkspaceControllerProviderReconfigurationTests()
     {
         _mockWorkspaceService = Substitute.For<IWorkspaceService>();
-        _mockProviderService  = Substitute.For<IWorkspaceProviderService>();
-        _mockAuthService      = Substitute.For<IWorkspaceAuthorizationService>();
+        _mockProviderService = Substitute.For<IWorkspaceProviderService>();
+        _mockAuthService = Substitute.For<IWorkspaceAuthorizationService>();
     }
 
     // ---------------------------------------------------------------

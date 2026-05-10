@@ -1,5 +1,5 @@
 
-import { Tool } from '../types';
+import { Tool, ToolCategory } from '../types';
 import { getToken } from './authService';
 
 // Map providerType to icon name
@@ -24,35 +24,49 @@ const getAuthHeaders = () => ({
 
 export const getTools = async (workspaceId: string): Promise<Tool[]> => {
   try {
-    const url = new URL(API_BASE_URL);
-    url.searchParams.append('workspaceId', workspaceId);
-
-    const response = await fetch(url.toString(), {
-      headers: getAuthHeaders()
-    });
-
-    if (!response.ok) throw new Error("Backend error");
-    
-    // API returns ToolCategoryDto[] where each category is a tool
-    const categories = await response.json();
-    
-    if (!Array.isArray(categories)) {
-      return [];
-    }
-    
-    // Map each category to a Tool object
-    const tools: Tool[] = categories.map((category: any) => ({
-      id: category.id,
-      name: category.name,
-      description: category.description,
-      category: category.providerType,
-      icon: getIconForProviderType(category.providerType),
-      actions: category.actions || []
+    const categories = await getToolCategories(workspaceId);
+    return categories.map(c => ({
+      id: c.id,
+      name: c.name,
+      description: c.description,
+      category: c.providerType as Tool['category'],
+      icon: getIconForProviderType(c.providerType),
+      actions: c.actions,
+      source: c.source,
+      integrationId: c.integrationId,
     }));
-    
-    return tools;
   } catch (error) {
     console.error('Failed to fetch tools:', error);
     return [];
   }
+};
+
+export const getToolCategories = async (workspaceId: string): Promise<ToolCategory[]> => {
+  const url = new URL(API_BASE_URL);
+  url.searchParams.append('workspaceId', workspaceId);
+
+  const response = await fetch(url.toString(), { headers: getAuthHeaders() });
+  if (!response.ok) throw new Error('Backend error');
+
+  const raw = await response.json();
+  if (!Array.isArray(raw)) return [];
+
+  return raw.map((category: any) => ({
+    id: category.id,
+    name: category.name,
+    description: category.description,
+    providerType: category.providerType,
+    source: category.source ?? 'native',
+    integrationId: category.integrationId ?? undefined,
+    actions: (category.actions ?? []).map((action: any) => ({
+      id: action.id,
+      name: action.name,
+      description: action.description,
+      dangerLevel: action.dangerLevel,
+      isEnabled: action.isEnabled ?? true,
+      isMcpTool: action.isMcpTool ?? false,
+      mcpToolSchema: action.mcpToolSchema ?? undefined,
+      integrationId: action.integrationId ?? undefined,
+    })),
+  }));
 };

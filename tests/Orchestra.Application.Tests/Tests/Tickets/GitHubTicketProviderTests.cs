@@ -59,7 +59,10 @@ public class GitHubTicketProviderTests : ServiceTestFixture<GitHubTicketProvider
         var integration = IntegrationBuilder.GitHubIntegration();
         var issues = Enumerable.Range(1, 50).Select(i => new GitHubIssue
         {
-            Number = i, Title = $"Issue {i}", State = "open", Labels = new()
+            Number = i,
+            Title = $"Issue {i}",
+            State = "open",
+            Labels = new()
         }).ToList();
 
         // Full page AND hasNextPage=true (GitHub returned rel="next" in Link header)
@@ -92,7 +95,10 @@ public class GitHubTicketProviderTests : ServiceTestFixture<GitHubTicketProvider
         // this is the last page even though count == perPage.
         var issues = Enumerable.Range(1, 50).Select(i => new GitHubIssue
         {
-            Number = i, Title = $"Issue {i}", State = "open", Labels = new()
+            Number = i,
+            Title = $"Issue {i}",
+            State = "open",
+            Labels = new()
         }).ToList();
 
         _apiClient.GetRepositoryIssuesAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())

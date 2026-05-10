@@ -200,7 +200,7 @@ public class GitLabApiClient : IGitLabApiClient
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
             var issues = JsonSerializer.Deserialize<List<GitLabIssue>>(content, _jsonOptions) ?? new();
 
-            _logger.LogInformation("Found {Count} issues matching query '{Query}' in project {Project}", 
+            _logger.LogInformation("Found {Count} issues matching query '{Query}' in project {Project}",
                 issues.Count, query, _projectPath);
             return issues;
         }
@@ -287,10 +287,10 @@ public class GitLabApiClient : IGitLabApiClient
 
             return new GitLabMrChangesResult
             {
-                BaseSha  = latestVersion?.BaseCommitSha  ?? string.Empty,
+                BaseSha = latestVersion?.BaseCommitSha ?? string.Empty,
                 StartSha = latestVersion?.StartCommitSha ?? string.Empty,
-                HeadSha  = latestVersion?.HeadCommitSha  ?? string.Empty,
-                Changes  = changes,
+                HeadSha = latestVersion?.HeadCommitSha ?? string.Empty,
+                Changes = changes,
             };
         }
         catch (HttpRequestException ex)
@@ -387,7 +387,7 @@ public class GitLabApiClient : IGitLabApiClient
             return new GitLabDiscussionResult
             {
                 Success = false,
-                Error   = "Invalid position: base_sha, start_sha, and head_sha must all be non-empty strings sourced from the MR version data.",
+                Error = "Invalid position: base_sha, start_sha, and head_sha must all be non-empty strings sourced from the MR version data.",
             };
         }
 
@@ -401,17 +401,17 @@ public class GitLabApiClient : IGitLabApiClient
                 position = new
                 {
                     position_type = "text",
-                    base_sha      = baseSha,
-                    start_sha     = startSha,
-                    head_sha      = headSha,
-                    old_path      = oldPath,
-                    new_path      = newPath,
-                    old_line      = oldLine,
-                    new_line      = newLine,
+                    base_sha = baseSha,
+                    start_sha = startSha,
+                    head_sha = headSha,
+                    old_path = oldPath,
+                    new_path = newPath,
+                    old_line = oldLine,
+                    new_line = newLine,
                 },
             };
 
-            var json    = JsonSerializer.Serialize(payload);
+            var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var response = await _httpClient.PostAsync(url, content, cancellationToken);
@@ -425,7 +425,7 @@ public class GitLabApiClient : IGitLabApiClient
                 return new GitLabDiscussionResult
                 {
                     Success = false,
-                    Error   = $"GitLab API returned {(int)response.StatusCode}: {errorBody}",
+                    Error = $"GitLab API returned {(int)response.StatusCode}: {errorBody}",
                 };
             }
 
@@ -434,9 +434,9 @@ public class GitLabApiClient : IGitLabApiClient
 
             return new GitLabDiscussionResult
             {
-                Success      = true,
+                Success = true,
                 DiscussionId = discussion?.Id,
-                NoteId       = discussion?.Notes?.FirstOrDefault()?.Id,
+                NoteId = discussion?.Notes?.FirstOrDefault()?.Id,
             };
         }
         catch (HttpRequestException ex)
@@ -454,7 +454,7 @@ public class GitLabApiClient : IGitLabApiClient
             return new GitLabDiscussionResult
             {
                 Success = false,
-                Error   = $"Failed to parse discussion response: {ex.Message}",
+                Error = $"Failed to parse discussion response: {ex.Message}",
             };
         }
     }

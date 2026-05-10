@@ -2,6 +2,7 @@ using NSubstitute;
 using Orchestra.Application.Agents.DTOs;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Common.Interfaces;
+using Orchestra.Application.McpServers.Interfaces;
 using Orchestra.Domain.Entities;
 using Orchestra.Tests.Shared.Builders;
 
@@ -24,9 +25,9 @@ public class AgentServiceProjectPrinciplesTests
         IToolValidationService toolValidationService)
         BuildSut()
     {
-        var agentDataAccess       = Substitute.For<IAgentDataAccess>();
-        var toolActionDataAccess  = Substitute.For<IAgentToolActionDataAccess>();
-        var authService           = Substitute.For<IWorkspaceAuthorizationService>();
+        var agentDataAccess = Substitute.For<IAgentDataAccess>();
+        var toolActionDataAccess = Substitute.For<IAgentToolActionDataAccess>();
+        var authService = Substitute.For<IWorkspaceAuthorizationService>();
         var toolValidationService = Substitute.For<IToolValidationService>();
 
         // Default stubs so MapToDtoAsync does not throw
@@ -45,6 +46,7 @@ public class AgentServiceProjectPrinciplesTests
         var service = new AgentService(
             agentDataAccess,
             toolActionDataAccess,
+            Substitute.For<IAgentMcpToolDataAccess>(),
             authService,
             toolValidationService,
             Substitute.For<IBuiltInAgentTemplateRegistry>(),
@@ -66,7 +68,7 @@ public class AgentServiceProjectPrinciplesTests
     {
         // Arrange
         var (sut, agentDataAccess, toolActionDataAccess, _, _) = BuildSut();
-        var userId      = Guid.NewGuid();
+        var userId = Guid.NewGuid();
         var workspaceId = Guid.NewGuid();
 
         toolActionDataAccess
@@ -110,7 +112,7 @@ public class AgentServiceProjectPrinciplesTests
     {
         // Arrange
         var (sut, agentDataAccess, toolActionDataAccess, _, _) = BuildSut();
-        var userId      = Guid.NewGuid();
+        var userId = Guid.NewGuid();
         var workspaceId = Guid.NewGuid();
 
         toolActionDataAccess
@@ -144,7 +146,7 @@ public class AgentServiceProjectPrinciplesTests
     {
         // Arrange
         var (sut, agentDataAccess, toolActionDataAccess, _, _) = BuildSut();
-        var userId      = Guid.NewGuid();
+        var userId = Guid.NewGuid();
         var workspaceId = Guid.NewGuid();
 
         toolActionDataAccess
@@ -178,7 +180,7 @@ public class AgentServiceProjectPrinciplesTests
     {
         // Arrange
         var (sut, agentDataAccess, toolActionDataAccess, _, _) = BuildSut();
-        var userId      = Guid.NewGuid();
+        var userId = Guid.NewGuid();
         var workspaceId = Guid.NewGuid();
 
         // ContainsReviewToolActionAsync returns false (default stub)
@@ -217,7 +219,7 @@ public class AgentServiceProjectPrinciplesTests
     {
         // Arrange
         var (sut, agentDataAccess, toolActionDataAccess, _, _) = BuildSut();
-        var userId      = Guid.NewGuid();
+        var userId = Guid.NewGuid();
         var workspaceId = Guid.NewGuid();
 
         toolActionDataAccess
@@ -252,7 +254,7 @@ public class AgentServiceProjectPrinciplesTests
     {
         // Arrange
         var (sut, agentDataAccess, toolActionDataAccess, _, _) = BuildSut();
-        var userId  = Guid.NewGuid();
+        var userId = Guid.NewGuid();
         var agentId = Guid.NewGuid();
 
         var existingAgent = new AgentBuilder()

@@ -1,13 +1,14 @@
 namespace Orchestra.Application.Tools.DTOs;
 
-/// <summary>
-/// Response DTO for Tool Category with associated actions.
-/// Includes hierarchical child collection of actions to reduce API roundtrips.
-/// </summary>
 public record ToolCategoryDto(
     Guid Id,
     string Name,
     string Description,
     string ProviderType,
-    List<ToolActionDto> Actions
+    List<ToolActionDto> Actions,
+    string Source = "native",
+    Guid? IntegrationId = null,
+    bool IsMcpCategory = false,
+    string? TransportType = null,
+    bool? IntegrationConnected = null
 );

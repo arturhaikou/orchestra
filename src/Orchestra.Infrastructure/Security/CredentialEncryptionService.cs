@@ -16,10 +16,10 @@ public class CredentialEncryptionService : ICredentialEncryptionService
 
     public CredentialEncryptionService(IConfiguration configuration)
     {
-        var keyString = configuration["Encryption:Key"] 
+        var keyString = configuration["Encryption:Key"]
             ?? throw new InvalidOperationException(
                 "Encryption key not configured. Set 'Encryption:Key' in configuration.");
-        
+
         try
         {
             _encryptionKey = Convert.FromBase64String(keyString);
@@ -29,7 +29,7 @@ public class CredentialEncryptionService : ICredentialEncryptionService
             throw new InvalidOperationException(
                 "Encryption key must be a valid Base64 string.", ex);
         }
-        
+
         if (_encryptionKey.Length != 32)
         {
             throw new InvalidOperationException(
@@ -87,7 +87,7 @@ public class CredentialEncryptionService : ICredentialEncryptionService
         {
             throw new ArgumentException(
                 $"Invalid encrypted data format. Minimum length: {NonceSize + TagSize} bytes, " +
-                $"actual: {combined.Length} bytes.", 
+                $"actual: {combined.Length} bytes.",
                 nameof(encryptedText));
         }
 

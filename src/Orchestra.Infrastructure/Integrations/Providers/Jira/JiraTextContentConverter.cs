@@ -84,12 +84,12 @@ public class JiraTextContentConverter : IJiraTextContentConverter
         {
             return element.GetString();
         }
-        
+
         if (element.ValueKind == JsonValueKind.Null || element.ValueKind == JsonValueKind.Undefined)
         {
             return null;
         }
-        
+
         // If it's a complex object (unlikely for simple fields), serialize it
         return element.ToString();
     }

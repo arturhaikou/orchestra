@@ -83,7 +83,7 @@ public class JiraToolService : IJiraToolService
 
             // Step 6: Build success response
             var issueUrl = $"{integration.Url.TrimEnd('/')}/browse/{issueKey}";
-            
+
             _logger.LogInformation(
                 "Successfully created JIRA issue {IssueKey} in workspace {WorkspaceId}",
                 issueKey,
@@ -103,7 +103,7 @@ public class JiraToolService : IJiraToolService
             _logger.LogError(ex,
                 "Integration not found for workspace {WorkspaceId}",
                 workspaceId);
-            
+
             return new
             {
                 success = false,
@@ -117,7 +117,7 @@ public class JiraToolService : IJiraToolService
                 "Invalid integration state for workspace {WorkspaceId}: {ErrorMessage}",
                 workspaceId,
                 ex.Message);
-            
+
             return new
             {
                 success = false,
@@ -136,7 +136,7 @@ public class JiraToolService : IJiraToolService
                 "Invalid argument for workspace {WorkspaceId}: {ErrorMessage}",
                 workspaceId,
                 ex.Message);
-            
+
             return new
             {
                 success = false,
@@ -149,7 +149,7 @@ public class JiraToolService : IJiraToolService
             _logger.LogError(ex,
                 "Failed to parse JIRA API response for workspace {WorkspaceId}",
                 workspaceId);
-            
+
             return new
             {
                 success = false,
@@ -162,7 +162,7 @@ public class JiraToolService : IJiraToolService
             _logger.LogError(ex,
                 "Failed to connect to JIRA for workspace {WorkspaceId}",
                 workspaceId);
-            
+
             return new
             {
                 success = false,
@@ -175,7 +175,7 @@ public class JiraToolService : IJiraToolService
             _logger.LogError(ex,
                 "JIRA server error for workspace {WorkspaceId}",
                 workspaceId);
-            
+
             return new
             {
                 success = false,
@@ -189,7 +189,7 @@ public class JiraToolService : IJiraToolService
                 "Failed to communicate with JIRA for workspace {WorkspaceId}: {ErrorMessage}",
                 workspaceId,
                 ex.Message);
-            
+
             return new
             {
                 success = false,
@@ -203,7 +203,7 @@ public class JiraToolService : IJiraToolService
                 "Unexpected error creating JIRA issue in workspace {WorkspaceId}: {ErrorMessage}",
                 workspaceId,
                 ex.Message);
-            
+
             return new
             {
                 success = false,
@@ -268,7 +268,7 @@ public class JiraToolService : IJiraToolService
                 var convertedDescription = await _contentConverter.ConvertMarkdownToDescriptionAsync(
                     description,
                     IntegrationTypeDetector.DetectJiraType(integration.Url));
-                
+
                 // Convert object result to JsonElement if needed
                 if (convertedDescription is JsonElement je)
                 {
@@ -304,7 +304,7 @@ public class JiraToolService : IJiraToolService
             _logger.LogError(ex,
                 "Integration not found for workspace {WorkspaceId}",
                 workspaceId);
-            
+
             return new
             {
                 success = false,
@@ -319,7 +319,7 @@ public class JiraToolService : IJiraToolService
                 issueKey,
                 workspaceId,
                 ex.Message);
-            
+
             return new
             {
                 success = false,
@@ -340,7 +340,7 @@ public class JiraToolService : IJiraToolService
                 issueKey,
                 workspaceId,
                 ex.Message);
-            
+
             return new
             {
                 success = false,
@@ -354,7 +354,7 @@ public class JiraToolService : IJiraToolService
                 "Failed to parse JIRA API response for workspace {WorkspaceId}, issue {IssueKey}",
                 workspaceId,
                 issueKey);
-            
+
             return new
             {
                 success = false,
@@ -367,7 +367,7 @@ public class JiraToolService : IJiraToolService
             _logger.LogError(ex,
                 "Failed to connect to JIRA for workspace {WorkspaceId}",
                 workspaceId);
-            
+
             return new
             {
                 success = false,
@@ -380,7 +380,7 @@ public class JiraToolService : IJiraToolService
             _logger.LogError(ex,
                 "JIRA server error for workspace {WorkspaceId}",
                 workspaceId);
-            
+
             return new
             {
                 success = false,
@@ -395,7 +395,7 @@ public class JiraToolService : IJiraToolService
                 issueKey,
                 workspaceId,
                 ex.Message);
-            
+
             return new
             {
                 success = false,
@@ -410,7 +410,7 @@ public class JiraToolService : IJiraToolService
                 issueKey,
                 workspaceId,
                 ex.Message);
-            
+
             return new
             {
                 success = false,
@@ -468,7 +468,7 @@ public class JiraToolService : IJiraToolService
             _logger.LogError(ex,
                 "Integration not found for workspace {WorkspaceId}",
                 workspaceId);
-            
+
             return new
             {
                 success = false,
@@ -483,7 +483,7 @@ public class JiraToolService : IJiraToolService
                 issueKey,
                 workspaceId,
                 ex.Message);
-            
+
             return new
             {
                 success = false,
@@ -504,7 +504,7 @@ public class JiraToolService : IJiraToolService
                 issueKey,
                 workspaceId,
                 ex.Message);
-            
+
             return new
             {
                 success = false,
@@ -518,7 +518,7 @@ public class JiraToolService : IJiraToolService
                 "Failed to parse JIRA API response for workspace {WorkspaceId}, issue {IssueKey}",
                 workspaceId,
                 issueKey);
-            
+
             return new
             {
                 success = false,
@@ -531,7 +531,7 @@ public class JiraToolService : IJiraToolService
             _logger.LogError(ex,
                 "Failed to connect to JIRA for workspace {WorkspaceId}",
                 workspaceId);
-            
+
             return new
             {
                 success = false,
@@ -544,7 +544,7 @@ public class JiraToolService : IJiraToolService
             _logger.LogError(ex,
                 "JIRA server error for workspace {WorkspaceId}",
                 workspaceId);
-            
+
             return new
             {
                 success = false,
@@ -559,7 +559,7 @@ public class JiraToolService : IJiraToolService
                 issueKey,
                 workspaceId,
                 ex.Message);
-            
+
             return new
             {
                 success = false,
@@ -574,7 +574,7 @@ public class JiraToolService : IJiraToolService
                 issueKey,
                 workspaceId,
                 ex.Message);
-            
+
             return new
             {
                 success = false,
@@ -625,7 +625,7 @@ public class JiraToolService : IJiraToolService
 
             // Step 4: Extract fields safely and build response
             var issueUrl = $"{integration.Url.TrimEnd('/')}/browse/{issueKey}";
-            
+
             // Convert description from JiraTicket format to markdown
             JsonElement? descriptionElement = null;
             if (jiraTicket.Fields?.Description != null)
@@ -641,7 +641,7 @@ public class JiraToolService : IJiraToolService
                     descriptionElement = JsonSerializer.Deserialize<JsonElement>(json);
                 }
             }
-            
+
             var description = await _contentConverter.ConvertDescriptionToMarkdownAsync(
                 descriptionElement ?? default,
                 IntegrationTypeDetector.DetectJiraType(integration.Url));
@@ -672,7 +672,7 @@ public class JiraToolService : IJiraToolService
             _logger.LogError(ex,
                 "Integration not found for workspace {WorkspaceId}",
                 workspaceId);
-            
+
             return new
             {
                 success = false,
@@ -686,7 +686,7 @@ public class JiraToolService : IJiraToolService
                 "Invalid operation while retrieving JIRA issue {IssueKey}: {ErrorMessage}",
                 issueKey,
                 ex.Message);
-            
+
             return new
             {
                 success = false,
@@ -707,7 +707,7 @@ public class JiraToolService : IJiraToolService
                 "Invalid argument while retrieving JIRA issue {IssueKey}: {ErrorMessage}",
                 issueKey,
                 ex.Message);
-            
+
             return new
             {
                 success = false,
@@ -721,7 +721,7 @@ public class JiraToolService : IJiraToolService
                 "Failed to parse JIRA API response for workspace {WorkspaceId}, issue {IssueKey}",
                 workspaceId,
                 issueKey);
-            
+
             return new
             {
                 success = false,
@@ -734,7 +734,7 @@ public class JiraToolService : IJiraToolService
             _logger.LogError(ex,
                 "Failed to connect to JIRA for workspace {WorkspaceId}",
                 workspaceId);
-            
+
             return new
             {
                 success = false,
@@ -747,7 +747,7 @@ public class JiraToolService : IJiraToolService
             _logger.LogError(ex,
                 "JIRA server error for workspace {WorkspaceId}",
                 workspaceId);
-            
+
             return new
             {
                 success = false,
@@ -762,7 +762,7 @@ public class JiraToolService : IJiraToolService
                 issueKey,
                 workspaceId,
                 ex.Message);
-            
+
             return new
             {
                 success = false,
@@ -777,7 +777,7 @@ public class JiraToolService : IJiraToolService
                 issueKey,
                 workspaceId,
                 ex.Message);
-            
+
             return new
             {
                 success = false,
@@ -904,7 +904,7 @@ public class JiraToolService : IJiraToolService
             _logger.LogError(ex,
                 "Integration not found for workspace {WorkspaceId}",
                 workspaceId);
-            
+
             return new
             {
                 success = false,
@@ -918,7 +918,7 @@ public class JiraToolService : IJiraToolService
                 "Invalid operation creating epic in workspace {WorkspaceId}: {ErrorMessage}",
                 workspaceId,
                 ex.Message);
-            
+
             return new
             {
                 success = false,
@@ -938,7 +938,7 @@ public class JiraToolService : IJiraToolService
                 "Invalid argument creating epic in workspace {WorkspaceId}: {ErrorMessage}",
                 workspaceId,
                 ex.Message);
-            
+
             return new
             {
                 success = false,
@@ -951,7 +951,7 @@ public class JiraToolService : IJiraToolService
             _logger.LogError(ex,
                 "Failed to parse JIRA API response for workspace {WorkspaceId}",
                 workspaceId);
-            
+
             return new
             {
                 success = false,
@@ -964,7 +964,7 @@ public class JiraToolService : IJiraToolService
             _logger.LogError(ex,
                 "Failed to connect to JIRA for workspace {WorkspaceId}",
                 workspaceId);
-            
+
             return new
             {
                 success = false,
@@ -978,7 +978,7 @@ public class JiraToolService : IJiraToolService
                 "JIRA server error for workspace {WorkspaceId}: {ErrorMessage}",
                 workspaceId,
                 ex.Message);
-            
+
             return new
             {
                 success = false,
@@ -992,7 +992,7 @@ public class JiraToolService : IJiraToolService
                 "Failed to communicate with JIRA creating epic in workspace {WorkspaceId}: {ErrorMessage}",
                 workspaceId,
                 ex.Message);
-            
+
             return new
             {
                 success = false,
@@ -1006,7 +1006,7 @@ public class JiraToolService : IJiraToolService
                 "Unexpected error creating epic in workspace {WorkspaceId}: {ErrorMessage}",
                 workspaceId,
                 ex.Message);
-            
+
             return new
             {
                 success = false,
@@ -1054,40 +1054,40 @@ public class JiraToolService : IJiraToolService
 
     private async Task<string> GetIssueTypeIdAsync(
         IJiraApiClient apiClient,
-        string issueTypeName, 
+        string issueTypeName,
         CancellationToken cancellationToken = default)
     {
         try
         {
             _logger.LogDebug(
-                "Fetching issue type ID for '{IssueTypeName}'", 
+                "Fetching issue type ID for '{IssueTypeName}'",
                 issueTypeName);
-            
+
             var issueTypes = await apiClient.GetIssueTypesAsync(cancellationToken);
-            
-            var issueType = issueTypes?.FirstOrDefault(it => 
+
+            var issueType = issueTypes?.FirstOrDefault(it =>
                 string.Equals(it.Name, issueTypeName, StringComparison.OrdinalIgnoreCase));
-            
+
             if (issueType == null)
             {
                 _logger.LogError(
-                    "Issue type '{IssueTypeName}' not found", 
+                    "Issue type '{IssueTypeName}' not found",
                     issueTypeName);
                 throw new ArgumentException(
                     $"Issue type '{issueTypeName}' not found. " +
                     $"Available types: {string.Join(", ", issueTypes?.Select(it => it.Name) ?? new List<string>())}");
             }
-            
+
             _logger.LogDebug(
-                "Resolved issue type '{IssueTypeName}' to ID {IssueTypeId}", 
-                issueTypeName, 
+                "Resolved issue type '{IssueTypeName}' to ID {IssueTypeId}",
+                issueTypeName,
                 issueType.Id);
-            
+
             return issueType.Id;
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogError(ex, 
+            _logger.LogError(ex,
                 "Failed to fetch issue types");
             throw;
         }
@@ -1122,36 +1122,36 @@ public class JiraToolService : IJiraToolService
                     Project = new ProjectField { Id = projectId }
                 }
             };
-            
+
             // Add parent if provided (for subtasks/stories under epics)
             if (!string.IsNullOrEmpty(parentKey))
             {
                 request.Fields.Parent = new ParentField { Key = parentKey };
             }
-            
+
             _logger.LogDebug(
-                "Creating JIRA issue in project {ProjectId} with type {IssueTypeId}", 
-                projectId, 
+                "Creating JIRA issue in project {ProjectId} with type {IssueTypeId}",
+                projectId,
                 issueTypeId);
-            
+
             var result = await apiClient.CreateIssueAsync(request, cancellationToken);
-            
+
             if (result == null || string.IsNullOrEmpty(result.Key))
             {
                 _logger.LogError(
                     "Failed to parse create issue response");
                 throw new InvalidOperationException("Failed to parse JIRA create issue response");
             }
-            
+
             _logger.LogInformation(
-                "Successfully created JIRA issue {IssueKey}", 
+                "Successfully created JIRA issue {IssueKey}",
                 result.Key);
-            
+
             return result.Key;
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogError(ex, 
+            _logger.LogError(ex,
                 "Failed to create issue");
             throw;
         }

@@ -2,6 +2,7 @@ using NSubstitute;
 using Orchestra.Application.Agents.DTOs;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Common.Interfaces;
+using Orchestra.Application.McpServers.Interfaces;
 using Orchestra.Tests.Shared.Builders;
 
 namespace Orchestra.Application.Tests.Tests.Agents;
@@ -32,6 +33,7 @@ public class AgentServiceTemplateImmutabilityTests
         var service = new AgentService(
             agentDataAccess,
             toolActionDataAccess,
+            Substitute.For<IAgentMcpToolDataAccess>(),
             authService,
             toolValidationService,
             Substitute.For<IBuiltInAgentTemplateRegistry>(),

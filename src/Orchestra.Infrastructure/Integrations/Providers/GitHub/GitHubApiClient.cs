@@ -227,7 +227,7 @@ public class GitHubApiClient : IGitHubApiClient
         {
             var url = $"/repos/{_owner}/{_repo}/issues/{issueNumber}";
             var payload = new Dictionary<string, object?>();
-            
+
             if (title != null)
                 payload["title"] = title;
             if (body != null)

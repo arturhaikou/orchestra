@@ -26,5 +26,8 @@ public class AgentToolActionConfiguration : IEntityTypeConfiguration<AgentToolAc
             .WithMany()
             .HasForeignKey(ata => ata.ToolActionId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasIndex(a => a.ToolActionId)
+            .HasDatabaseName("IX_AgentToolActions_ToolActionId");
     }
 }

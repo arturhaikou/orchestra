@@ -287,7 +287,7 @@ public class ToolScanningService : IToolScanningService
                                 "  Failed to process action {ActionName} in category {CategoryName}",
                                 actionAttribute.Name,
                                 categoryAttribute.Name);
-                            
+
                             result.Errors.Add($"Failed to process action {actionAttribute.Name}: {ex.Message}");
                         }
                     }

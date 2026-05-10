@@ -88,8 +88,8 @@ public class TicketCommentService : ITicketCommentService
 
         // Validate user has access to ticket's workspace
         await _workspaceAuthorizationService.EnsureUserIsMemberAsync(
-            userId, 
-            ticket.WorkspaceId, 
+            userId,
+            ticket.WorkspaceId,
             cancellationToken);
 
         // Fetch author name from database
@@ -145,8 +145,8 @@ public class TicketCommentService : ITicketCommentService
 
         // Validate workspace access
         await _workspaceAuthorizationService.EnsureUserIsMemberAsync(
-            userId, 
-            integration.WorkspaceId, 
+            userId,
+            integration.WorkspaceId,
             cancellationToken);
 
         // Get provider

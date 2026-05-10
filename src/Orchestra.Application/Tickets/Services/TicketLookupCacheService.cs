@@ -13,7 +13,7 @@ public class TicketLookupCacheService : ITicketLookupCacheService
 {
     private readonly ITicketDataAccess _ticketDataAccess;
     private readonly IMemoryCache _cache;
-    
+
     private const string STATUS_CACHE_KEY = "ticket_statuses_all";
     private const string PRIORITY_CACHE_KEY = "ticket_priorities_all";
     private static readonly TimeSpan CACHE_DURATION = TimeSpan.FromMinutes(5);

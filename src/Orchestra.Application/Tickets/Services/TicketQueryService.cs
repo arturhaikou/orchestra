@@ -126,7 +126,7 @@ public class TicketQueryService : ITicketQueryService
         {
             // Parse and validate ticket ID format
             var parseResult = _ticketIdParsingService.Parse(ticketId);
-            
+
             if (parseResult.Type == TicketIdType.External)
             {
                 // External ticket path (composite ID)
@@ -428,7 +428,7 @@ public class TicketQueryService : ITicketQueryService
 
         // 1. Fetch ticket from database with eager loading
         var ticket = await _ticketDataAccess.GetTicketByIdAsync(ticketId, cancellationToken);
-        
+
         if (ticket == null)
         {
             _logger.LogWarning(
@@ -443,7 +443,7 @@ public class TicketQueryService : ITicketQueryService
             _logger.LogDebug(
                 "Ticket {TicketId} is a materialized external ticket. Redirecting to composite ID path.",
                 ticketId);
-            
+
             var compositeId = $"{ticket.IntegrationId.Value}:{ticket.ExternalTicketId}";
             return await GetExternalTicketByCompositeIdAsync(compositeId, userId, cancellationToken);
         }
@@ -453,7 +453,7 @@ public class TicketQueryService : ITicketQueryService
             userId,
             ticket.WorkspaceId,
             cancellationToken);
-        
+
         if (!hasAccess)
         {
             _logger.LogWarning(
@@ -465,13 +465,13 @@ public class TicketQueryService : ITicketQueryService
         // 3. Load status and priority lookup data
         TicketStatus? status = null;
         TicketPriority? priority = null;
-        
+
         if (ticket.StatusId.HasValue)
         {
             var allStatuses = await _ticketDataAccess.GetAllStatusesAsync(cancellationToken);
             status = allStatuses.FirstOrDefault(s => s.Id == ticket.StatusId.Value);
         }
-        
+
         if (ticket.PriorityId.HasValue)
         {
             var allPriorities = await _ticketDataAccess.GetAllPrioritiesAsync(cancellationToken);
@@ -531,14 +531,14 @@ public class TicketQueryService : ITicketQueryService
 
         // 1. Parse composite ID format using validator
         var parseResult = _ticketIdParsingService.Parse(compositeId);
-        
+
         if (parseResult.Type != TicketIdType.External)
         {
             throw new ArgumentException(
                 $"Expected external ticket ID in composite format, but received: '{compositeId}'",
                 nameof(compositeId));
         }
-        
+
         var integrationId = parseResult.IntegrationId!.Value;
         var externalTicketId = parseResult.ExternalTicketId!;
 
@@ -550,7 +550,7 @@ public class TicketQueryService : ITicketQueryService
         var integration = await _integrationDataAccess.GetByIdAsync(
             integrationId,
             cancellationToken);
-        
+
         if (integration == null)
         {
             _logger.LogWarning(
@@ -564,7 +564,7 @@ public class TicketQueryService : ITicketQueryService
             userId,
             integration.WorkspaceId,
             cancellationToken);
-        
+
         if (!hasAccess)
         {
             _logger.LogWarning(
@@ -628,7 +628,7 @@ public class TicketQueryService : ITicketQueryService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, 
+            _logger.LogError(ex,
                 "Failed to fetch ticket {ExternalTicketId} from provider {Provider}",
                 normalizedExternalTicketId, integration.Provider);
             throw new TicketNotFoundException(compositeId);
@@ -655,7 +655,7 @@ public class TicketQueryService : ITicketQueryService
         TicketStatusDto? status = null;
         TicketPriorityDto? priority = null;
         List<CommentDto> mergedComments = externalTicket.Comments;
-        
+
         if (materializedTicket != null)
         {
             assignedAgentId = materializedTicket.AssignedAgentId;
@@ -706,13 +706,13 @@ public class TicketQueryService : ITicketQueryService
                 .OrderByDescending(c => c.Timestamp ?? DateTime.MinValue)
                 .ToList();
         }
-        
+
         // Fallback to external status/priority if not materialized or not set
         if (status == null && !string.IsNullOrEmpty(externalTicket.StatusName))
         {
             status = new TicketStatusDto(Guid.Empty, externalTicket.StatusName, externalTicket.StatusColor ?? "bg-gray-500");
         }
-        
+
         if (priority == null && !string.IsNullOrEmpty(externalTicket.PriorityName))
         {
             priority = new TicketPriorityDto(Guid.Empty, externalTicket.PriorityName, externalTicket.PriorityColor ?? "bg-gray-500", externalTicket.PriorityValue);
@@ -787,7 +787,8 @@ public class TicketQueryService : ITicketQueryService
             Comments: [],
             Satisfaction: null,
             Summary: null
-        ) { CommentCount = dto.CommentCount };
+        )
+        { CommentCount = dto.CommentCount };
     }
 
     private TicketDto MapInternalTicketToDto(
@@ -893,14 +894,14 @@ public class TicketQueryService : ITicketQueryService
     {
         // Fetch workspace to read the configured CSAT model ID
         var workspace = await _workspaceDataAccess.GetByIdAsync(ticket.WorkspaceId, cancellationToken);
-        
+
         // Check if CSAT is enabled for this workspace
         if (workspace != null && !workspace.IsCustomerSatisfactionAnalysisEnabled)
         {
             _logger.LogInformation(
                 "CSAT analysis is disabled for workspace {WorkspaceId}. Setting ticket {TicketId} to Satisfaction=100",
                 ticket.WorkspaceId, ticket.Id);
-            
+
             return ticket with { Satisfaction = 100 };
         }
 
@@ -930,7 +931,7 @@ public class TicketQueryService : ITicketQueryService
 
         // Fetch workspace to check CSAT enabled flag and read the configured model ID
         var workspace = await _workspaceDataAccess.GetByIdAsync(workspaceId, cancellationToken);
-        
+
         if (workspace != null && !workspace.IsCustomerSatisfactionAnalysisEnabled)
         {
             // CSAT is disabled for this workspace - set all tickets to 100 and skip sentiment analysis

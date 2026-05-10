@@ -43,7 +43,7 @@ public class ToolCategoryDataAccess : IToolCategoryDataAccess
     {
         return await _context.ToolCategories
             .AsNoTracking()
-            .Where(tc => providerTypes.Contains(tc.ProviderType))
+            .Where(tc => providerTypes.Contains(tc.ProviderType) && tc.IsActive)
             .OrderBy(tc => tc.ProviderType)
             .ThenBy(tc => tc.Name)
             .ToListAsync(cancellationToken);
@@ -77,5 +77,40 @@ public class ToolCategoryDataAccess : IToolCategoryDataAccess
     {
         _context.ToolCategories.Update(toolCategory);
         await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<ToolCategory?> FindByIntegrationIdAsync(
+        Guid integrationId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.ToolCategories
+            .AsNoTracking()
+            .FirstOrDefaultAsync(tc => tc.IntegrationId == integrationId, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<List<ToolCategory>> GetByIntegrationIdsAsync(
+        List<Guid> integrationIds,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.ToolCategories
+            .AsNoTracking()
+            .Where(tc => tc.IntegrationId.HasValue && integrationIds.Contains(tc.IntegrationId.Value) && tc.IsActive)
+            .OrderBy(tc => tc.Name)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<bool> DeactivateByIntegrationIdAsync(Guid integrationId, CancellationToken cancellationToken = default)
+    {
+        var categories = await _context.ToolCategories
+            .Where(tc => tc.IntegrationId == integrationId && tc.IsActive)
+            .ToListAsync(cancellationToken);
+
+        foreach (var category in categories)
+            category.Deactivate();
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return categories.Count > 0;
     }
 }

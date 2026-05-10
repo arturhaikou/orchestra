@@ -149,6 +149,29 @@ namespace Orchestra.Infrastructure.Migrations
                     b.ToTable("Agents", (string)null);
                 });
 
+            modelBuilder.Entity("Orchestra.Domain.Entities.AgentMcpTool", b =>
+                {
+                    b.Property<Guid>("AgentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("McpServerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ToolName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("AgentId", "McpServerId", "ToolName");
+
+                    b.HasIndex("AgentId")
+                        .HasDatabaseName("IX_AgentMcpTools_AgentId");
+
+                    b.HasIndex("McpServerId")
+                        .HasDatabaseName("IX_AgentMcpTools_McpServerId");
+
+                    b.ToTable("AgentMcpTools", (string)null);
+                });
+
             modelBuilder.Entity("Orchestra.Domain.Entities.AgentToolAction", b =>
                 {
                     b.Property<Guid>("AgentId")
@@ -159,7 +182,8 @@ namespace Orchestra.Infrastructure.Migrations
 
                     b.HasKey("AgentId", "ToolActionId");
 
-                    b.HasIndex("ToolActionId");
+                    b.HasIndex("ToolActionId")
+                        .HasDatabaseName("IX_AgentToolActions_ToolActionId");
 
                     b.ToTable("AgentToolActions", (string)null);
                 });
@@ -168,11 +192,6 @@ namespace Orchestra.Infrastructure.Migrations
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
-
-                    b.Property<bool>("Connected")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -242,6 +261,73 @@ namespace Orchestra.Infrastructure.Migrations
                         .HasDatabaseName("IX_Integrations_WorkspaceId_Name");
 
                     b.ToTable("Integrations", (string)null);
+                });
+
+            modelBuilder.Entity("Orchestra.Domain.Entities.McpServer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Arguments")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<string>("AuthType")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Command")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ConnectionStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Unknown");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EncryptedApiKey")
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)");
+
+                    b.Property<string>("EncryptedEnvironmentVariables")
+                        .HasMaxLength(8000)
+                        .HasColumnType("character varying(8000)");
+
+                    b.Property<string>("EndpointUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("TransportType")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkspaceId")
+                        .HasDatabaseName("IX_McpServers_WorkspaceId");
+
+                    b.HasIndex("WorkspaceId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("IX_McpServers_WorkspaceId_Name");
+
+                    b.ToTable("McpServers", (string)null);
                 });
 
             modelBuilder.Entity("Orchestra.Domain.Entities.Ticket", b =>
@@ -466,6 +552,30 @@ namespace Orchestra.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<Guid?>("IntegrationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("IsMcpTool")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateTimeOffset?>("LastSyncedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("McpToolSchema")
+                        .HasColumnType("jsonb");
+
                     b.Property<string>("MethodName")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -481,7 +591,20 @@ namespace Orchestra.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("IsActive")
+                        .HasDatabaseName("IX_ToolActions_IsActive");
+
+                    b.HasIndex("IsEnabled")
+                        .HasDatabaseName("IX_ToolActions_IsEnabled");
+
                     b.HasIndex("ToolCategoryId");
+
+                    b.HasIndex("IntegrationId", "IsActive")
+                        .HasDatabaseName("IX_ToolActions_IntegrationId_IsActive");
+
+                    b.HasIndex("ToolCategoryId", "MethodName")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ToolActions_ToolCategoryId_MethodName");
 
                     b.HasIndex("ToolCategoryId", "Name")
                         .IsUnique();
@@ -503,6 +626,17 @@ namespace Orchestra.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<Guid?>("IntegrationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<Guid?>("McpServerId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -513,7 +647,6 @@ namespace Orchestra.Infrastructure.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("ServiceClassName")
-                        .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
@@ -521,6 +654,17 @@ namespace Orchestra.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("IntegrationId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ToolCategories_IntegrationId_Unique")
+                        .HasFilter("\"IntegrationId\" IS NOT NULL");
+
+                    b.HasIndex("IsActive")
+                        .HasDatabaseName("IX_ToolCategories_IsActive");
+
+                    b.HasIndex("McpServerId")
+                        .HasDatabaseName("IX_ToolCategories_McpServerId");
 
                     b.HasIndex("Name")
                         .IsUnique();
@@ -666,6 +810,21 @@ namespace Orchestra.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Orchestra.Domain.Entities.AgentMcpTool", b =>
+                {
+                    b.HasOne("Orchestra.Domain.Entities.Agent", null)
+                        .WithMany()
+                        .HasForeignKey("AgentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Orchestra.Domain.Entities.McpServer", null)
+                        .WithMany()
+                        .HasForeignKey("McpServerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Orchestra.Domain.Entities.AgentToolAction", b =>
                 {
                     b.HasOne("Orchestra.Domain.Entities.Agent", null)
@@ -682,6 +841,15 @@ namespace Orchestra.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("Orchestra.Domain.Entities.Integration", b =>
+                {
+                    b.HasOne("Orchestra.Domain.Entities.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Orchestra.Domain.Entities.McpServer", b =>
                 {
                     b.HasOne("Orchestra.Domain.Entities.Workspace", null)
                         .WithMany()
@@ -730,11 +898,29 @@ namespace Orchestra.Infrastructure.Migrations
 
             modelBuilder.Entity("Orchestra.Domain.Entities.ToolAction", b =>
                 {
+                    b.HasOne("Orchestra.Domain.Entities.Integration", null)
+                        .WithMany()
+                        .HasForeignKey("IntegrationId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Orchestra.Domain.Entities.ToolCategory", null)
                         .WithMany()
                         .HasForeignKey("ToolCategoryId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Orchestra.Domain.Entities.ToolCategory", b =>
+                {
+                    b.HasOne("Orchestra.Domain.Entities.Integration", null)
+                        .WithMany()
+                        .HasForeignKey("IntegrationId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("Orchestra.Domain.Entities.McpServer", null)
+                        .WithMany()
+                        .HasForeignKey("McpServerId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("Orchestra.Domain.Entities.UserWorkspace", b =>

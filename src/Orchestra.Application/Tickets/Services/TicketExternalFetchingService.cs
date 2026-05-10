@@ -35,7 +35,7 @@ public class TicketExternalFetchingService : IExternalTicketFetchingService
         CancellationToken cancellationToken)
     {
         var state = currentState ?? new ExternalPaginationState();
-        
+
         // Use redistribution logic to fill slots with redistribution across providers
         var (tickets, updatedState) = await FetchWithRedistributionAsync(
             trackerIntegrations,
@@ -60,7 +60,7 @@ public class TicketExternalFetchingService : IExternalTicketFetchingService
         int remainingSlots)
     {
         var distribution = new Dictionary<Guid, int>();
-        
+
         if (integrations.Count == 0 || remainingSlots <= 0)
         {
             return distribution;
@@ -98,11 +98,11 @@ public class TicketExternalFetchingService : IExternalTicketFetchingService
     {
         var allFetchedTickets = new List<TicketDto>();
         const int maxRedistributionRounds = 3;
-        
+
         for (int round = 0; round < maxRedistributionRounds; round++)
         {
             var remainingSlots = targetSlots - allFetchedTickets.Count;
-            
+
             if (remainingSlots <= 0)
             {
                 _logger.LogDebug(
@@ -250,7 +250,7 @@ public class TicketExternalFetchingService : IExternalTicketFetchingService
             foreach (var extTicket in externalTickets)
             {
                 var compositeId = $"{integration.Id}:{extTicket.ExternalTicketId}";
-                
+
                 // Check if materialized
                 var hasMaterialized = materializedTickets.TryGetValue(
                     (integration.Id, extTicket.ExternalTicketId),
@@ -264,9 +264,9 @@ public class TicketExternalFetchingService : IExternalTicketFetchingService
                 {
                     // Use internal status for materialized tickets
                     var internalStatus = await _ticketDataAccess.GetStatusByIdAsync(
-                        materializedTicket.StatusId.Value, 
+                        materializedTicket.StatusId.Value,
                         cancellationToken);
-                    status = internalStatus != null 
+                    status = internalStatus != null
                         ? new TicketStatusDto(internalStatus.Id, internalStatus.Name, internalStatus.Color)
                         : (!string.IsNullOrEmpty(extTicket.StatusName)
                             ? new TicketStatusDto(Guid.Empty, extTicket.StatusName, extTicket.StatusColor ?? "bg-gray-500")
@@ -284,9 +284,9 @@ public class TicketExternalFetchingService : IExternalTicketFetchingService
                 {
                     // Use internal priority for materialized tickets
                     var internalPriority = await _ticketDataAccess.GetPriorityByIdAsync(
-                        materializedTicket.PriorityId.Value, 
+                        materializedTicket.PriorityId.Value,
                         cancellationToken);
-                    priority = internalPriority != null 
+                    priority = internalPriority != null
                         ? new TicketPriorityDto(internalPriority.Id, internalPriority.Name, internalPriority.Color, internalPriority.Value)
                         : (!string.IsNullOrEmpty(extTicket.PriorityName)
                             ? new TicketPriorityDto(Guid.Empty, extTicket.PriorityName, extTicket.PriorityColor ?? "bg-gray-500", extTicket.PriorityValue)

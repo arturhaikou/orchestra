@@ -17,7 +17,7 @@ public class IntegrationDataAccess : IIntegrationDataAccess
     }
 
     public async Task<List<Integration>> GetByWorkspaceIdAsync(
-        Guid workspaceId, 
+        Guid workspaceId,
         CancellationToken cancellationToken = default)
     {
         return await _context.Integrations
@@ -26,8 +26,22 @@ public class IntegrationDataAccess : IIntegrationDataAccess
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<List<Integration>> GetMcpServersByWorkspaceIdAsync(
+        Guid workspaceId,
+        CancellationToken cancellationToken = default)
+    {
+        var integrations = await _context.Integrations
+            .Where(i => i.WorkspaceId == workspaceId && i.IsActive)
+            .ToListAsync(cancellationToken);
+
+        return integrations
+            .Where(i => i.Types.Any(t => t == IntegrationType.MCP_SERVER))
+            .OrderByDescending(i => i.CreatedAt)
+            .ToList();
+    }
+
     public async Task<Integration?> GetByIdAsync(
-        Guid integrationId, 
+        Guid integrationId,
         CancellationToken cancellationToken = default)
     {
         return await _context.Integrations
@@ -35,9 +49,9 @@ public class IntegrationDataAccess : IIntegrationDataAccess
     }
 
     public async Task<bool> ExistsByNameInWorkspaceAsync(
-        string name, 
-        Guid workspaceId, 
-        Guid? excludeIntegrationId = null, 
+        string name,
+        Guid workspaceId,
+        Guid? excludeIntegrationId = null,
         CancellationToken cancellationToken = default)
     {
         var query = _context.Integrations
@@ -110,5 +124,17 @@ public class IntegrationDataAccess : IIntegrationDataAccess
             .ThenBy(i => i.Name)
             .Select(i => new IntegrationSummaryDto(i.Id, i.Name, i.Provider))
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task SoftDeleteAsync(Guid integrationId, CancellationToken cancellationToken = default)
+    {
+        var integration = await _context.Integrations
+            .FirstOrDefaultAsync(i => i.Id == integrationId && i.IsActive, cancellationToken);
+
+        if (integration is null)
+            return;
+
+        integration.Deactivate();
+        await _context.SaveChangesAsync(cancellationToken);
     }
 }

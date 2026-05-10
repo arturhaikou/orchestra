@@ -14,6 +14,7 @@ public record AgentDto(
     string[] Capabilities,
     string[] ToolActionIds,     // Used for create/update operations
     string[] ToolCategories,    // Unique category names for display
+    string[] McpServerNames,    // MCP server names assigned to this agent
     string AvatarUrl,
     string? CustomInstructions,
     string? ProjectPrinciples,

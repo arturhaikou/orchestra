@@ -7,6 +7,7 @@ import AgentCreatePage from '../pages/AgentCreatePage';
 import * as agentService from '../../services/agentService';
 import * as toolService from '../../services/toolService';
 import * as workspaceService from '../../services/workspaceService';
+import * as mcpServerService from '../../services/mcpServerService';
 import { Tool } from '../../types';
 
 vi.mock('../../services/agentService', () => ({
@@ -22,6 +23,10 @@ vi.mock('../../services/toolService', () => ({
   getTools: vi.fn(),
 }));
 
+vi.mock('../../services/mcpServerService', () => ({
+  getMcpServers: vi.fn(),
+}));
+
 vi.mock('../../services/workspaceService', () => ({
   fetchWorkspaceModels: vi.fn(),
   getWorkspaces: vi.fn(),
@@ -33,6 +38,10 @@ vi.mock('../../services/workspaceService', () => ({
   fetchPlatformModels: vi.fn(),
   getWorkspaceProviderConfig: vi.fn(),
   updateWorkspaceProvider: vi.fn(),
+}));
+
+vi.mock('../../utils/markdownRenderer', () => ({
+  renderMarkdown: vi.fn((input: string) => `<p>${input}</p>`),
 }));
 
 const mockTools: Tool[] = [
@@ -95,6 +104,7 @@ describe('AgentCreatePage', () => {
     vi.mocked(toolService.getTools).mockResolvedValue(mockTools);
     vi.mocked(workspaceService.fetchWorkspaceModels).mockResolvedValue(['gpt-4', 'gpt-3.5-turbo']);
     vi.mocked(agentService.createAgent).mockResolvedValue(mockCreatedAgent);
+    vi.mocked(mcpServerService.getMcpServers).mockResolvedValue([]);
   });
 
   describe('Scenario 1: Form rendering', () => {
@@ -227,6 +237,24 @@ describe('AgentCreatePage', () => {
     });
   });
 
+  describe('FR-005 — Tool Summary Section on Create page', () => {
+    beforeEach(() => {
+      vi.mocked(mcpServerService.getMcpServers).mockResolvedValue([]);
+    });
+
+    it('shows_empty_state_prompt_when_no_tools_are_selected', async () => {
+      renderAgentCreatePage();
+      await screen.findByText(/create agent/i);
+      expect(screen.getByText(/no tools selected/i)).toBeInTheDocument();
+    });
+
+    it('renders_add_tools_button_on_initial_load', async () => {
+      renderAgentCreatePage();
+      await screen.findByText(/create agent/i);
+      expect(screen.getByTestId('add-tools-button')).toBeInTheDocument();
+    });
+  });
+
   describe('Error handling', () => {
     it('shows_error_toast_when_api_returns_400', async () => {
       vi.mocked(agentService.createAgent).mockRejectedValue(new Error('Invalid tool action ID'));
@@ -269,6 +297,69 @@ describe('AgentCreatePage', () => {
         expect(screen.getByLabelText(/name/i)).toHaveValue('Test Agent');
         expect(screen.getByLabelText(/role/i)).toHaveValue('Developer');
       });
+    });
+  });
+
+  describe('FR-007 — Custom Instructions Markdown Preview Toggle', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      vi.mocked(toolService.getTools).mockResolvedValue(mockTools);
+      vi.mocked(workspaceService.fetchWorkspaceModels).mockResolvedValue(['gpt-4', 'gpt-3.5-turbo']);
+      vi.mocked(agentService.createAgent).mockResolvedValue(mockCreatedAgent);
+      vi.mocked(mcpServerService.getMcpServers).mockResolvedValue([]);
+    });
+
+    it('renders_the_edit_write_toggle_button_in_custom_instructions_section', async () => {
+      renderAgentCreatePage();
+
+      await waitFor(() => {
+        expect(screen.getByText(/create agent/i)).toBeInTheDocument();
+      });
+
+      const toggleButton = screen.queryByRole('button', { name: /write|edit/i });
+      expect(toggleButton).toBeTruthy();
+    });
+
+    it('renders_the_preview_toggle_button_in_custom_instructions_section', async () => {
+      renderAgentCreatePage();
+
+      await waitFor(() => {
+        expect(screen.getByText(/create agent/i)).toBeInTheDocument();
+      });
+
+      const previewButton = screen.queryByRole('button', { name: /preview/i });
+      expect(previewButton).toBeTruthy();
+    });
+
+    it('custom_instructions_textarea_is_visible_by_default_edit_mode_is_active', async () => {
+      renderAgentCreatePage();
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/custom instructions/i)).toBeInTheDocument();
+      });
+
+      const textarea = screen.getByLabelText(/custom instructions/i);
+      expect(textarea).toBeVisible();
+    });
+
+    it('form_isdirty_computation_is_unaffected_by_toggle_mode', async () => {
+      const user = userEvent.setup();
+      renderAgentCreatePage();
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/custom instructions/i)).toBeInTheDocument();
+      });
+
+      const textarea = screen.getByLabelText(/custom instructions/i);
+      await user.type(textarea, 'Test instructions');
+
+      const previewButton = screen.queryByRole('button', { name: /preview/i });
+      if (previewButton) {
+        await user.click(previewButton);
+        await user.click(screen.getByRole('button', { name: /write|edit/i }));
+      }
+
+      expect(textarea).toHaveValue('Test instructions');
     });
   });
 });

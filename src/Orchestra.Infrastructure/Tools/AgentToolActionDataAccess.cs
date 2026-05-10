@@ -164,4 +164,46 @@ public class AgentToolActionDataAccess : IAgentToolActionDataAccess
             .Where(ta => ids.Contains(ta.Id) && reviewActionNames.Contains(ta.Name))
             .AnyAsync(cancellationToken);
     }
+
+    public async Task RemoveByToolActionIdsAsync(
+        List<Guid> toolActionIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (toolActionIds.Count == 0)
+            return;
+
+        var rowsToDelete = await _context.AgentToolActions
+            .Where(ata => toolActionIds.Contains(ata.ToolActionId))
+            .ToListAsync(cancellationToken);
+
+        _context.AgentToolActions.RemoveRange(rowsToDelete);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<int> CountByToolActionIdsAsync(
+        List<Guid> toolActionIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (toolActionIds.Count == 0)
+            return 0;
+
+        return await _context.AgentToolActions
+            .AsNoTracking()
+            .Where(ata => toolActionIds.Contains(ata.ToolActionId))
+            .CountAsync(cancellationToken);
+    }
+
+    public async Task<int> DeleteByToolActionIdsAsync(IEnumerable<Guid> toolActionIds, CancellationToken cancellationToken = default)
+    {
+        var ids = toolActionIds.ToList();
+        if (ids.Count == 0)
+            return 0;
+
+        var rowsToDelete = await _context.AgentToolActions
+            .Where(ata => ids.Contains(ata.ToolActionId))
+            .ToListAsync(cancellationToken);
+
+        _context.AgentToolActions.RemoveRange(rowsToDelete);
+        return await _context.SaveChangesAsync(cancellationToken);
+    }
 }

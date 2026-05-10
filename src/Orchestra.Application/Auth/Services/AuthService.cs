@@ -97,26 +97,26 @@ public class AuthService : IAuthService
     public async Task<UserDto> UpdateProfileAsync(Guid userId, UpdateProfileRequest request, CancellationToken cancellationToken = default)
     {
         var user = await _userDataAccess.FindByIdAsync(userId, cancellationToken);
-        
+
         if (user == null)
             throw new InvalidOperationException($"User with ID {userId} not found");
-        
+
         // Check for duplicate email only if email has changed
         var normalizedEmail = request.Email.ToLowerInvariant();
         if (user.Email != normalizedEmail)
         {
             var emailExists = await _userDataAccess.AnyByEmailExcludingUserAsync(
                 request.Email, userId, cancellationToken);
-            
+
             if (emailExists)
                 throw new DuplicateEmailException(request.Email);
         }
-        
+
         // Use domain method to update profile
         user.UpdateProfile(normalizedEmail, request.Name);
-        
+
         await _userDataAccess.SaveChangesAsync(cancellationToken);
-        
+
         return new UserDto(user.Id.ToString(), user.Email, user.Name);
     }
 
@@ -129,9 +129,9 @@ public class AuthService : IAuthService
 
         // Verify current password
         var isCurrentPasswordValid = _passwordHashingService.VerifyPassword(
-            request.CurrentPassword, 
+            request.CurrentPassword,
             user.PasswordHash);
-        
+
         if (!isCurrentPasswordValid)
             throw new InvalidCredentialsException();
 

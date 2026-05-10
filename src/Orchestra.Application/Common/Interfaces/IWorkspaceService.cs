@@ -36,9 +36,9 @@ public interface IWorkspaceService
     /// <exception cref="WorkspaceNotFoundException">Thrown when workspace is not found.</exception>
     /// <exception cref="UnauthorizedWorkspaceAccessException">Thrown when user is not the owner.</exception>
     Task<WorkspaceDto> UpdateWorkspaceAsync(
-        Guid userId, 
-        Guid workspaceId, 
-        UpdateWorkspaceRequest request, 
+        Guid userId,
+        Guid workspaceId,
+        UpdateWorkspaceRequest request,
         CancellationToken cancellationToken = default);
 
     /// <summary>

@@ -26,7 +26,7 @@ public class TicketPaginationService : ITicketPaginationService
     public TicketPageToken ParsePageToken(string? pageToken)
     {
         var currentToken = new TicketPageToken();
-        
+
         if (!string.IsNullOrWhiteSpace(pageToken))
         {
             try
@@ -80,7 +80,7 @@ public class TicketPaginationService : ITicketPaginationService
             pageSize = 100;
         if (pageSize < 1)
             pageSize = 50;
-        
+
         return pageSize;
     }
 }

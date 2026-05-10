@@ -16,7 +16,7 @@ public interface IToolActionDataAccess
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>A list of tool actions belonging to the specified categories, ordered by name.</returns>
     Task<List<ToolAction>> GetByCategoryIdsAsync(
-        List<Guid> categoryIds, 
+        List<Guid> categoryIds,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -26,7 +26,7 @@ public interface IToolActionDataAccess
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>A list of tool actions belonging to the specified category, ordered by name.</returns>
     Task<List<ToolAction>> GetByCategoryIdAsync(
-        Guid categoryId, 
+        Guid categoryId,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -36,7 +36,20 @@ public interface IToolActionDataAccess
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>The tool action if found; otherwise, null.</returns>
     Task<ToolAction?> GetByIdAsync(
-        Guid id, 
+        Guid id,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves enabled tool actions matching the given IDs.
+    /// Only returns actions where <c>IsEnabled = true</c>, enforcing the destructive
+    /// opt-in gate: non-opted-in MCP tool actions are excluded because they have
+    /// <c>IsEnabled = false</c> and will be absent from the result.
+    /// </summary>
+    /// <param name="ids">The tool action IDs to look up.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>Enabled tool actions matching the provided IDs. Missing or disabled IDs are absent from the result.</returns>
+    Task<List<ToolAction>> GetEnabledByIdsAsync(
+        List<Guid> ids,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -46,7 +59,11 @@ public interface IToolActionDataAccess
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     Task AddAsync(
-        ToolAction toolAction, 
+        ToolAction toolAction,
+        CancellationToken cancellationToken = default);
+
+    Task AddRangeAsync(
+        IEnumerable<ToolAction> toolActions,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -56,7 +73,11 @@ public interface IToolActionDataAccess
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     Task UpdateAsync(
-        ToolAction toolAction, 
+        ToolAction toolAction,
+        CancellationToken cancellationToken = default);
+
+    Task UpdateRangeAsync(
+        List<ToolAction> toolActions,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -70,6 +91,16 @@ public interface IToolActionDataAccess
         List<string> methodNames,
         CancellationToken cancellationToken = default);
 
+    Task<List<ToolAction>> GetActiveByIntegrationIdAsync(
+        Guid integrationId,
+        CancellationToken cancellationToken = default);
+
+    Task<List<ToolAction>> GetByIntegrationIdAsync(Guid integrationId, CancellationToken cancellationToken = default);
+
+    Task<Dictionary<Guid, int>> CountActiveByIntegrationIdsAsync(
+        List<Guid> integrationIds,
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Retrieves tool actions matching the given action names (snake_case identifiers).
     /// Used by the template availability resolver to look up actions by their public name.
@@ -80,4 +111,11 @@ public interface IToolActionDataAccess
     Task<List<ToolAction>> GetByNamesAsync(
         List<string> names,
         CancellationToken cancellationToken = default);
+
+    Task<ToolAction?> FindByToolCategoryIdAndMethodNameAsync(
+        Guid toolCategoryId,
+        string methodName,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Guid>> DeactivateByIntegrationIdAsync(Guid integrationId, CancellationToken cancellationToken = default);
 }

@@ -1,9 +1,5 @@
 namespace Orchestra.Application.Integrations.DTOs;
 
-/// <summary>
-/// Data transfer object for integration API responses.
-/// API keys are intentionally excluded for security.
-/// </summary>
 public record IntegrationDto(
     string Id,
     string WorkspaceId,
@@ -14,9 +10,14 @@ public record IntegrationDto(
     string? Url,
     string? Username,
     bool Connected,
-    string? LastSync,  // Formatted as human-readable (e.g., "2 hours ago")
+    string? LastSync,
     string? FilterQuery,
     bool Vectorize,
     string? JiraType = null,
-    string? ConfluenceType = null
+    string? ConfluenceType = null,
+    bool IsMcpBacked = false,
+    string? McpEndpointUrl = null,
+    int? ToolCount = null,
+    string? McpTransportType = null,
+    string? McpCommand = null
 );

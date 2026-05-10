@@ -15,7 +15,8 @@ import {
   Pencil,
   Trash2,
   X,
-  User as UserIcon
+  User as UserIcon,
+  Server
 } from 'lucide-react';
 import { Workspace, User } from '../types';
 import { getUser } from '../services/authService';
@@ -64,6 +65,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const location = useLocation();
 
   const isActive = (view: string) => location.pathname.endsWith(`/${view}`);
+  const isActiveSection = (section: string) => location.pathname.includes(`/${section}`);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
@@ -186,6 +188,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           <SidebarItem icon={GitBranch} label="Integrations" to={`/workspaces/${activeWorkspaceId}/integrations`} active={isActive('integrations')} onClick={onClose} />
+          <SidebarItem icon={Server} label="MCP Servers" to={`/workspaces/${activeWorkspaceId}/mcp-servers`} active={isActiveSection('mcp-servers')} onClick={onClose} />
           <SidebarItem icon={TicketIcon} label="Tickets" to={`/workspaces/${activeWorkspaceId}/tickets`} active={isActive('tickets')} onClick={onClose} />
           <SidebarItem icon={Bot} label="Agents" to={`/workspaces/${activeWorkspaceId}/agents`} active={isActive('agents')} onClick={onClose} />
         </nav>

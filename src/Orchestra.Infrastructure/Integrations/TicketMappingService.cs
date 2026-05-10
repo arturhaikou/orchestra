@@ -231,13 +231,13 @@ public class TicketMappingService : ITicketMappingService
                 .OrderByDescending(c => c.Timestamp ?? DateTime.MinValue)
                 .ToList();
         }
-        
+
         // Fallback to external status/priority if not materialized or not set
         if (status == null && !string.IsNullOrEmpty(externalTicket.StatusName))
         {
             status = new TicketStatusDto(Guid.Empty, externalTicket.StatusName, externalTicket.StatusColor ?? "bg-gray-500");
         }
-        
+
         if (priority == null && !string.IsNullOrEmpty(externalTicket.PriorityName))
         {
             priority = new TicketPriorityDto(Guid.Empty, externalTicket.PriorityName, externalTicket.PriorityColor ?? "bg-gray-500", externalTicket.PriorityValue);

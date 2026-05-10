@@ -10,7 +10,7 @@ export function hasIntegrationWarning(agent: Agent): boolean {
 
 export function getWarningMessage(agent: Agent): string {
   if (!hasIntegrationWarning(agent)) return '';
-  return agent.integrationStatus?.warningMessage ?? 'Required integration is missing.';
+  return agent.integrationStatus?.warningMessage || 'Required integration is missing.';
 }
 
 export function buildBuiltInUpdatePayload(

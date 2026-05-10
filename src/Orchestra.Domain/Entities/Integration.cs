@@ -40,7 +40,6 @@ public class Integration
     public string? EncryptedApiKey { get; private set; }
     public string? FilterQuery { get; private set; }
     public bool Vectorize { get; private set; }
-    public bool Connected { get; private set; }
     public DateTime? LastSyncAt { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime? UpdatedAt { get; private set; }
@@ -63,12 +62,12 @@ public class Integration
         // Validate workspace ID
         if (workspaceId == Guid.Empty)
             throw new ArgumentException("WorkspaceId cannot be empty.", nameof(workspaceId));
-        
+
         // Validate and trim name
         var trimmedName = name?.Trim() ?? string.Empty;
         if (trimmedName.Length < 2 || trimmedName.Length > 100)
             throw new ArgumentException("Name must be between 2 and 100 characters.", nameof(name));
-        
+
         // Validate URL format if provided
         if (!string.IsNullOrEmpty(url) && !Uri.TryCreate(url, UriKind.Absolute, out _))
             throw new ArgumentException("URL must be a valid absolute URL.", nameof(url));
@@ -77,7 +76,7 @@ public class Integration
         var typeList = types?.ToList() ?? [];
         if (typeList.Count == 0)
             throw new ArgumentException("At least one integration type must be provided.", nameof(types));
-        
+
         return new Integration
         {
             Id = Guid.NewGuid(),
@@ -91,7 +90,6 @@ public class Integration
             EncryptedApiKey = encryptedApiKey,
             FilterQuery = filterQuery,
             Vectorize = vectorize,
-            Connected = true, // Default to connected
             CreatedAt = DateTime.UtcNow,
             IsActive = true
         };
@@ -106,7 +104,6 @@ public class Integration
     /// <param name="url">The URL for the integration (optional, must be absolute if specified).</param>
     /// <param name="username">The username for authentication (optional).</param>
     /// <param name="encryptedApiKey">The encrypted API key (optional, only updated if provided).</param>
-    /// <param name="connected">The connection status (optional, only updated if provided).</param>
     public void Update(
         string name,
         IEnumerable<IntegrationType> integrationTypes,
@@ -115,8 +112,7 @@ public class Integration
         string? username = null,
         string? encryptedApiKey = null,
         string? filterQuery = null,
-        bool vectorize = false,
-        bool? connected = null)
+        bool vectorize = false)
     {
         // Validate and trim name
         var trimmedName = name?.Trim() ?? string.Empty;
@@ -146,27 +142,21 @@ public class Integration
         Vectorize = vectorize;
         UpdatedAt = DateTime.UtcNow;
 
-        // Only update API key if a new value is provided
         if (!string.IsNullOrEmpty(encryptedApiKey))
-        {
             EncryptedApiKey = encryptedApiKey;
-        }
-
-        // Only update connected status if provided
-        if (connected.HasValue)
-        {
-            Connected = connected.Value;
-        }
     }
 
-    /// <summary>
-    /// Deactivates the integration (soft delete).
-    /// Sets IsActive and Connected to false, preserving audit trail.
-    /// </summary>
+    public void SetEncryptedApiKey(string? encryptedApiKey)
+        => EncryptedApiKey = encryptedApiKey;
+
     public void Deactivate()
     {
         IsActive = false;
-        Connected = false;
         UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void UpdateLastSyncAt(DateTime syncAt)
+    {
+        LastSyncAt = syncAt;
     }
 }

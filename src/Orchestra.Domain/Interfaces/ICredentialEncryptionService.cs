@@ -12,7 +12,7 @@ public interface ICredentialEncryptionService
     /// <returns>The encrypted credential as a Base64-encoded string.</returns>
     /// <exception cref="ArgumentException">Thrown when plainText is null or empty.</exception>
     string Encrypt(string plainText);
-    
+
     /// <summary>
     /// Decrypts an encrypted credential using AES-256-GCM authenticated encryption.
     /// </summary>

@@ -184,18 +184,18 @@ public class GitHubToolService : IGitHubToolService
             var apiClient = _apiClientFactory.CreateClient(integration);
             var result = await apiClient.SearchIssuesAsync(query, clampedLimit);
 
-                return new GitHubSearchIssuesResult
+            return new GitHubSearchIssuesResult
+            {
+                Success = true,
+                TotalCount = result.TotalCount,
+                Items = result.Items.Select(i => new
                 {
-                    Success = true,
-                    TotalCount = result.TotalCount,
-                    Items = result.Items.Select(i => new
-                    {
-                        number = i.Number,
-                        title = i.Title,
-                        state = i.State,
-                        url = i.HtmlUrl
-                    }).ToArray()
-                };
+                    number = i.Number,
+                    title = i.Title,
+                    state = i.State,
+                    url = i.HtmlUrl
+                }).ToArray()
+            };
         }
         catch (InvalidOperationException ex) when (
             ex.Message.Contains("integrationId is required") ||

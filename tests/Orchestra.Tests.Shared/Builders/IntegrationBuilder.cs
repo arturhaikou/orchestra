@@ -1,5 +1,6 @@
 using Bogus;
 using Orchestra.Domain.Enums;
+using System.Reflection;
 
 namespace Orchestra.Tests.Shared.Builders;
 
@@ -18,7 +19,9 @@ public class IntegrationBuilder
     private string? _encryptedApiKey = "encrypted_key_" + Guid.NewGuid();
     private string? _filterQuery;
     private bool _vectorize = false;
-    private bool _connected = true;
+    private bool _isActive = true;
+    private DateTime _createdAt = DateTime.UtcNow;
+    private DateTime? _lastSyncAt = null;
 
     /// <summary>
     /// Sets the integration ID.
@@ -120,11 +123,31 @@ public class IntegrationBuilder
     }
 
     /// <summary>
-    /// Sets the connection status.
+    /// Sets the IsActive flag on the built integration via reflection (private setter).
     /// </summary>
-    public IntegrationBuilder AsConnected(bool connected)
+    public IntegrationBuilder WithIsActive(bool isActive)
     {
-        _connected = connected;
+        _isActive = isActive;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the CreatedAt timestamp on the built integration via reflection (private setter).
+    /// Use for testing sort-order scenarios.
+    /// </summary>
+    public IntegrationBuilder WithCreatedAt(DateTime createdAt)
+    {
+        _createdAt = createdAt;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the LastSyncAt timestamp on the built integration via reflection (private setter).
+    /// Null = "Unverified" status; non-null with Connected=false = "ConnectionFailed" status.
+    /// </summary>
+    public IntegrationBuilder WithLastSyncAt(DateTime? lastSyncAt)
+    {
+        _lastSyncAt = lastSyncAt;
         return this;
     }
 
@@ -142,25 +165,127 @@ public class IntegrationBuilder
             _username,
             _encryptedApiKey,
             _filterQuery,
-            _vectorize
-        );
+            _vectorize);
 
-        if (!_connected)
+        typeof(Integration)
+            .GetProperty(nameof(Integration.Id))!
+            .SetValue(integration, _id);
+
+        typeof(Integration)
+            .GetProperty(nameof(Integration.IsActive))!
+            .SetValue(integration, _isActive);
+
+        typeof(Integration)
+            .GetProperty(nameof(Integration.CreatedAt))!
+            .SetValue(integration, _createdAt);
+
+        if (_lastSyncAt.HasValue)
         {
-            integration.Update(
-                _name,
-                _types,
-                _provider,
-                _url,
-                _username,
-                _encryptedApiKey,
-                _filterQuery,
-                _vectorize,
-                _connected);
+            typeof(Integration)
+                .GetProperty(nameof(Integration.LastSyncAt))!
+                .SetValue(integration, _lastSyncAt);
         }
 
         return integration;
     }
+
+    public IntegrationBuilder AsMcpBacked(
+        string url = "https://mcp.example.com",
+        string authType = "API_KEY",
+        string? encryptedApiKey = null)
+    {
+        _provider = ProviderType.MCP_GENERIC;
+        _url = url;
+        if (encryptedApiKey is not null)
+            _encryptedApiKey = encryptedApiKey;
+        return this;
+    }
+
+    public IntegrationBuilder WithIsMcpBacked(bool isMcpBacked)
+    {
+        if (isMcpBacked)
+            _provider = ProviderType.MCP_GENERIC;
+        return this;
+    }
+
+    /// <summary>
+    /// Marks the integration as MCP-backed (alias for WithIsMcpBacked(true)).
+    /// Transport type is now on McpServer; this just sets the provider.
+    /// </summary>
+    public IntegrationBuilder WithMcpBacked(bool isMcpBacked) => WithIsMcpBacked(isMcpBacked);
+
+    /// <summary>
+    /// Sets the MCP endpoint URL. Maps to the integration URL field.
+    /// </summary>
+    public IntegrationBuilder WithMcpEndpointUrl(string url)
+    {
+        _url = url;
+        return this;
+    }
+
+    /// <summary>
+    /// Marks the integration as stdio MCP-backed.
+    /// Transport type is now on McpServer; this just sets the provider.
+    /// </summary>
+    public IntegrationBuilder AsStdioMcpBacked()
+    {
+        _provider = ProviderType.MCP_GENERIC;
+        return this;
+    }
+
+    /// <summary>
+    /// Marks the integration as stdio MCP-backed with a command hint.
+    /// Command is now stored on McpServer; this just sets the provider.
+    /// </summary>
+    public IntegrationBuilder AsStdioMcpBacked(string command)
+    {
+        _provider = ProviderType.MCP_GENERIC;
+        return this;
+    }
+
+    /// <summary>
+    /// No-op stub — auth type has moved to McpServer entity.
+    /// </summary>
+    public IntegrationBuilder WithMcpAuthType(McpAuthType authType) => this;
+
+    /// <summary>
+    /// No-op stub — command has moved to McpServer entity.
+    /// </summary>
+    public IntegrationBuilder WithMcpCommand(string command) => this;
+
+    /// <summary>
+    /// No-op stub — arguments JSON has moved to McpServer entity.
+    /// </summary>
+    public IntegrationBuilder WithMcpArgumentsJson(string? argumentsJson) => this;
+
+    /// <summary>
+    /// No-op stub — encrypted environment variables have moved to McpServer entity.
+    /// </summary>
+    public IntegrationBuilder WithMcpEncryptedEnvironmentVariables(string? encryptedEnvVars) => this;
+
+    /// <summary>
+    /// No-op stub — transport type has moved to McpServer entity.
+    /// </summary>
+    public IntegrationBuilder WithMcpTransportType(McpTransportType transportType) => this;
+
+    /// <summary>
+    /// Sets the connected/active state. Maps to IsActive.
+    /// </summary>
+    public IntegrationBuilder AsConnected(bool connected)
+    {
+        _isActive = connected;
+        return this;
+    }
+
+    /// <summary>
+    /// No-op stub — HTTP transport is now configured on McpServer entity.
+    /// </summary>
+    public IntegrationBuilder WithHttpTransport() => this;
+
+    /// <summary>
+    /// No-op stub — stdio transport is now configured on McpServer entity.
+    /// </summary>
+    public IntegrationBuilder WithStdioTransport() => this;
 
     /// <summary>
     /// Creates a Jira Cloud integration.
@@ -171,7 +296,6 @@ public class IntegrationBuilder
             .WithProvider(ProviderType.JIRA)
             .WithType(IntegrationType.TRACKER)
             .WithUrl("https://mycompany.atlassian.net")
-            .AsConnected(true)
             .Build();
     }
 
@@ -224,12 +348,11 @@ public class IntegrationBuilder
     }
 
     /// <summary>
-    /// Creates a disconnected integration.
+    /// Creates a disconnected integration (legacy stub — connection tracking removed).
     /// </summary>
     public static Integration DisconnectedIntegration()
     {
         return new IntegrationBuilder()
-            .AsConnected(false)
             .Build();
     }
 }

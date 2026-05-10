@@ -15,11 +15,11 @@ namespace Orchestra.Application.Common.Exceptions
         }
 
         public UnauthorizedWorkspaceAccessException(
-            Guid userId, 
-            Guid workspaceId, 
+            Guid userId,
+            Guid workspaceId,
             Exception innerException)
             : base(
-                $"User '{userId}' is not authorized to access workspace '{workspaceId}'.", 
+                $"User '{userId}' is not authorized to access workspace '{workspaceId}'.",
                 innerException)
         {
             UserId = userId;

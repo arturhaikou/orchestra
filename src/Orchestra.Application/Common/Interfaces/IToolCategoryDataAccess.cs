@@ -28,7 +28,7 @@ public interface IToolCategoryDataAccess
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>A list of tool categories matching the specified provider types.</returns>
     Task<List<ToolCategory>> GetByProviderTypesAsync(
-        List<ProviderType> providerTypes, 
+        List<ProviderType> providerTypes,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -47,6 +47,21 @@ public interface IToolCategoryDataAccess
     /// <returns>The tool category if found; otherwise, null.</returns>
     Task<ToolCategory?> GetByNameAsync(string name, CancellationToken cancellationToken = default);
 
+    Task<ToolCategory?> FindByIntegrationIdAsync(
+        Guid integrationId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves tool categories whose IntegrationId is in the given list.
+    /// Used to load MCP tool categories for active MCP-backed integrations.
+    /// </summary>
+    /// <param name="integrationIds">List of integration identifiers to match.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A list of tool categories belonging to the specified integrations.</returns>
+    Task<List<ToolCategory>> GetByIntegrationIdsAsync(
+        List<Guid> integrationIds,
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Adds a new tool category to the database.
     /// </summary>
@@ -62,4 +77,6 @@ public interface IToolCategoryDataAccess
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     Task UpdateAsync(ToolCategory toolCategory, CancellationToken cancellationToken = default);
+
+    Task<bool> DeactivateByIntegrationIdAsync(Guid integrationId, CancellationToken cancellationToken = default);
 }

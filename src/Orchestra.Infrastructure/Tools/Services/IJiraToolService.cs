@@ -9,15 +9,15 @@ namespace Orchestra.Infrastructure.Tools.Services;
 [ToolCategory("Jira", ProviderType.JIRA, "Manage Jira issues and epics")]
 public interface IJiraToolService
 {
-[ToolAction("create_issue", "Create a new Jira issue", DangerLevel.Moderate)]
+    [ToolAction("create_issue", "Create a new Jira issue", DangerLevel.Moderate)]
     [Description("Create a new Jira issue with summary, description, and issue type")]
     Task<object> CreateIssueAsync(
-        [Description("The workspace ID where the Jira integration is configured")] string workspaceId,
-        [Description("The ID of the specific Jira integration instance to use. Required when the workspace has multiple Jira integrations configured.")] string integrationId,
-        [Description("Brief summary of the issue")] string summary,
-        [Description("Detailed description of the issue in markdown format")] string description,
-        [Description("The issue type name (e.g., Bug, Story, Task, Epic)")] string issueTypeName,
-        [Description("The Jira project ID to use (optional, required if not specified in filter query)")] string? projectId = null);
+            [Description("The workspace ID where the Jira integration is configured")] string workspaceId,
+            [Description("The ID of the specific Jira integration instance to use. Required when the workspace has multiple Jira integrations configured.")] string integrationId,
+            [Description("Brief summary of the issue")] string summary,
+            [Description("Detailed description of the issue in markdown format")] string description,
+            [Description("The issue type name (e.g., Bug, Story, Task, Epic)")] string issueTypeName,
+            [Description("The Jira project ID to use (optional, required if not specified in filter query)")] string? projectId = null);
 
     [ToolAction("update_issue", "Update an existing Jira issue", DangerLevel.Moderate)]
     [Description("Update an existing Jira issue's summary and/or description")]

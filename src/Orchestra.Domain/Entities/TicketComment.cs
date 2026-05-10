@@ -50,13 +50,13 @@ public class TicketComment
     {
         if (ticketId == Guid.Empty)
             throw new ArgumentException("Ticket ID is required.", nameof(ticketId));
-        
+
         if (string.IsNullOrWhiteSpace(author))
             throw new ArgumentException("Author is required.", nameof(author));
-        
+
         if (author.Length > 255)
             throw new ArgumentException("Author cannot exceed 255 characters.", nameof(author));
-        
+
         if (string.IsNullOrWhiteSpace(content))
             throw new ArgumentException("Content is required.", nameof(content));
 

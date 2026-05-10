@@ -2,13 +2,18 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Loader2, AlertTriangle, Info } from 'lucide-react';
 import { Agent, Tool } from '../../types';
-import { getAgent, updateAgent } from '../../services/agentService';
+import { getAgent, updateAgent, saveAgentToolAssignments } from '../../services/agentService';
 import { getTools } from '../../services/toolService';
 import { fetchWorkspaceModels } from '../../services/workspaceService';
 import Toast from '../Toast';
 import LockedField from '../agents/LockedField';
 import AgentFormCapabilities from '../agents/AgentFormCapabilities';
-import AgentFormToolAuthorization, { ActionModalState } from '../agents/AgentFormToolAuthorization';
+import AgentToolSummarySection from '../agents/AgentToolSummarySection';
+import AddToolsModal from '../agents/AddToolsModal';
+import MarkdownPreviewToggle from '../agents/MarkdownPreviewToggle';
+import { getMcpServers } from '../../services/mcpServerService';
+import { useAgentMcpAssignments } from '../../hooks/useAgentMcpAssignments';
+import { McpServer, McpToolSelection, ToolCatalogueEntry } from '../../types';
 
 interface FormState {
   name: string;
@@ -39,16 +44,30 @@ const AgentEditPage: React.FC = () => {
   const [availableTools, setAvailableTools] = useState<Tool[]>([]);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
-  const [toolSearch, setToolSearch] = useState('');
-  const [configuringToolId, setConfiguringToolId] = useState<string | null>(null);
-  const [selectedActionIds, setSelectedActionIds] = useState<string[]>([]);
+  const [isAddToolsModalOpen, setIsAddToolsModalOpen] = useState(false);
+  const [openAtSourceId, setOpenAtSourceId] = useState<string | null>(null);
+  const [mcpServers, setMcpServers] = useState<McpServer[]>([]);
+  const [mcpSelections, setMcpSelections] = useState<McpToolSelection[]>([]);
+
+  const { assignments: mcpAssignments } = useAgentMcpAssignments(agentId, !!agentId);
 
   useEffect(() => {
     if (!workspaceId || !agentId) return;
     loadAgentData();
     getTools(workspaceId).then(setAvailableTools).catch(() => setAvailableTools([]));
     fetchWorkspaceModels(workspaceId).then(setAvailableModels).catch(() => setAvailableModels([]));
+    getMcpServers(workspaceId).then(setMcpServers).catch(() => setMcpServers([]));
   }, [workspaceId, agentId]);
+
+  useEffect(() => {
+    if (Object.keys(mcpAssignments).length > 0) {
+      setMcpSelections(
+        Object.entries(mcpAssignments)
+          .filter(([, tools]) => tools.length > 0)
+          .map(([serverId, toolNames]) => ({ mcpServerId: serverId, toolNames }))
+      );
+    }
+  }, [mcpAssignments]);
 
   const loadAgentData = async () => {
     setIsLoading(true);
@@ -71,6 +90,22 @@ const AgentEditPage: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  const toolCatalogue = useMemo<ToolCatalogueEntry[]>(
+    () =>
+      availableTools.flatMap(tool =>
+        (tool.actions ?? []).map(action => ({
+          actionId: action.id,
+          actionName: action.name,
+          actionDescription: action.description,
+          dangerLevel: action.dangerLevel ?? 'Safe',
+          sourceId: tool.id,
+          sourceName: tool.name,
+          sourceType: tool.source ?? 'native',
+        }))
+      ),
+    [availableTools]
+  );
 
   const isBuiltIn = agent?.isBuiltIn === true;
 
@@ -135,6 +170,41 @@ const AgentEditPage: React.FC = () => {
     return payload;
   };
 
+  const handleOpenModal = (sourceId?: string | null) => {
+    setOpenAtSourceId(sourceId ?? null);
+    setIsAddToolsModalOpen(true);
+  };
+
+  const handleCommit = async (ids: string[], newMcpSelections: McpToolSelection[]) => {
+    setFormState(prev => ({ ...prev, toolActionIds: ids }));
+    setIsAddToolsModalOpen(false);
+    setMcpSelections(newMcpSelections.filter(s => s.toolNames.length > 0));
+    if (agentId) {
+      try {
+        await saveAgentToolAssignments(agentId, { nativeToolActionIds: ids, mcpSelections: newMcpSelections });
+        setToast({ message: `Tools saved for ${agent?.name ?? 'agent'}.`, type: 'success' });
+      } catch {
+        setToast({ message: 'Failed to save tool assignments.', type: 'error' });
+      }
+    }
+  };
+
+  const handleDiscard = () => setIsAddToolsModalOpen(false);
+
+  const handleRemoveSource = (sourceId: string) => {
+    const idsToRemove = new Set(
+      toolCatalogue.filter(e => e.sourceId === sourceId).map(e => e.actionId)
+    );
+    setFormState(prev => ({
+      ...prev,
+      toolActionIds: prev.toolActionIds.filter(id => !idsToRemove.has(id)),
+    }));
+  };
+
+  const handleRemoveMcpServer = (serverId: string) => {
+    setMcpSelections(prev => prev.filter(s => s.mcpServerId !== serverId));
+  };
+
   const handleCancel = () => navigate(`/workspaces/${workspaceId}/agents`);
 
   const clearFieldError = (field: string) => {
@@ -156,61 +226,6 @@ const AgentEditPage: React.FC = () => {
 
   const removeCapability = (cap: string) => {
     setFormState(prev => ({ ...prev, capabilities: prev.capabilities.filter(c => c !== cap) }));
-  };
-
-  const toggleTool = (toolId: string) => {
-    const tool = availableTools.find(t => t.id === toolId);
-    if (tool?.actions && tool.actions.length > 0) {
-      setConfiguringToolId(toolId);
-      setSelectedActionIds(formState.toolActionIds.filter(id => tool.actions!.some(a => a.id === id)));
-    } else {
-      setFormState(prev => ({
-        ...prev,
-        toolActionIds: prev.toolActionIds.includes(toolId)
-          ? prev.toolActionIds.filter(id => id !== toolId)
-          : [...prev.toolActionIds, toolId],
-      }));
-    }
-  };
-
-  const confirmActionSelection = () => {
-    const tool = availableTools.find(t => t.id === configuringToolId);
-    if (!tool) return;
-    const otherActionIds = formState.toolActionIds.filter(id => !tool.actions?.some(a => a.id === id));
-    setFormState(prev => ({ ...prev, toolActionIds: [...otherActionIds, ...selectedActionIds] }));
-    setConfiguringToolId(null);
-    setSelectedActionIds([]);
-  };
-
-  const cancelActionSelection = () => {
-    setConfiguringToolId(null);
-    setSelectedActionIds([]);
-  };
-
-  const toggleActionId = (actionId: string) => {
-    setSelectedActionIds(prev =>
-      prev.includes(actionId) ? prev.filter(id => id !== actionId) : [...prev, actionId]
-    );
-  };
-
-  const actionModalState: ActionModalState | null = configuringToolId
-    ? {
-        toolName: availableTools.find(t => t.id === configuringToolId)?.name ?? '',
-        actions: availableTools.find(t => t.id === configuringToolId)?.actions ?? [],
-        selectedActionIds,
-      }
-    : null;
-
-  const filteredTools = availableTools.filter(tool =>
-    tool.name.toLowerCase().includes(toolSearch.toLowerCase()) ||
-    tool.description.toLowerCase().includes(toolSearch.toLowerCase())
-  );
-
-  const isToolSelected = (tool: Tool) => {
-    if (tool.actions && tool.actions.length > 0) {
-      return tool.actions.some(a => formState.toolActionIds.includes(a.id));
-    }
-    return formState.toolActionIds.includes(tool.id);
   };
 
   if (isLoading) {
@@ -310,16 +325,14 @@ const AgentEditPage: React.FC = () => {
           )}
 
           {!isBuiltIn && (
-            <AgentFormToolAuthorization
-              toolSearch={toolSearch}
-              onToolSearchChange={setToolSearch}
-              filteredTools={filteredTools}
-              isToolSelected={isToolSelected}
-              onToggleTool={toggleTool}
-              actionModal={actionModalState}
-              onToggleActionId={toggleActionId}
-              onConfirmActions={confirmActionSelection}
-              onCancelActions={cancelActionSelection}
+            <AgentToolSummarySection
+              toolActionIds={formState.toolActionIds}
+              toolCatalogue={toolCatalogue}
+              mcpServers={mcpServers}
+              mcpSelections={mcpSelections}
+              onOpenModal={handleOpenModal}
+              onRemoveSource={handleRemoveSource}
+              onRemoveMcpServer={handleRemoveMcpServer}
             />
           )}
 
@@ -338,15 +351,26 @@ const AgentEditPage: React.FC = () => {
             ) : (
               <div>
                 <label htmlFor="custom-instructions" className="block text-sm font-medium text-text mb-1">Custom Instructions</label>
-                <textarea id="custom-instructions" value={formState.customInstructions}
-                  onChange={e => setFormState(prev => ({ ...prev, customInstructions: e.target.value }))}
+                <MarkdownPreviewToggle id="custom-instructions" value={formState.customInstructions}
+                  onChange={value => setFormState(prev => ({ ...prev, customInstructions: value }))}
                   onFocus={() => clearFieldError('customInstructions')} rows={6}
-                  className="w-full px-3 py-2 bg-background border border-border rounded-md text-text text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-y"
                   placeholder="Describe the agent's behavior and guidelines..." />
                 {validationErrors.customInstructions && <p className="text-red-400 text-xs mt-1">{validationErrors.customInstructions}</p>}
               </div>
             )}
           </section>
+
+          <AddToolsModal
+            isOpen={isAddToolsModalOpen}
+            agentId={agentId}
+            initialToolActionIds={formState.toolActionIds}
+            toolCatalogue={toolCatalogue}
+            workspaceId={workspaceId!}
+            onCommit={handleCommit}
+            onDiscard={handleDiscard}
+            openAtSource={openAtSourceId}
+            initialMcpSelections={mcpSelections}
+          />
 
           <div className="flex justify-end gap-3 pt-4 border-t border-border">
             <button type="button" onClick={handleCancel} disabled={isSaving}

@@ -1,6 +1,21 @@
 
-import { Agent, AgentTemplateDto, CreateAgentFromTemplateRequest } from '../types';
+import { Agent, AgentTemplateDto, CreateAgentFromTemplateRequest, McpToolSelection } from '../types';
 import { getToken } from './authService';
+
+export interface SaveAgentToolsPayload {
+  nativeToolActionIds: string[];
+  mcpSelections: McpToolSelection[];
+}
+
+export interface AgentMcpServerAssignment {
+  mcpServerId: string;
+  toolNames: string[];
+}
+
+export interface AgentToolAssignmentsResponse {
+  nativeToolActionIds: string[];
+  mcpAssignments: AgentMcpServerAssignment[];
+}
 
 const API_BASE_URL = `${import.meta.env.VITE_API_URL}/v1/agents`;
 
@@ -79,7 +94,7 @@ export const createAgentFromTemplate = async (
   return await response.json();
 };
 
-export const createAgent = async (workspaceId: string, data: { name: string; role: string; capabilities: string[]; toolActionIds: string[]; customInstructions?: string; projectPrinciples?: string; model?: string | null }): Promise<Agent> => {
+export const createAgent = async (workspaceId: string, data: { name: string; role: string; capabilities: string[]; toolActionIds: string[]; mcpSelections?: McpToolSelection[]; customInstructions?: string; projectPrinciples?: string; model?: string | null }): Promise<Agent> => {
   try {
     const response = await fetch(API_BASE_URL, {
       method: 'POST',
@@ -137,4 +152,33 @@ export const deleteAgent = async (agentId: string): Promise<void> => {
     console.error('Failed to delete agent:', error);
     throw error;
   }
+};
+
+export const saveAgentToolAssignments = async (
+  agentId: string,
+  payload: SaveAgentToolsPayload
+): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/${agentId}/tools`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Backend error: ${response.statusText}`);
+  }
+};
+
+export const getAgentMcpAssignments = async (
+  agentId: string
+): Promise<AgentToolAssignmentsResponse> => {
+  const response = await fetch(`${API_BASE_URL}/${agentId}/mcp-tools`, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Backend error: ${response.statusText}`);
+  }
+
+  return response.json();
 };

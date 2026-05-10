@@ -35,7 +35,7 @@ public class ToolValidationService : IToolValidationService
         CancellationToken cancellationToken = default)
     {
         var toolActionIdList = toolActionIds.ToList();
-        
+
         if (!toolActionIdList.Any())
         {
             return; // No tools to validate
@@ -91,7 +91,7 @@ public class ToolValidationService : IToolValidationService
             _logger.LogWarning(
                 "Tool action IDs not found: {MissingIds}",
                 string.Join(", ", missingToolActionIds));
-            
+
             throw new InvalidToolAssignmentException(
                 workspaceId,
                 $"Tool action IDs not found: {string.Join(", ", missingToolActionIds)}");

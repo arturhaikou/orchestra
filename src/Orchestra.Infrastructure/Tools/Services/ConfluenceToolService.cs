@@ -81,7 +81,7 @@ public class ConfluenceToolService : IConfluenceToolService
 
             // Step 2: Split query into keywords and search for each
             var keywords = query.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            
+
             if (keywords.Length == 0)
             {
                 return new
@@ -128,7 +128,7 @@ public class ConfluenceToolService : IConfluenceToolService
                     if (keywordPages.Count > 0)
                     {
                         allPages.AddRange(keywordPages);
-                        
+
                         // Extract IDs to exclude from subsequent searches
                         foreach (var page in keywordPages)
                         {
@@ -164,8 +164,8 @@ public class ConfluenceToolService : IConfluenceToolService
                 allPages.Count,
                 workspaceId);
 
-            var keywordsMessage = keywords.Length == 1 
-                ? $"'{keywords[0]}'" 
+            var keywordsMessage = keywords.Length == 1
+                ? $"'{keywords[0]}'"
                 : $"keywords: {string.Join(", ", keywords)}";
 
             return new
@@ -181,7 +181,7 @@ public class ConfluenceToolService : IConfluenceToolService
             _logger.LogError(ex,
                 "Integration not found for workspace {WorkspaceId}",
                 workspaceId);
-            
+
             return new
             {
                 success = false,
@@ -194,7 +194,7 @@ public class ConfluenceToolService : IConfluenceToolService
             _logger.LogError(ex,
                 "Invalid operation while searching Confluence: {ErrorMessage}",
                 ex.Message);
-            
+
             return new
             {
                 success = false,
@@ -210,7 +210,7 @@ public class ConfluenceToolService : IConfluenceToolService
             _logger.LogError(ex,
                 "HTTP request failed while searching Confluence for workspace {WorkspaceId}",
                 workspaceId);
-            
+
             return new
             {
                 success = false,
@@ -223,7 +223,7 @@ public class ConfluenceToolService : IConfluenceToolService
             _logger.LogError(ex,
                 "Unexpected error while searching Confluence for workspace {WorkspaceId}",
                 workspaceId);
-            
+
             return new
             {
                 success = false,
@@ -269,7 +269,7 @@ public class ConfluenceToolService : IConfluenceToolService
 
             // Step 2: Fetch page content
             var page = await apiClient.GetPageAsync(pageId);
-            
+
             if (page == null)
             {
                 return new
@@ -299,7 +299,7 @@ public class ConfluenceToolService : IConfluenceToolService
                         // If it's already a JsonElement or raw string, try direct parsing
                         adfElement = JsonSerializer.SerializeToElement(adfString);
                     }
-                    
+
                     markdownContent = await _adfConversionService.ConvertAdfToMarkdownAsync(adfElement, CancellationToken.None);
                 }
             }
@@ -311,8 +311,8 @@ public class ConfluenceToolService : IConfluenceToolService
             }
 
             var baseUrl = integration.Url?.TrimEnd('/') ?? "";
-            var pageUrl = page.Links?.TryGetValue("webui", out var webui) == true 
-                ? $"{baseUrl}{webui}" 
+            var pageUrl = page.Links?.TryGetValue("webui", out var webui) == true
+                ? $"{baseUrl}{webui}"
                 : $"{baseUrl}/pages/{page.Id}";
 
             _logger.LogInformation(
@@ -343,7 +343,7 @@ public class ConfluenceToolService : IConfluenceToolService
             _logger.LogError(ex,
                 "Integration not found for workspace {WorkspaceId}",
                 workspaceId);
-            
+
             return new
             {
                 success = false,
@@ -357,7 +357,7 @@ public class ConfluenceToolService : IConfluenceToolService
                 "Invalid operation while getting Confluence page {PageId}: {ErrorMessage}",
                 pageId,
                 ex.Message);
-            
+
             return new
             {
                 success = false,
@@ -374,7 +374,7 @@ public class ConfluenceToolService : IConfluenceToolService
                 "HTTP request failed while getting Confluence page {PageId} for workspace {WorkspaceId}",
                 pageId,
                 workspaceId);
-            
+
             return new
             {
                 success = false,
@@ -388,7 +388,7 @@ public class ConfluenceToolService : IConfluenceToolService
                 "Unexpected error while getting Confluence page {PageId} for workspace {WorkspaceId}",
                 pageId,
                 workspaceId);
-            
+
             return new
             {
                 success = false,
@@ -471,7 +471,7 @@ public class ConfluenceToolService : IConfluenceToolService
 
             // Step 4: Create the page
             var createdPage = await apiClient.CreatePageAsync(spaceKey, title, bodyObject, parentPageId);
-            
+
             if (createdPage == null)
             {
                 return new
@@ -483,8 +483,8 @@ public class ConfluenceToolService : IConfluenceToolService
             }
 
             var baseUrl = integration.Url?.TrimEnd('/') ?? "";
-            var pageUrl = createdPage.Links?.TryGetValue("webui", out var webui) == true 
-                ? $"{baseUrl}{webui}" 
+            var pageUrl = createdPage.Links?.TryGetValue("webui", out var webui) == true
+                ? $"{baseUrl}{webui}"
                 : $"{baseUrl}/pages/{createdPage.Id}";
 
             _logger.LogInformation(
@@ -510,7 +510,7 @@ public class ConfluenceToolService : IConfluenceToolService
             _logger.LogError(ex,
                 "Integration not found for workspace {WorkspaceId}",
                 workspaceId);
-            
+
             return new
             {
                 success = false,
@@ -523,7 +523,7 @@ public class ConfluenceToolService : IConfluenceToolService
             _logger.LogError(ex,
                 "Invalid operation while creating Confluence page: {ErrorMessage}",
                 ex.Message);
-            
+
             return new
             {
                 success = false,
@@ -539,7 +539,7 @@ public class ConfluenceToolService : IConfluenceToolService
             _logger.LogError(ex,
                 "HTTP request failed while creating Confluence page for workspace {WorkspaceId}",
                 workspaceId);
-            
+
             return new
             {
                 success = false,
@@ -552,7 +552,7 @@ public class ConfluenceToolService : IConfluenceToolService
             _logger.LogError(ex,
                 "Unexpected error while creating Confluence page for workspace {WorkspaceId}",
                 workspaceId);
-            
+
             return new
             {
                 success = false,
@@ -641,7 +641,7 @@ public class ConfluenceToolService : IConfluenceToolService
 
             // Step 4: Update the page
             var updatedPage = await apiClient.UpdatePageAsync(pageId, title, bodyObject, currentVersion);
-            
+
             if (updatedPage == null)
             {
                 return new
@@ -653,8 +653,8 @@ public class ConfluenceToolService : IConfluenceToolService
             }
 
             var baseUrl = integration.Url?.TrimEnd('/') ?? "";
-            var pageUrl = updatedPage.Links?.TryGetValue("webui", out var webui) == true 
-                ? $"{baseUrl}{webui}" 
+            var pageUrl = updatedPage.Links?.TryGetValue("webui", out var webui) == true
+                ? $"{baseUrl}{webui}"
                 : $"{baseUrl}/pages/{updatedPage.Id}";
 
             _logger.LogInformation(
@@ -680,7 +680,7 @@ public class ConfluenceToolService : IConfluenceToolService
             _logger.LogError(ex,
                 "Integration not found for workspace {WorkspaceId}",
                 workspaceId);
-            
+
             return new
             {
                 success = false,
@@ -694,7 +694,7 @@ public class ConfluenceToolService : IConfluenceToolService
                 "Invalid operation while updating Confluence page {PageId}: {ErrorMessage}",
                 pageId,
                 ex.Message);
-            
+
             return new
             {
                 success = false,
@@ -711,7 +711,7 @@ public class ConfluenceToolService : IConfluenceToolService
                 "HTTP request failed while updating Confluence page {PageId} for workspace {WorkspaceId}",
                 pageId,
                 workspaceId);
-            
+
             return new
             {
                 success = false,
@@ -725,7 +725,7 @@ public class ConfluenceToolService : IConfluenceToolService
                 "Unexpected error while updating Confluence page {PageId} for workspace {WorkspaceId}",
                 pageId,
                 workspaceId);
-            
+
             return new
             {
                 success = false,
@@ -749,8 +749,8 @@ public class ConfluenceToolService : IConfluenceToolService
         try
         {
             // Build CQL query with keyword and exclusions
-            var cql = string.IsNullOrEmpty(integration.FilterQuery) 
-                ? $"text ~ {keyword}" 
+            var cql = string.IsNullOrEmpty(integration.FilterQuery)
+                ? $"text ~ {keyword}"
                 : $"{integration.FilterQuery} AND text ~ {keyword}";
 
             // Add exclusion clause if we have IDs to exclude
@@ -763,7 +763,7 @@ public class ConfluenceToolService : IConfluenceToolService
             _logger.LogDebug("Executing Confluence search with CQL: {CQL}", cql);
 
             var searchResponse = await apiClient.SearchPagesAsync(cql, remainingLimit);
-            
+
             if (searchResponse?.Results == null || searchResponse.Results.Count == 0)
             {
                 _logger.LogDebug("No results found for keyword '{Keyword}'", keyword);
@@ -786,9 +786,9 @@ public class ConfluenceToolService : IConfluenceToolService
                         _logger.LogWarning("Search result has no ID");
                         continue;
                     }
-                    
+
                     var page = await apiClient.GetPageAsync(result.Id);
-                    
+
                     if (page == null)
                     {
                         _logger.LogWarning("Failed to fetch page {PageId}", result.Id);
@@ -816,8 +816,8 @@ public class ConfluenceToolService : IConfluenceToolService
                     }
 
                     var baseUrl = integration.Url?.TrimEnd('/') ?? "";
-                    var pageUrl = page.Links?.TryGetValue("webui", out var webui) == true 
-                        ? $"{baseUrl}{webui}" 
+                    var pageUrl = page.Links?.TryGetValue("webui", out var webui) == true
+                        ? $"{baseUrl}{webui}"
                         : $"{baseUrl}/pages/{page.Id}";
 
                     pages.Add(new

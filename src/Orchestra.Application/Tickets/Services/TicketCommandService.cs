@@ -96,12 +96,12 @@ public class TicketCommandService : ITicketCommandService
         {
             // Validate agent workspace consistency (FR-004)
             var agentWorkspaceId = await _ticketAssignmentValidationService.ValidateAndGetAgentWorkspaceAsync(
-                request.AssignedAgentId, 
+                request.AssignedAgentId,
                 cancellationToken);
 
             // Validate workflow workspace consistency (FR-004)
             var workflowWorkspaceId = await _ticketAssignmentValidationService.ValidateAndGetWorkflowWorkspaceAsync(
-                request.AssignedWorkflowId, 
+                request.AssignedWorkflowId,
                 cancellationToken);
 
             // Apply assignments with workspace validation
@@ -152,9 +152,9 @@ public class TicketCommandService : ITicketCommandService
         if (userId == Guid.Empty)
             throw new ArgumentException("User ID is required.", nameof(userId));
 
-        if (request.StatusId == null && 
-            request.PriorityId == null && 
-            request.AssignedAgentId == null && 
+        if (request.StatusId == null &&
+            request.PriorityId == null &&
+            request.AssignedAgentId == null &&
             request.AssignedWorkflowId == null &&
             string.IsNullOrEmpty(request.Description))
         {
@@ -164,7 +164,7 @@ public class TicketCommandService : ITicketCommandService
         }
 
         var parseResult = _ticketIdParsingService.Parse(ticketId);
-        
+
         if (parseResult.Type == TicketIdType.External)
         {
             return await UpdateExternalTicketAsync(parseResult, userId, request, cancellationToken);
@@ -204,8 +204,8 @@ public class TicketCommandService : ITicketCommandService
 
         // Verify workspace access
         await _workspaceAuthorizationService.EnsureUserIsMemberAsync(
-            userId, 
-            ticket.WorkspaceId, 
+            userId,
+            ticket.WorkspaceId,
             cancellationToken);
 
         // Get and validate integration
@@ -239,7 +239,7 @@ public class TicketCommandService : ITicketCommandService
             throw new InvalidOperationException(
                 $"Provider {integration.Provider} is not supported for ticket conversion.");
         }
-        
+
         var result = await provider.CreateIssueAsync(
             integration,
             ticket.Title,
@@ -271,28 +271,28 @@ public class TicketCommandService : ITicketCommandService
         CancellationToken cancellationToken = default)
     {
         var parseResult = _ticketIdParsingService.Parse(ticketId);
-        
+
         if (parseResult.Type != TicketIdType.Internal)
         {
             throw new InvalidTicketOperationException(
                 "Cannot delete external tickets. Only internal tickets with GUID format can be deleted.");
         }
-        
+
         var ticketGuid = parseResult.InternalId!.Value;
-        
+
         var ticket = await _ticketDataAccess.GetTicketByIdAsync(ticketGuid, cancellationToken);
-        
+
         if (ticket == null)
         {
             _logger.LogWarning("Ticket {TicketId} not found for deletion by user {UserId}", ticketId, userId);
             throw new TicketNotFoundException(ticketId);
         }
-        
+
         var hasAccess = await _workspaceAuthorizationService.IsMemberAsync(
             userId,
             ticket.WorkspaceId,
             cancellationToken);
-        
+
         if (!hasAccess)
         {
             _logger.LogWarning(
@@ -300,7 +300,7 @@ public class TicketCommandService : ITicketCommandService
                 userId, ticketId, ticket.WorkspaceId);
             throw new UnauthorizedTicketAccessException(userId, ticketId);
         }
-        
+
         if (!ticket.CanDelete())
         {
             _logger.LogWarning(
@@ -309,9 +309,9 @@ public class TicketCommandService : ITicketCommandService
             throw new InvalidTicketOperationException(
                 "Cannot delete external tickets. External tickets must be deleted in their source system.");
         }
-        
+
         await _ticketDataAccess.DeleteTicketAsync(ticketGuid, cancellationToken);
-        
+
         _logger.LogInformation(
             "User {UserId} successfully deleted ticket {TicketId} from workspace {WorkspaceId}",
             userId, ticketId, ticket.WorkspaceId);
@@ -327,7 +327,7 @@ public class TicketCommandService : ITicketCommandService
         _logger.LogDebug("Updating internal ticket {TicketId}", ticketId);
 
         var ticket = await _ticketDataAccess.GetTicketByIdAsync(ticketId, cancellationToken);
-        
+
         if (ticket == null)
         {
             throw new TicketNotFoundException(ticketId.ToString());
@@ -337,7 +337,7 @@ public class TicketCommandService : ITicketCommandService
             userId,
             ticket.WorkspaceId,
             cancellationToken);
-        
+
         if (!hasAccess)
         {
             throw new UnauthorizedTicketAccessException(userId, ticketId.ToString());
@@ -366,11 +366,11 @@ public class TicketCommandService : ITicketCommandService
             }
 
             var agentWorkspaceId = await _ticketAssignmentValidationService.ValidateAndGetAgentWorkspaceAsync(
-                request.AssignedAgentId, 
+                request.AssignedAgentId,
                 cancellationToken);
 
             var workflowWorkspaceId = await _ticketAssignmentValidationService.ValidateAndGetWorkflowWorkspaceAsync(
-                request.AssignedWorkflowId, 
+                request.AssignedWorkflowId,
                 cancellationToken);
 
             ticket.UpdateAssignments(

@@ -122,14 +122,14 @@ describe('DeleteWorkspaceModal - Save and Close Behavior', () => {
       const user = userEvent.setup();
       render(<DeleteWorkspaceModal {...defaultProps} />);
       await user.click(screen.getByRole('button', { name: /cancel/i }));
-      expect(defaultProps.onClose).toHaveBeenCalledOnce();
+      expect(defaultProps.onClose).toHaveBeenCalledTimes(1);
     });
 
     it('should call onConfirm when Confirm is clicked', async () => {
       const user = userEvent.setup();
       render(<DeleteWorkspaceModal {...defaultProps} />);
       await user.click(screen.getByRole('button', { name: /confirm/i }));
-      expect(defaultProps.onConfirm).toHaveBeenCalledOnce();
+      expect(defaultProps.onConfirm).toHaveBeenCalledTimes(1);
     });
 
     it('should call onClose when X button is clicked', async () => {
@@ -139,7 +139,7 @@ describe('DeleteWorkspaceModal - Save and Close Behavior', () => {
       const xButton = closeButtons.find(b => b.querySelector('svg.lucide-x'));
       if (xButton) {
         await user.click(xButton);
-        expect(defaultProps.onClose).toHaveBeenCalledOnce();
+        expect(defaultProps.onClose).toHaveBeenCalledTimes(1);
       }
     });
   });

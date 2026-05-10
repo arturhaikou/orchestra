@@ -58,7 +58,7 @@ internal static class ReviewResultMarshaller
             // Extract the outermost JSON object from the response; the sub-agent may
             // include preamble or trailing prose before/after the JSON block.
             var jsonStart = responseText.IndexOf('{');
-            var jsonEnd   = responseText.LastIndexOf('}');
+            var jsonEnd = responseText.LastIndexOf('}');
 
             if (jsonStart >= 0 && jsonEnd > jsonStart)
             {

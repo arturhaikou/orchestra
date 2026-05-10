@@ -39,8 +39,8 @@ public class JiraErrorResponse
             messages.AddRange(fieldErrors);
         }
 
-        return messages.Any() 
-            ? string.Join("; ", messages) 
+        return messages.Any()
+            ? string.Join("; ", messages)
             : "Unknown validation error";
     }
 }

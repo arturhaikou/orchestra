@@ -11,25 +11,25 @@ public record TicketDto(
     Guid WorkspaceId,
     string Title,
     string Description,
-    
+
     // Status and Priority as nested objects
     TicketStatusDto? Status,
     TicketPriorityDto? Priority,
-    
+
     // Common fields
     bool Internal,
     Guid? IntegrationId,            // Null for internal, populated for external
     string? ExternalTicketId,       // Null for internal, e.g., "PROJ-123" for external
     string? ExternalUrl,            // Null for internal, provider URL for external
     string Source,                  // "INTERNAL", "JIRA", "AZURE-DEVOPS", etc.
-    
+
     // Assignments (for both types)
     Guid? AssignedAgentId,
     Guid? AssignedWorkflowId,
-    
+
     // Comments
     List<CommentDto> Comments,
-    
+
     // Additional fields
     int? Satisfaction,              // CSAT score (0-100)
     string? Summary                // AI-generated summary

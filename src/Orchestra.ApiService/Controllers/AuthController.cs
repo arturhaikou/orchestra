@@ -122,7 +122,7 @@ public class AuthController : ControllerBase
 
             // Call service to change password
             await _authService.ChangePasswordAsync(userId, request, cancellationToken);
-            
+
             // Return success
             return NoContent();
         }

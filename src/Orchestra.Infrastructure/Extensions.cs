@@ -28,6 +28,12 @@ using Microsoft.Extensions.Options;
 using Orchestra.Infrastructure.Services;
 using Orchestra.Infrastructure.Tools;
 using Orchestra.Infrastructure.Tools.Services;
+using Orchestra.Infrastructure.Mcp;
+using Orchestra.Infrastructure.McpServers;
+using Orchestra.Application.McpServers;
+using Orchestra.Application.McpServers.Interfaces;
+using McpServerQueryServiceNew = Orchestra.Application.McpServers.McpServerQueryService;
+using IMcpServerQueryServiceNew = Orchestra.Application.McpServers.Interfaces.IMcpServerQueryService;
 using Microsoft.Extensions.Logging;
 using Orchestra.Application.Common.Configuration;
 
@@ -42,24 +48,25 @@ public static class Extensions
     public static IHostApplicationBuilder AddInfrastructureServices(this IHostApplicationBuilder builder)
     {
         builder.AddNpgsqlDbContext<AppDbContext>("Orchestra");
+        builder.Services.AddScoped<IDatabaseMigrator, EfCoreDatabaseMigrator>();
         builder.Services.AddDataProtection()
             .SetApplicationName("Orchestra")
             .PersistKeysToDbContext<AppDbContext>();
-        
+
         // Register a no-op hub context only if SignalR infrastructure isn't present.
         // The API will call AddSignalR() which registers the real hub context.
         // The Worker doesn't call AddSignalR(), so it gets the no-op version.
-        var hasSignalRServices = builder.Services.Any(sd => 
-            sd.ServiceType.Name.Contains("SignalR") || 
+        var hasSignalRServices = builder.Services.Any(sd =>
+            sd.ServiceType.Name.Contains("SignalR") ||
             sd.ServiceType.Name.Contains("HubContext") ||
             sd.ServiceType.Name.Contains("HubConnectionManager"));
-        
+
         if (!hasSignalRServices && !builder.Services.Any(sd => sd.ServiceType == typeof(IHubContext<NotificationHub>)))
         {
             builder.Services.AddScoped<IHubContext<NotificationHub>>(provider =>
                 new NoOpHubContext<NotificationHub>());
         }
-        
+
         builder.Services.AddScoped<IChatClientResolver, ChatClientResolver>();
         // AI Provider Phase 2 — concrete EF Core repository implementations
         builder.Services.AddScoped<IWorkspaceAIProviderRepository, EfWorkspaceAIProviderRepository>();
@@ -85,6 +92,8 @@ public static class Extensions
         builder.Services.AddSingleton<ITemplateRegistry, TemplateRegistry>();
         builder.Services.AddScoped<ITemplateAvailabilityResolver, TemplateAvailabilityResolver>();
         builder.Services.AddScoped<IIntegrationDataAccess, IntegrationDataAccess>();
+        builder.Services.AddScoped<IMcpServerDataAccess, McpServerDataAccess>();
+        builder.Services.AddScoped<IMcpServerService, McpServerService>();
         builder.Services.AddScoped<IIntegrationResolver, IntegrationResolver>();
         builder.Services.AddScoped<IIntegrationService, IntegrationService>();
         builder.Services.AddScoped<IAgentDataAccess, AgentDataAccess>();
@@ -177,6 +186,19 @@ public static class Extensions
         builder.Services.AddScoped<IToolScanningService, ToolScanningService>();
         builder.Services.AddScoped<IToolRetrieverService, ToolRetrieverService>();
         builder.Services.AddScoped<IToolValidationService, ToolValidationService>();
+
+        // MCP infrastructure
+        builder.Services.AddScoped<IMcpClientFactory, McpClientFactory>();
+        builder.Services.AddScoped<IMcpToolDiscoveryService, McpToolDiscoveryService>();
+        builder.Services.AddScoped<IMcpToolSeedingService, McpToolSeedingService>();
+        builder.Services.AddScoped<IMcpServerConnectionService, McpServerConnectionService>();
+        builder.Services.AddScoped<IMcpServerConnectionChecker, McpServerConnectionChecker>();
+        builder.Services.AddScoped<IMcpServerQueryServiceNew, McpServerQueryServiceNew>();
+        builder.Services.AddScoped<IAgentMcpToolDataAccess, AgentMcpToolDataAccess>();
+        builder.Services.AddScoped<IAgentToolAssignmentService, AgentToolAssignmentService>();
+        builder.Services.AddScoped<IMcpServerImpactCounter, McpServerImpactCounter>();
+        builder.Services.AddScoped<IMcpServerCommandService, McpServerCommandService>();
+        builder.Services.AddScoped<IMcpServerToolFetcher, McpServerToolFetcher>();
 
         // Agent Execution Services
         builder.Services.Configure<AgentExecutionSettings>(

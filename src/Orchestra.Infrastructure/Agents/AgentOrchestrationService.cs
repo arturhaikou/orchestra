@@ -96,7 +96,7 @@ public class AgentOrchestrationService : IAgentOrchestrationService
             {
                 ticket.UpdateStatus(ToDoStatusId);
             }
-            
+
             ticket.UpdateStatus(InProgressStatusId);
             await _ticketDataAccess.UpdateTicketAsync(ticket, cancellationToken);
 

@@ -16,49 +16,49 @@ public class IntegrationService : IIntegrationService
     private readonly IIntegrationDataAccess _integrationDataAccess;
     private readonly IWorkspaceAuthorizationService _workspaceAuthorizationService;
     private readonly ICredentialEncryptionService _credentialEncryptionService;
+    private readonly IMcpToolDiscoveryService _mcpToolDiscoveryService;
 
     public IntegrationService(
         IIntegrationDataAccess integrationDataAccess,
         IWorkspaceAuthorizationService workspaceAuthorizationService,
-        ICredentialEncryptionService credentialEncryptionService)
+        ICredentialEncryptionService credentialEncryptionService,
+        IMcpToolDiscoveryService mcpToolDiscoveryService)
     {
         _integrationDataAccess = integrationDataAccess;
         _workspaceAuthorizationService = workspaceAuthorizationService;
         _credentialEncryptionService = credentialEncryptionService;
+        _mcpToolDiscoveryService = mcpToolDiscoveryService;
     }
 
     public async Task<List<IntegrationDto>> GetWorkspaceIntegrationsAsync(
-        Guid userId, 
-        Guid workspaceId, 
+        Guid userId,
+        Guid workspaceId,
         CancellationToken cancellationToken = default)
     {
-        // 1. Verify user has access to workspace (authorization first!)
-        await _workspaceAuthorizationService.ValidateMembershipAsync(
-            userId, 
-            workspaceId, 
-            cancellationToken);
+        await _workspaceAuthorizationService.ValidateMembershipAsync(userId, workspaceId, cancellationToken);
 
-        // 2. Retrieve all active integrations for workspace
-        var integrations = await _integrationDataAccess.GetByWorkspaceIdAsync(
-            workspaceId, 
-            cancellationToken);
+        var integrations = await _integrationDataAccess.GetByWorkspaceIdAsync(workspaceId, cancellationToken);
 
-        // 3. Map to DTOs (credentials are excluded)
         return integrations
+            .Where(i => i.Provider != ProviderType.MCP_GENERIC)
             .Select(MapToDto)
             .ToList();
     }
 
     public async Task<IntegrationDto> CreateIntegrationAsync(
-        Guid userId, 
-        CreateIntegrationRequest request, 
+        Guid userId,
+        CreateIntegrationRequest request,
         CancellationToken cancellationToken = default)
     {
-        // 1. Verify user has access to workspace
         await _workspaceAuthorizationService.ValidateMembershipAsync(
-            userId, 
-            request.WorkspaceId, 
+            userId,
+            request.WorkspaceId,
             cancellationToken);
+
+        if (request.Provider.Equals("MCP_GENERIC", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException(
+                "MCP servers must be managed through the MCP Server settings",
+                nameof(request.Provider));
 
         // 2. Parse and validate integration types
         if (request.Types == null || request.Types.Length == 0)
@@ -106,8 +106,8 @@ public class IntegrationService : IIntegrationService
 
         // 3c. Validate duplicate name
         var isDuplicate = await _integrationDataAccess.ExistsByNameInWorkspaceAsync(
-            request.Name, 
-            request.WorkspaceId, 
+            request.Name,
+            request.WorkspaceId,
             cancellationToken: cancellationToken);
 
         if (isDuplicate)
@@ -127,8 +127,8 @@ public class IntegrationService : IIntegrationService
         }
 
         // 4. Encrypt API key
-        var encryptedApiKey = string.IsNullOrEmpty(request.ApiKey) 
-            ? null 
+        var encryptedApiKey = string.IsNullOrEmpty(request.ApiKey)
+            ? null
             : _credentialEncryptionService.Encrypt(request.ApiKey);
 
         // 5. Create integration entity using domain factory
@@ -144,21 +144,7 @@ public class IntegrationService : IIntegrationService
             vectorize: request.Vectorize
         );
 
-        // 5b. Set connected status if provided in request
-        if (request.Connected.HasValue)
-        {
-            integration.Update(
-                name: integration.Name,
-                integrationTypes: integration.Types,
-                provider: integration.Provider,
-                url: integration.Url,
-                username: integration.Username,
-                encryptedApiKey: null, // Don't re-encrypt
-                filterQuery: integration.FilterQuery,
-                vectorize: integration.Vectorize,
-                connected: request.Connected.Value
-            );
-        }
+        // 5b. Connected status tracking removed — Integration entity no longer carries connection state
 
         // 7. Persist to database
         await _integrationDataAccess.AddAsync(integration, cancellationToken);
@@ -168,9 +154,9 @@ public class IntegrationService : IIntegrationService
     }
 
     public async Task<IntegrationDto> UpdateIntegrationAsync(
-        Guid userId, 
-        Guid integrationId, 
-        UpdateIntegrationRequest request, 
+        Guid userId,
+        Guid integrationId,
+        UpdateIntegrationRequest request,
         CancellationToken cancellationToken = default)
     {
         // 1. Retrieve the existing integration
@@ -182,8 +168,8 @@ public class IntegrationService : IIntegrationService
 
         // 2. Verify user has access to the integration's workspace
         await _workspaceAuthorizationService.ValidateMembershipAsync(
-            userId, 
-            integration.WorkspaceId, 
+            userId,
+            integration.WorkspaceId,
             cancellationToken);
 
         // 3. Parse and validate integration types
@@ -201,6 +187,12 @@ public class IntegrationService : IIntegrationService
             }
             integrationTypes.Add(parsedType);
         }
+
+        if (!string.IsNullOrEmpty(request.Provider) &&
+            request.Provider.Equals("MCP_GENERIC", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException(
+                "MCP servers must be managed through the MCP Server settings",
+                nameof(request.Provider));
 
         // 4. Parse provider type if provided
         ProviderType? providerType = null;
@@ -240,8 +232,8 @@ public class IntegrationService : IIntegrationService
         }
 
         var isDuplicate = await _integrationDataAccess.ExistsByNameInWorkspaceAsync(
-            request.Name, 
-            integration.WorkspaceId, 
+            request.Name,
+            integration.WorkspaceId,
             excludeIntegrationId: integrationId,
             cancellationToken: cancellationToken);
 
@@ -283,8 +275,7 @@ public class IntegrationService : IIntegrationService
             username: request.Username,
             encryptedApiKey: encryptedApiKey,
             filterQuery: request.FilterQuery,
-            vectorize: request.Vectorize,
-            connected: request.Connected
+            vectorize: request.Vectorize
         );
 
         // 7. Persist changes to database
@@ -294,34 +285,32 @@ public class IntegrationService : IIntegrationService
         return MapToDto(integration);
     }
 
-    /// <summary>
-    /// Soft deletes an integration by marking it as inactive.
-    /// </summary>
-    /// <param name="userId">The ID of the user performing the deletion.</param>
-    /// <param name="integrationId">The ID of the integration to delete.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <exception cref="IntegrationNotFoundException">Thrown when the integration is not found.</exception>
-    /// <exception cref="UnauthorizedWorkspaceAccessException">Thrown when the user is not a workspace member.</exception>
-    public async Task DeleteIntegrationAsync(
-        Guid userId, 
-        Guid integrationId, 
+    public async Task<DeleteIntegrationResult> DeleteIntegrationAsync(
+        Guid userId,
+        Guid integrationId,
         CancellationToken cancellationToken = default)
     {
-        // 1. Load integration
         var integration = await _integrationDataAccess.GetByIdAsync(integrationId, cancellationToken)
             ?? throw new IntegrationNotFoundException(integrationId);
 
-        // 2. Verify user has access to the workspace
-        await _workspaceAuthorizationService.EnsureUserIsMemberAsync(
-            userId, 
-            integration.WorkspaceId, 
-            cancellationToken);
+        await _workspaceAuthorizationService.EnsureUserIsMemberAsync(userId, integration.WorkspaceId, cancellationToken);
 
-        // 3. Soft delete integration
         integration.Deactivate();
-
-        // 4. Persist changes
         await _integrationDataAccess.UpdateAsync(integration, cancellationToken);
+        return new DeleteIntegrationResult(0, 0, 0);
+    }
+
+    public async Task<DeletionImpactDto> GetDeletionImpactAsync(
+        Guid userId,
+        Guid integrationId,
+        CancellationToken cancellationToken = default)
+    {
+        var integration = await _integrationDataAccess.GetByIdAsync(integrationId, cancellationToken)
+            ?? throw new IntegrationNotFoundException(integrationId);
+
+        await _workspaceAuthorizationService.EnsureUserIsMemberAsync(userId, integration.WorkspaceId, cancellationToken);
+
+        return new DeletionImpactDto(0, 0, false);
     }
 
     public async Task ValidateConnectionAsync(
@@ -456,15 +445,15 @@ public class IntegrationService : IIntegrationService
         try
         {
             using var client = CreateHttpClient(request);
-            
+
             // Detect Jira type from URL: Cloud uses API v3, On-Premise uses API v2
             var jiraType = IntegrationTypeDetector.DetectJiraType(request.Url);
             var endpoint = jiraType == JiraType.Cloud
                 ? "/rest/api/3/serverInfo"
                 : "/rest/api/2/serverInfo";
-            
+
             var response = await client.GetAsync(endpoint);
-            
+
             if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
                 throw new InvalidOperationException("Failed to authenticate with Jira. Please verify your credentials.");
@@ -490,15 +479,15 @@ public class IntegrationService : IIntegrationService
         try
         {
             using var client = CreateHttpClient(request);
-            
+
             // Detect Confluence type from URL: Cloud has /wiki/ prefix, On-Premise does not
             var confluenceType = IntegrationTypeDetector.DetectConfluenceType(request.Url);
             var endpoint = confluenceType == ConfluenceType.Cloud
                 ? "/wiki/rest/api/space?limit=1"
                 : "/rest/api/space?limit=1";
-            
+
             var response = await client.GetAsync(endpoint);
-            
+
             if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
                 throw new InvalidOperationException("Failed to authenticate with Confluence. Please verify your credentials.");
@@ -524,7 +513,7 @@ public class IntegrationService : IIntegrationService
         try
         {
             var client = new HttpClient();
-            
+
             if (string.IsNullOrEmpty(request.Url))
             {
                 throw new ArgumentException("Integration URL is required.", nameof(request.Url));
@@ -535,7 +524,7 @@ public class IntegrationService : IIntegrationService
             // Set Basic Auth header
             var authValue = Convert.ToBase64String(
                 System.Text.Encoding.ASCII.GetBytes($"{request.Username}:{request.ApiKey}"));
-            client.DefaultRequestHeaders.Authorization = 
+            client.DefaultRequestHeaders.Authorization =
                 new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", authValue);
 
             return client;
@@ -557,7 +546,7 @@ public class IntegrationService : IIntegrationService
             Provider: integration.Provider.ToString(),
             Url: integration.Url,
             Username: integration.Username,
-            Connected: integration.Connected,
+            Connected: false,
             LastSync: FormatLastSync(integration.LastSyncAt),
             FilterQuery: integration.FilterQuery,
             Vectorize: integration.Vectorize,
@@ -566,7 +555,12 @@ public class IntegrationService : IIntegrationService
                 : null,
             ConfluenceType: integration.Provider == ProviderType.CONFLUENCE
                 ? IntegrationTypeDetector.DetectConfluenceType(integration.Url).ToString()
-                : null
+                : null,
+            IsMcpBacked: false,
+            McpEndpointUrl: null,
+            ToolCount: null,
+            McpTransportType: null,
+            McpCommand: null
         );
     }
 
@@ -575,12 +569,29 @@ public class IntegrationService : IIntegrationService
         if (!lastSyncAt.HasValue) return null;
 
         var timeSpan = DateTime.UtcNow - lastSyncAt.Value;
-        
+
         if (timeSpan.TotalMinutes < 1) return "Just now";
         if (timeSpan.TotalMinutes < 60) return $"{(int)timeSpan.TotalMinutes} min ago";
         if (timeSpan.TotalHours < 24) return $"{(int)timeSpan.TotalHours}h ago";
         if (timeSpan.TotalDays < 30) return $"{(int)timeSpan.TotalDays}d ago";
-        
+
         return lastSyncAt.Value.ToString("MMM dd, yyyy");
+    }
+
+    public async Task<SyncToolsResultDto> SyncToolsAsync(
+        Guid userId,
+        Guid integrationId,
+        CancellationToken cancellationToken = default)
+    {
+        var integration = await _integrationDataAccess.GetByIdAsync(integrationId, cancellationToken)
+            ?? throw new IntegrationNotFoundException(integrationId);
+
+        await _workspaceAuthorizationService.ValidateMembershipAsync(
+            userId, integration.WorkspaceId, cancellationToken);
+
+        if (integration.Provider == ProviderType.MCP_GENERIC)
+            throw new InvalidOperationException("MCP servers must be managed through the MCP Server settings");
+
+        return await _mcpToolDiscoveryService.SyncToolsAsync(integrationId, cancellationToken);
     }
 }

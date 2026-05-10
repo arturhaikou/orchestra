@@ -43,13 +43,13 @@ public class TicketPageToken
     /// </summary>
     [JsonPropertyName("phase")]
     public string Phase { get; set; } = "internal";
-    
+
     /// <summary>
     /// Offset for internal ticket pagination (0-based)
     /// </summary>
     [JsonPropertyName("internalOffset")]
     public int InternalOffset { get; set; } = 0;
-    
+
     /// <summary>
     /// State for external ticket pagination across multiple providers
     /// </summary>
@@ -67,19 +67,19 @@ public class ExternalPaginationState
     /// </summary>
     [JsonPropertyName("currentProviderIndex")]
     public int CurrentProviderIndex { get; set; } = 0;
-    
+
     /// <summary>
     /// Provider-specific continuation tokens mapped by integration ID
     /// </summary>
     [JsonPropertyName("providerTokens")]
     public Dictionary<string, string?> ProviderTokens { get; set; } = new();
-    
+
     /// <summary>
     /// Total number of external tickets fetched so far across all providers
     /// </summary>
     [JsonPropertyName("totalExternalFetched")]
     public int TotalExternalFetched { get; set; } = 0;
-    
+
     /// <summary>
     /// List of integration IDs (as strings) that have been exhausted (returned 0 tickets).
     /// These providers are skipped in subsequent redistribution rounds.

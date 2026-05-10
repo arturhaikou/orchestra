@@ -53,7 +53,7 @@ public class JiraCloudApiClient : IJiraApiClient
             response.EnsureSuccessStatusCode();
 
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
-            
+
             JiraSearchResponse searchResponse;
             try
             {
@@ -239,7 +239,7 @@ public class JiraCloudApiClient : IJiraApiClient
             response.EnsureSuccessStatusCode();
 
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
-            
+
             // Cloud API returns a wrapper object with "values" property
             using var doc = JsonDocument.Parse(content);
             var projects = new List<Project>();

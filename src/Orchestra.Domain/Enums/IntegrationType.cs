@@ -9,14 +9,17 @@ public enum IntegrationType
     /// Issue tracking systems (Jira, Azure DevOps, Linear).
     /// </summary>
     TRACKER = 0,
-    
+
     /// <summary>
     /// Knowledge base systems (Confluence, Notion).
     /// </summary>
     KNOWLEDGE_BASE = 1,
-    
+
     /// <summary>
     /// Code repository systems (GitHub, GitLab).
     /// </summary>
-    CODE_SOURCE = 2
+    CODE_SOURCE = 2,
+
+    DESIGN_TOOL = 3,
+    MCP_SERVER = 4
 }

@@ -8,7 +8,7 @@ public class DuplicateIntegrationException : Exception
     public string IntegrationName { get; }
     public Guid WorkspaceId { get; }
 
-    public DuplicateIntegrationException(string integrationName, Guid workspaceId) 
+    public DuplicateIntegrationException(string integrationName, Guid workspaceId)
         : base($"An integration with name '{integrationName}' already exists in this workspace.")
     {
         IntegrationName = integrationName;

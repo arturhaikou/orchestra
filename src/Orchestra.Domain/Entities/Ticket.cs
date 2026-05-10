@@ -84,10 +84,10 @@ public class Ticket
     {
         if (workspaceId == Guid.Empty)
             throw new ArgumentException("Workspace ID is required.", nameof(workspaceId));
-        
+
         if (integrationId == Guid.Empty)
             throw new ArgumentException("Integration ID is required.", nameof(integrationId));
-        
+
         if (string.IsNullOrWhiteSpace(externalTicketId))
             throw new ArgumentException("External ticket ID is required.", nameof(externalTicketId));
 
@@ -124,7 +124,7 @@ public class Ticket
     {
         if (statusId == Guid.Empty)
             throw new ArgumentException("Status ID is required.", nameof(statusId));
-        
+
         StatusId = statusId;
         UpdatedAt = DateTime.UtcNow;
     }
@@ -138,7 +138,7 @@ public class Ticket
     {
         if (priorityId == Guid.Empty)
             throw new ArgumentException("Priority ID is required.", nameof(priorityId));
-        
+
         PriorityId = priorityId;
         UpdatedAt = DateTime.UtcNow;
     }
@@ -156,9 +156,9 @@ public class Ticket
     /// Thrown when the agent or workflow workspace does not match the ticket's workspace
     /// </exception>
     public void UpdateAssignments(
-        Guid? assignedAgentId, 
+        Guid? assignedAgentId,
         Guid? agentWorkspaceId,
-        Guid? assignedWorkflowId, 
+        Guid? assignedWorkflowId,
         Guid? workflowWorkspaceId)
     {
         // Validate agent workspace consistency
@@ -167,26 +167,26 @@ public class Ticket
             if (agentWorkspaceId.Value != WorkspaceId)
             {
                 throw new Orchestra.Domain.Exceptions.InvalidWorkspaceAssignmentException(
-                    "Agent", 
-                    assignedAgentId.Value, 
-                    WorkspaceId, 
+                    "Agent",
+                    assignedAgentId.Value,
+                    WorkspaceId,
                     agentWorkspaceId.Value);
             }
         }
-        
+
         // Validate workflow workspace consistency
         if (assignedWorkflowId.HasValue && workflowWorkspaceId.HasValue)
         {
             if (workflowWorkspaceId.Value != WorkspaceId)
             {
                 throw new Orchestra.Domain.Exceptions.InvalidWorkspaceAssignmentException(
-                    "Workflow", 
-                    assignedWorkflowId.Value, 
-                    WorkspaceId, 
+                    "Workflow",
+                    assignedWorkflowId.Value,
+                    WorkspaceId,
                     workflowWorkspaceId.Value);
             }
         }
-        
+
         // Apply assignments after validation passes
         AssignedAgentId = assignedAgentId;
         AssignedWorkflowId = assignedWorkflowId;
@@ -248,13 +248,13 @@ public class Ticket
     {
         if (!IsInternal)
             throw new InvalidOperationException("Cannot convert external tickets. Ticket is already external.");
-        
+
         if (integrationId == Guid.Empty)
             throw new ArgumentException("Integration ID is required.", nameof(integrationId));
-        
+
         if (string.IsNullOrWhiteSpace(externalTicketId))
             throw new ArgumentException("External ticket ID is required.", nameof(externalTicketId));
-        
+
         IntegrationId = integrationId;
         ExternalTicketId = externalTicketId;
         IsInternal = false;

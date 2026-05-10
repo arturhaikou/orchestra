@@ -96,7 +96,7 @@ public class AdfConversionService : IAdfConversionService
 
         var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
         var adfDocument = JsonDocument.Parse(responseJson);
-        
+
         _logger.LogDebug("Markdown converted to ADF successfully. Input length: {Length}", markdown.Length);
         return adfDocument.RootElement.Clone();
     }

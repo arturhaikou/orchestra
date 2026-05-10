@@ -12,7 +12,7 @@
     "skipLibCheck": true,
     "types": [
       "node",
-      "jest"
+      "vitest/globals"
     ],
     "moduleResolution": "bundler",
     "isolatedModules": true,

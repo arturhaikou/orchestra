@@ -3,6 +3,7 @@ using Orchestra.Application.Agents.DTOs;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Common;
 using Orchestra.Application.Common.Interfaces;
+using Orchestra.Application.McpServers.Interfaces;
 using Orchestra.Domain.Entities;
 using Orchestra.Tests.Shared.Builders;
 
@@ -36,6 +37,7 @@ public class AgentServiceLockedFieldTests
         var service = new AgentService(
             agentDataAccess,
             toolActionDataAccess,
+            Substitute.For<IAgentMcpToolDataAccess>(),
             authService,
             toolValidationService,
             Substitute.For<IBuiltInAgentTemplateRegistry>(),

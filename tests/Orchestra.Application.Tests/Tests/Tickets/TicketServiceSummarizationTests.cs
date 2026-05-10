@@ -87,7 +87,7 @@ public class TicketServiceSummarizationTests
         Assert.False(result.FeatureDisabled);
         Assert.NotNull(result.Ticket);
         Assert.Equal("AI-generated summary", result.Ticket.Summary);
-        
+
         // Verify the model ID was passed to enrichment service
         await _enrichmentService.Received(1).GenerateSummaryAsync(
             "Formatted ticket content",
@@ -107,7 +107,7 @@ public class TicketServiceSummarizationTests
         var ticketId = "TKT-456";
         var userId = Guid.NewGuid();
         var providerDefaultModelId = "gpt-4o";
-        
+
         var workspace = new WorkspaceBuilder()
             .WithIsAiSummarizationEnabled(true)
             .WithAiSummarizationModelId(null)
@@ -115,7 +115,7 @@ public class TicketServiceSummarizationTests
 
 
         var workspaceId = workspace.Id;
-        
+
         var ticketDto = new TicketDtoBuilder()
             .WithWorkspaceId(workspaceId)
             .Build();
@@ -221,7 +221,7 @@ public class TicketServiceSummarizationTests
         Assert.True(result.FeatureDisabled);
         Assert.Null(result.Ticket);
         Assert.NotNull(result.Message);
-        
+
         // Verify enrichment service was never called
         await _enrichmentService.DidNotReceive().GenerateSummaryAsync(
             Arg.Any<string>(),
@@ -261,11 +261,11 @@ public class TicketServiceSummarizationTests
             .Returns((AIProviderConfiguration?)null);
         _enrichmentService.BuildSummaryContent(ticketDto)
             .Returns("Formatted ticket content");
-        
+
         // Simulate AI provider failure
         var summarizationEx = new SummarizationException("AI provider error", new Exception("Network timeout"));
         _enrichmentService.GenerateSummaryAsync("Formatted ticket content", workspaceId, modelId, Arg.Any<CancellationToken>())
-            .Throws(summarizationEx);
+.ThrowsAsync(summarizationEx);
 
         // Act & Assert
         var ex = await Assert.ThrowsAsync<SummarizationException>(

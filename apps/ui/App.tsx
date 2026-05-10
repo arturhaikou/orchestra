@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
 import CreateWorkspacePage from './components/pages/CreateWorkspacePage';
 import EditWorkspacePage from './components/pages/EditWorkspacePage';
 import AgentCreatePage from './components/pages/AgentCreatePage';
@@ -8,6 +8,9 @@ import AgentEditPage from './components/pages/AgentEditPage';
 import DeployBuiltInAgentPage from './components/pages/DeployBuiltInAgentPage';
 import IntegrationCreatePage from './components/pages/IntegrationCreatePage';
 import IntegrationEditPage from './components/pages/IntegrationEditPage';
+import EditMcpServerPage from './components/pages/EditMcpServerPage';
+import CreateMcpServerPage from './components/pages/CreateMcpServerPage';
+import McpServersPage from './components/pages/McpServersPage';
 import TicketCreatePage from './components/pages/TicketCreatePage';
 import TicketDetailPage from './components/pages/TicketDetailPage';
 import TicketEditPage from './components/pages/TicketEditPage';
@@ -24,6 +27,16 @@ import AuthGuard from './components/AuthGuard';
 import WorkspaceLayout from './components/WorkspaceLayout';
 import PostLoginRedirect from './components/PostLoginRedirect';
 import { Loader2 } from 'lucide-react';
+
+const RedirectToMcpNew: React.FC = () => {
+  const { workspaceId } = useParams<{ workspaceId: string }>();
+  return <Navigate to={`/workspaces/${workspaceId}/mcp-servers/new`} replace />;
+};
+
+const RedirectToMcpEdit: React.FC = () => {
+  const { workspaceId, integrationId } = useParams<{ workspaceId: string; integrationId: string }>();
+  return <Navigate to={`/workspaces/${workspaceId}/mcp-servers/${integrationId}/edit`} replace />;
+};
 
 const App: React.FC = () => {
   const navigate = useNavigate();
@@ -123,6 +136,13 @@ const App: React.FC = () => {
           <Route path="agents/:agentId/edit" element={<AgentEditPage />} />
           <Route path="agents/deploy/:templateId" element={<DeployBuiltInAgentPage />} />
           <Route path="agents" element={<AgentsList />} />
+          <Route path="mcp-servers/new" element={<CreateMcpServerPage />} />
+          <Route path="mcp-servers/:serverId/edit" element={<EditMcpServerPage />} />
+          <Route path="mcp-servers" element={<McpServersPage />} />
+
+          <Route path="integrations/new/mcp" element={<RedirectToMcpNew />} />
+          <Route path="integrations/:integrationId/edit/mcp" element={<RedirectToMcpEdit />} />
+
           <Route path="integrations/new" element={<IntegrationCreatePage />} />
           <Route path="integrations/:integrationId/edit" element={<IntegrationEditPage />} />
           <Route path="integrations" element={<Integrations />} />

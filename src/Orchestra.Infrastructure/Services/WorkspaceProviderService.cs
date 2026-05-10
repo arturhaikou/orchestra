@@ -128,7 +128,7 @@ public sealed class WorkspaceProviderService : IWorkspaceProviderService
         return config.ProviderType switch
         {
             AIProviderType.AzureOpenAI => await GetAzureOpenAIModelsAsync(config, cancellationToken),
-            AIProviderType.Ollama      => await GetOllamaModelsAsync(config, cancellationToken),
+            AIProviderType.Ollama => await GetOllamaModelsAsync(config, cancellationToken),
             _ => throw new InvalidOperationException(
                      $"Unsupported provider type: {config.ProviderType}.")
         };
@@ -158,7 +158,7 @@ public sealed class WorkspaceProviderService : IWorkspaceProviderService
             IReadOnlyList<string> models = config.ProviderType switch
             {
                 AIProviderType.AzureOpenAI => await GetAzureOpenAIModelsAsync(config, cancellationToken),
-                AIProviderType.Ollama      => await GetOllamaModelsAsync(config, cancellationToken),
+                AIProviderType.Ollama => await GetOllamaModelsAsync(config, cancellationToken),
                 _ => throw new InvalidOperationException(
                          $"Unsupported provider type: {config.ProviderType}.")
             };
@@ -300,7 +300,7 @@ public sealed class WorkspaceProviderService : IWorkspaceProviderService
         // Credentials are decrypted inside this method scope only — they
         // must not escape into logs, fields, or exception messages.
         var endpoint = _encryptionService.Decrypt(config.Endpoint!);
-        var apiKey   = _encryptionService.Decrypt(config.ApiKey!);
+        var apiKey = _encryptionService.Decrypt(config.ApiKey!);
 
         try
         {
@@ -345,7 +345,7 @@ public sealed class WorkspaceProviderService : IWorkspaceProviderService
             }
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var doc  = JsonDocument.Parse(json);
+            var doc = JsonDocument.Parse(json);
 
             var models = doc.RootElement
                 .GetProperty("models")
@@ -425,7 +425,7 @@ public sealed class WorkspaceProviderService : IWorkspaceProviderService
             }
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var doc  = System.Text.Json.JsonDocument.Parse(json);
+            var doc = System.Text.Json.JsonDocument.Parse(json);
 
             var models = doc.RootElement
                 .GetProperty("models")
@@ -486,7 +486,7 @@ public sealed class WorkspaceProviderService : IWorkspaceProviderService
             // are not widened to any field or variable outside this method.
             return (
                 encryptedEndpoint: _encryptionService.Encrypt(endpoint),
-                encryptedApiKey:   _encryptionService.Encrypt(apiKey));
+                encryptedApiKey: _encryptionService.Encrypt(apiKey));
         }
 
         if (providerType == AIProviderType.Ollama)
@@ -499,7 +499,7 @@ public sealed class WorkspaceProviderService : IWorkspaceProviderService
             // Ollama base URL is stored directly in Endpoint (plaintext — not encrypted).
             return (
                 encryptedEndpoint: endpoint,
-                encryptedApiKey:   null);
+                encryptedApiKey: null);
         }
 
         throw new ArgumentException(

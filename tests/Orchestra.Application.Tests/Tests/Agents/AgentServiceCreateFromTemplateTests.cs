@@ -5,6 +5,7 @@ using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Agents.Templates;
 using Orchestra.Application.Common.Exceptions;
 using Orchestra.Application.Common.Interfaces;
+using Orchestra.Application.McpServers.Interfaces;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
 using Orchestra.Tests.Shared.Builders;
@@ -37,6 +38,7 @@ public class AgentServiceCreateFromTemplateTests
         _sut = new AgentService(
             _agentDataAccess,
             _agentToolActionDataAccess,
+            Substitute.For<IAgentMcpToolDataAccess>(),
             _workspaceAuthorizationService,
             _toolValidationService,
             _templateRegistry,
@@ -147,7 +149,7 @@ public class AgentServiceCreateFromTemplateTests
         _templateRegistry.GetByIdentifier("code-review").Returns(template);
         _availabilityResolver
             .ValidatePrerequisitesAsync(request.WorkspaceId, template, Arg.Any<CancellationToken>())
-            .Throws(new IntegrationRequiredException("A Code Source integration (GitHub or GitLab) is required to deploy this template."));
+.ThrowsAsync(new IntegrationRequiredException("A Code Source integration (GitHub or GitLab) is required to deploy this template."));
 
         var ex = await Assert.ThrowsAsync<IntegrationRequiredException>(
             () => _sut.CreateFromTemplateAsync(userId, request));
@@ -164,7 +166,7 @@ public class AgentServiceCreateFromTemplateTests
         _templateRegistry.GetByIdentifier("code-review").Returns(template);
         _availabilityResolver
             .ValidatePrerequisitesAsync(request.WorkspaceId, template, Arg.Any<CancellationToken>())
-            .Throws(new TemplateAlreadyDeployedException("code-review"));
+.ThrowsAsync(new TemplateAlreadyDeployedException("code-review"));
 
         var ex = await Assert.ThrowsAsync<TemplateAlreadyDeployedException>(
             () => _sut.CreateFromTemplateAsync(userId, request));
@@ -277,7 +279,7 @@ public class AgentServiceCreateFromTemplateTests
 
         _workspaceAuthorizationService
             .EnsureUserIsMemberAsync(userId, request.WorkspaceId, Arg.Any<CancellationToken>())
-            .Throws(new UnauthorizedWorkspaceAccessException(userId, request.WorkspaceId));
+.ThrowsAsync(new UnauthorizedWorkspaceAccessException(userId, request.WorkspaceId));
 
         await Assert.ThrowsAsync<UnauthorizedWorkspaceAccessException>(
             () => _sut.CreateFromTemplateAsync(userId, request));
@@ -313,7 +315,7 @@ public class AgentServiceCreateFromTemplateTests
         _templateRegistry.GetByIdentifier("code-review").Returns(template);
         _availabilityResolver
             .ValidatePrerequisitesAsync(request.WorkspaceId, template, Arg.Any<CancellationToken>())
-            .Throws(new IntegrationRequiredException("test"));
+.ThrowsAsync(new IntegrationRequiredException("test"));
 
         await Assert.ThrowsAsync<IntegrationRequiredException>(
             () => _sut.CreateFromTemplateAsync(userId, request));

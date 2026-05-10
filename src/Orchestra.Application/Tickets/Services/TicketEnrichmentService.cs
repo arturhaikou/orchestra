@@ -110,7 +110,7 @@ public class TicketEnrichmentService : ITicketEnrichmentService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to analyze sentiment for tickets, defaulting to 100");
-                
+
                 // Default to 100 on error
                 foreach (var ticketId in ticketIndexMap.Keys)
                 {
@@ -175,7 +175,7 @@ public class TicketEnrichmentService : ITicketEnrichmentService
                 _logger.LogInformation(
                     "Sentiment analysis complete for ticket {TicketId}: {Sentiment}",
                     ticket.Id, result.Sentiment);
-                
+
                 return ticket with { Satisfaction = result.Sentiment };
             }
 
@@ -225,16 +225,16 @@ public class TicketEnrichmentService : ITicketEnrichmentService
     public string BuildSummaryContent(TicketDto ticket)
     {
         var contentBuilder = new StringBuilder();
-        
+
         // Add title
         contentBuilder.AppendLine($"Title: {ticket.Title}");
         contentBuilder.AppendLine();
-        
+
         // Add description
         contentBuilder.AppendLine("Description:");
         contentBuilder.AppendLine(ticket.Description);
         contentBuilder.AppendLine();
-        
+
         // Add comments if any exist
         if (ticket.Comments != null && ticket.Comments.Any())
         {

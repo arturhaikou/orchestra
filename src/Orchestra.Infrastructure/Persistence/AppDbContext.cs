@@ -8,7 +8,7 @@ namespace Orchestra.Infrastructure.Persistence
     {
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
-        public DbSet<User> Users { get; set; }
+        public DbSet<User> Users { get; set; } = null!;
 
         public DbSet<Workspace> Workspaces { get; set; } = null!;
 
@@ -19,6 +19,10 @@ namespace Orchestra.Infrastructure.Persistence
         public DbSet<AgentToolAction> AgentToolActions { get; set; } = null!;
 
         public DbSet<Integration> Integrations => Set<Integration>();
+
+        public DbSet<McpServer> McpServers { get; set; } = null!;
+
+        public DbSet<AgentMcpTool> AgentMcpTools { get; set; } = null!;
 
         public DbSet<Ticket> Tickets { get; set; } = null!;
 
@@ -40,14 +44,17 @@ namespace Orchestra.Infrastructure.Persistence
         {
             base.OnModelCreating(modelBuilder);
 
-            modelBuilder.HasPostgresExtension("citext");
+            if (Database.ProviderName?.Contains("InMemory") != true)
+                modelBuilder.HasPostgresExtension("citext");
 
             modelBuilder.ApplyConfiguration(new Configurations.UserConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.WorkspaceConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.UserWorkspaceConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.AgentConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.AgentToolActionConfiguration());
-            modelBuilder.ApplyConfiguration(new Configurations.IntegrationConfiguration());
+            modelBuilder.ApplyConfiguration(new Configurations.IntegrationConfiguration(Database.ProviderName?.Contains("InMemory") == true));
+            modelBuilder.ApplyConfiguration(new Configurations.McpServerConfiguration());
+            modelBuilder.ApplyConfiguration(new Configurations.AgentMcpToolConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.TicketConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.TicketStatusConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.TicketPriorityConfiguration());

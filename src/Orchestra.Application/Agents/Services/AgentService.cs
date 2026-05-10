@@ -2,6 +2,7 @@ using Orchestra.Application.Agents.DTOs;
 using Orchestra.Application.Agents.Templates;
 using Orchestra.Application.Common.Exceptions;
 using Orchestra.Application.Common.Interfaces;
+using Orchestra.Application.McpServers.Interfaces;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
 
@@ -11,6 +12,7 @@ public class AgentService : IAgentService
 {
     private readonly IAgentDataAccess _agentDataAccess;
     private readonly IAgentToolActionDataAccess _agentToolActionDataAccess;
+    private readonly IAgentMcpToolDataAccess _agentMcpToolDataAccess;
     private readonly IWorkspaceAuthorizationService _workspaceAuthorizationService;
     private readonly IToolValidationService _toolValidationService;
     private readonly IBuiltInAgentTemplateRegistry _templateRegistry;
@@ -21,6 +23,7 @@ public class AgentService : IAgentService
     public AgentService(
         IAgentDataAccess agentDataAccess,
         IAgentToolActionDataAccess agentToolActionDataAccess,
+        IAgentMcpToolDataAccess agentMcpToolDataAccess,
         IWorkspaceAuthorizationService workspaceAuthorizationService,
         IToolValidationService toolValidationService,
         IBuiltInAgentTemplateRegistry templateRegistry,
@@ -30,6 +33,7 @@ public class AgentService : IAgentService
     {
         _agentDataAccess = agentDataAccess ?? throw new ArgumentNullException(nameof(agentDataAccess));
         _agentToolActionDataAccess = agentToolActionDataAccess ?? throw new ArgumentNullException(nameof(agentToolActionDataAccess));
+        _agentMcpToolDataAccess = agentMcpToolDataAccess ?? throw new ArgumentNullException(nameof(agentMcpToolDataAccess));
         _workspaceAuthorizationService = workspaceAuthorizationService ?? throw new ArgumentNullException(nameof(workspaceAuthorizationService));
         _toolValidationService = toolValidationService ?? throw new ArgumentNullException(nameof(toolValidationService));
         _templateRegistry = templateRegistry ?? throw new ArgumentNullException(nameof(templateRegistry));
@@ -42,8 +46,8 @@ public class AgentService : IAgentService
     {
         // 1. Validate workspace membership
         await _workspaceAuthorizationService.EnsureUserIsMemberAsync(
-            userId, 
-            request.WorkspaceId, 
+            userId,
+            request.WorkspaceId,
             cancellationToken);
 
         // 2. Resolve tool action GUIDs and detect review tool presence
@@ -110,6 +114,23 @@ public class AgentService : IAgentService
                 cancellationToken);
         }
 
+        // 6.5. Assign MCP tools if provided
+        if (request.McpSelections != null && request.McpSelections.Count > 0)
+        {
+            foreach (var selection in request.McpSelections)
+            {
+                var tools = selection.ToolNames
+                    .Select(name => AgentMcpTool.Create(agent.Id, selection.McpServerId, name))
+                    .ToList();
+
+                await _agentMcpToolDataAccess.ReplaceForAgentAndServerAsync(
+                    agent.Id,
+                    selection.McpServerId,
+                    tools,
+                    cancellationToken);
+            }
+        }
+
         // 7. Map to DTO and return
         return await MapToDtoAsync(agent, cancellationToken);
     }
@@ -118,13 +139,13 @@ public class AgentService : IAgentService
     {
         // 1. Validate workspace membership
         await _workspaceAuthorizationService.EnsureUserIsMemberAsync(
-            userId, 
-            workspaceId, 
+            userId,
+            workspaceId,
             cancellationToken);
 
         // 2. Retrieve agents from data access layer
         var agents = await _agentDataAccess.GetByWorkspaceIdAsync(
-            workspaceId, 
+            workspaceId,
             cancellationToken);
 
         // 3. Pre-resolve provider label once for the entire workspace
@@ -155,8 +176,8 @@ public class AgentService : IAgentService
 
         // 3. Validate workspace membership
         await _workspaceAuthorizationService.EnsureUserIsMemberAsync(
-            userId, 
-            agent.WorkspaceId, 
+            userId,
+            agent.WorkspaceId,
             cancellationToken);
 
         // 4. Map to DTO and return
@@ -176,8 +197,8 @@ public class AgentService : IAgentService
 
         // 3. Validate workspace membership
         await _workspaceAuthorizationService.EnsureUserIsMemberAsync(
-            userId, 
-            agent.WorkspaceId, 
+            userId,
+            agent.WorkspaceId,
             cancellationToken);
 
         EnsureNoLockedFieldViolations(agent, request);
@@ -307,8 +328,8 @@ public class AgentService : IAgentService
 
         // 3. Validate workspace membership
         await _workspaceAuthorizationService.EnsureUserIsMemberAsync(
-            userId, 
-            agent.WorkspaceId, 
+            userId,
+            agent.WorkspaceId,
             cancellationToken);
 
         // 4. Delete agent via data access layer
@@ -429,6 +450,9 @@ public class AgentService : IAgentService
         var toolCategories = await _agentToolActionDataAccess.GetUniqueCategoryNamesByAgentIdAsync(
             agent.Id, cancellationToken);
 
+        var mcpServerNames = await _agentMcpToolDataAccess.GetMcpServerNamesByAgentIdAsync(
+            agent.Id, cancellationToken);
+
         var guide = await ResolveGuideAsync(agent, cancellationToken, preResolvedLabel);
 
         return new AgentDto(
@@ -446,6 +470,7 @@ public class AgentService : IAgentService
             Capabilities: agent.Capabilities.ToArray(),
             ToolActionIds: toolActionIds.Select(id => id.ToString()).ToArray(),
             ToolCategories: toolCategories.ToArray(),
+            McpServerNames: mcpServerNames,
             AvatarUrl: agent.AvatarUrl,
             CustomInstructions: agent.CustomInstructions,
             ProjectPrinciples: agent.ProjectPrinciples,

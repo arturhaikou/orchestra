@@ -4,6 +4,7 @@ using System.Security.Claims;
 using Orchestra.Application.Auth.DTOs;
 using Orchestra.Application.Common.Exceptions;
 using Orchestra.Application.Common.Interfaces;
+using Orchestra.Application.Agents.DTOs;
 using Orchestra.Application.Tools.DTOs;
 
 namespace Orchestra.ApiService.Controllers;
@@ -15,15 +16,18 @@ public class ToolsController : ControllerBase
 {
     private readonly IToolService _toolService;
     private readonly IWorkspaceAuthorizationService _workspaceAuthorizationService;
+    private readonly IAgentToolAssignmentService _agentToolAssignmentService;
     private readonly ILogger<ToolsController> _logger;
 
     public ToolsController(
         IToolService toolService,
         IWorkspaceAuthorizationService workspaceAuthorizationService,
+        IAgentToolAssignmentService agentToolAssignmentService,
         ILogger<ToolsController> logger)
     {
         _toolService = toolService;
         _workspaceAuthorizationService = workspaceAuthorizationService;
+        _agentToolAssignmentService = agentToolAssignmentService;
         _logger = logger;
     }
 
@@ -229,5 +233,67 @@ public class ToolsController : ControllerBase
             _logger.LogError(ex, "Error removing tool actions from agent {AgentId}", agentId);
             return StatusCode(500, new ErrorResponse("An unexpected error occurred while removing tool actions"));
         }
+    }
+
+    [HttpPatch("{toolActionId}/enabled")]
+    [ProducesResponseType(typeof(ToolActionDetailDto), 200)]
+    [ProducesResponseType(typeof(ErrorResponse), 400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(typeof(ErrorResponse), 403)]
+    [ProducesResponseType(typeof(ErrorResponse), 404)]
+    public async Task<IActionResult> ToggleToolActionEnabled(
+        [FromRoute] Guid toolActionId,
+        [FromBody] ToggleToolEnabledRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var userId = GetUserIdFromClaims();
+            var result = await _toolService.ToggleToolActionEnabledAsync(userId, toolActionId, request.IsEnabled, cancellationToken);
+            return Ok(result);
+        }
+        catch (ToolActionNotFoundException ex)
+        {
+            return NotFound(new ErrorResponse(ex.Message));
+        }
+        catch (Application.Common.Exceptions.UnauthorizedWorkspaceAccessException ex)
+        {
+            _logger.LogWarning(ex, "Unauthorized toggle attempt for tool action {ToolActionId}", toolActionId);
+            return StatusCode(403, new ErrorResponse(ex.Message));
+        }
+    }
+
+    [HttpPut]
+    [Route("/v1/agents/{agentId}/tools")]
+    [ProducesResponseType(204)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(typeof(ErrorResponse), 400)]
+    [ProducesResponseType(typeof(ErrorResponse), 403)]
+    [ProducesResponseType(typeof(ErrorResponse), 404)]
+    [ProducesResponseType(typeof(ErrorResponse), 500)]
+    public async Task<IActionResult> SaveAgentToolAssignments(
+        [FromRoute] Guid agentId,
+        [FromBody] SaveAgentToolsRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = GetUserIdFromClaims();
+        await _agentToolAssignmentService.SaveAssignmentsAsync(userId, agentId, request, cancellationToken);
+        return NoContent();
+    }
+
+    [HttpGet]
+    [Route("/v1/agents/{agentId}/mcp-tools")]
+    [ProducesResponseType(typeof(AgentToolAssignmentsDto), 200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(typeof(ErrorResponse), 403)]
+    [ProducesResponseType(typeof(ErrorResponse), 404)]
+    [ProducesResponseType(typeof(ErrorResponse), 500)]
+    public async Task<IActionResult> GetAgentMcpToolAssignments(
+        [FromRoute] Guid agentId,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = GetUserIdFromClaims();
+        var result = await _agentToolAssignmentService.GetAssignmentsAsync(userId, agentId, cancellationToken);
+        return Ok(result);
     }
 }

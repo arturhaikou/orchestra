@@ -753,3 +753,62 @@ public class UpdateIntegrationRequestBuilder
         return new UpdateIntegrationRequest(_name, _types, _provider, _url, _username, _encryptedApiKey, _filterQuery, _vectorize, _connected);
     }
 }
+
+/// <summary>
+/// Builder for CreateMcpIntegrationRequest DTOs.
+/// </summary>
+public class CreateMcpIntegrationRequestBuilder
+{
+    private Guid _workspaceId = Guid.NewGuid();
+    private string _name = new Faker().Company.CompanyName();
+    private string _provider = "FIGMA";
+    private string _mcpEndpointUrl = "https://mcp.figma.com/mcp";
+    private string _mcpAuthType = "API_KEY";
+    private string? _apiKey = new Faker().Random.AlphaNumeric(32);
+    private IReadOnlyList<ToolEnablementOverride>? _toolOverrides = null;
+
+    public CreateMcpIntegrationRequestBuilder WithWorkspaceId(Guid id)
+    {
+        _workspaceId = id;
+        return this;
+    }
+
+    public CreateMcpIntegrationRequestBuilder WithName(string name)
+    {
+        _name = name;
+        return this;
+    }
+
+    public CreateMcpIntegrationRequestBuilder WithProvider(string provider)
+    {
+        _provider = provider;
+        return this;
+    }
+
+    public CreateMcpIntegrationRequestBuilder WithMcpEndpointUrl(string url)
+    {
+        _mcpEndpointUrl = url;
+        return this;
+    }
+
+    public CreateMcpIntegrationRequestBuilder WithMcpAuthType(string authType)
+    {
+        _mcpAuthType = authType;
+        return this;
+    }
+
+    public CreateMcpIntegrationRequestBuilder WithApiKey(string? apiKey)
+    {
+        _apiKey = apiKey;
+        return this;
+    }
+
+    public CreateMcpIntegrationRequestBuilder WithToolOverrides(IReadOnlyList<ToolEnablementOverride>? overrides)
+    {
+        _toolOverrides = overrides;
+        return this;
+    }
+
+    public CreateMcpIntegrationRequest Build() =>
+        new(_workspaceId, _name, _provider, _mcpEndpointUrl, _mcpAuthType, _apiKey, _toolOverrides);
+}

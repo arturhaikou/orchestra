@@ -32,7 +32,7 @@ public class JiraToolServiceTests : ServiceTestFixture<JiraToolService>
         var mockHttpClientFactory = Substitute.For<IHttpClientFactory>();
         var mockCredentialService = Substitute.For<ICredentialEncryptionService>();
         var mockLoggerFactory = Substitute.For<ILoggerFactory>();
-        
+
         var apiClientFactory = new JiraApiClientFactory(mockHttpClientFactory, mockCredentialService, mockLoggerFactory);
         _sut = new JiraToolService(apiClientFactory, _integrationResolver, Logger, _contentConverter);
     }
@@ -202,10 +202,10 @@ public class JiraToolServiceTests : ServiceTestFixture<JiraToolService>
     {
         if (value is bool b)
             return b;
-        
+
         if (value is System.Text.Json.JsonElement je)
             return je.GetBoolean();
-        
+
         return Convert.ToBoolean(value);
     }
 }

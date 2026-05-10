@@ -44,7 +44,7 @@ public class WorkspaceServiceTests
         mockProviderService
             .CreateProviderConfigAsync(Arg.Any<Guid>(), Arg.Any<AIProviderType>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(providerConfigId));
-        
+
         var createdWorkspace = new WorkspaceBuilder()
             .WithOwnerId(userId)
             .WithName("AI-Enabled Workspace")
@@ -86,7 +86,7 @@ public class WorkspaceServiceTests
         mockProviderService
             .CreateProviderConfigAsync(Arg.Any<Guid>(), Arg.Any<AIProviderType>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(providerConfigId));
-        
+
         var createdWorkspace = new WorkspaceBuilder()
             .WithOwnerId(userId)
             .WithName("Standard Workspace")
@@ -130,7 +130,7 @@ public class WorkspaceServiceTests
         mockProviderService
             .CreateProviderConfigAsync(Arg.Any<Guid>(), Arg.Any<AIProviderType>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(providerConfigId));
-        
+
         var createdWorkspace = new WorkspaceBuilder()
             .WithOwnerId(userId)
             .WithName("Partial AI Workspace")
@@ -713,7 +713,7 @@ public class WorkspaceServiceTests
         var mockAiProviderRepo = Substitute.For<IWorkspaceAIProviderRepository>();
 
         mockProviderService
-            .CreateProviderConfigAsync(Arg.Any<Guid>(), Arg.Any<AIProviderType>(), Arg.Any<string?>(), 
+            .CreateProviderConfigAsync(Arg.Any<Guid>(), Arg.Any<AIProviderType>(), Arg.Any<string?>(),
                 Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Guid.NewGuid()));
 

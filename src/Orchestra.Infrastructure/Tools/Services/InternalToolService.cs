@@ -378,7 +378,7 @@ public class InternalToolService : IInternalToolService
             }
 
             // Validate at least one field is provided
-            if (string.IsNullOrWhiteSpace(assignedAgentId) && 
+            if (string.IsNullOrWhiteSpace(assignedAgentId) &&
                 string.IsNullOrWhiteSpace(assignedWorkflowId))
             {
                 _logger.LogWarning(

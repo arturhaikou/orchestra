@@ -32,7 +32,7 @@ public class ConfluenceToolServiceTests : ServiceTestFixture<ConfluenceToolServi
         var mockHttpClientFactory = Substitute.For<IHttpClientFactory>();
         var mockCredentialService = Substitute.For<ICredentialEncryptionService>();
         var mockLoggerFactory = Substitute.For<ILoggerFactory>();
-        
+
         var apiClientFactory = new ConfluenceApiClientFactory(mockHttpClientFactory, mockCredentialService, mockLoggerFactory);
         _sut = new ConfluenceToolService(apiClientFactory, _integrationResolver, _adfConversionService, Logger);
     }
@@ -189,10 +189,10 @@ public class ConfluenceToolServiceTests : ServiceTestFixture<ConfluenceToolServi
     {
         if (value is bool b)
             return b;
-        
+
         if (value is System.Text.Json.JsonElement je)
             return je.GetBoolean();
-        
+
         return Convert.ToBoolean(value);
     }
 }

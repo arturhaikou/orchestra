@@ -58,7 +58,11 @@ public class GitLabTicketProviderTests : ServiceTestFixture<GitLabTicketProvider
         var integration = IntegrationBuilder.GitLabIntegration();
         var issues = Enumerable.Range(1, 50).Select(i => new GitLabIssue
         {
-            Id = i, Iid = i, Title = $"Issue {i}", State = "opened", Labels = new()
+            Id = i,
+            Iid = i,
+            Title = $"Issue {i}",
+            State = "opened",
+            Labels = new()
         }).ToList();
 
         _apiClient.GetProjectIssuesAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
@@ -111,8 +115,12 @@ public class GitLabTicketProviderTests : ServiceTestFixture<GitLabTicketProvider
         var integration = IntegrationBuilder.GitLabIntegration();
         var issue = new GitLabIssue
         {
-            Id = 1, Iid = 42, Title = "Test issue", Description = "Description here",
-            State = "opened", WebUrl = "https://gitlab.com/myorg/myrepo/-/issues/42",
+            Id = 1,
+            Iid = 42,
+            Title = "Test issue",
+            Description = "Description here",
+            State = "opened",
+            WebUrl = "https://gitlab.com/myorg/myrepo/-/issues/42",
             Labels = new() { "priority/critical" }
         };
 
@@ -202,9 +210,12 @@ public class GitLabTicketProviderTests : ServiceTestFixture<GitLabTicketProvider
         var integration = IntegrationBuilder.GitLabIntegration();
         var createdIssue = new GitLabIssue
         {
-            Id = 100, Iid = 5, Title = "New issue",
+            Id = 100,
+            Iid = 5,
+            Title = "New issue",
             WebUrl = "https://gitlab.com/myorg/myrepo/-/issues/5",
-            State = "opened", Labels = new()
+            State = "opened",
+            Labels = new()
         };
 
         _apiClient.CreateIssueAsync("New issue", "Some description", Arg.Any<List<string>>(), Arg.Any<CancellationToken>())
@@ -233,7 +244,11 @@ public class GitLabTicketProviderTests : ServiceTestFixture<GitLabTicketProvider
         // Exactly 50 issues - fills the page, but X-Next-Page header is absent (last page).
         var issues = Enumerable.Range(1, 50).Select(i => new GitLabIssue
         {
-            Id = i, Iid = i, Title = $"Issue {i}", State = "opened", Labels = new()
+            Id = i,
+            Iid = i,
+            Title = $"Issue {i}",
+            State = "opened",
+            Labels = new()
         }).ToList();
 
         _apiClient.GetProjectIssuesAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
@@ -246,7 +261,7 @@ public class GitLabTicketProviderTests : ServiceTestFixture<GitLabTicketProvider
 
         // Assert
         Assert.Equal(50, tickets.Count);
-        Assert.True(isLast,  "isLast must be true when X-Next-Page header is absent, even on a full page.");
+        Assert.True(isLast, "isLast must be true when X-Next-Page header is absent, even on a full page.");
         Assert.Null(nextPageToken);
     }
 

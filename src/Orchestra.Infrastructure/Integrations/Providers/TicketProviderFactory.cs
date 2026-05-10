@@ -33,7 +33,7 @@ public class TicketProviderFactory : ITicketProviderFactory
     public ITicketProvider? CreateProvider(ProviderType providerType)
     {
         _logger.LogDebug("Creating ticket provider for '{ProviderType}'", providerType);
-        
+
         return providerType switch
         {
             ProviderType.JIRA => _serviceProvider.GetRequiredService<JiraTicketProvider>(),
@@ -57,7 +57,7 @@ public class TicketProviderFactory : ITicketProviderFactory
 
     private ITicketProvider? LogAndReturnNull(ProviderType providerType)
     {
-        _logger.LogWarning("Unsupported ticket provider requested: '{ProviderType}'. Returning null.", 
+        _logger.LogWarning("Unsupported ticket provider requested: '{ProviderType}'. Returning null.",
             providerType);
         return null;
     }

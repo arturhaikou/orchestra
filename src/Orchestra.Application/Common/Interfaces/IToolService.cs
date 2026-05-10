@@ -66,4 +66,10 @@ public interface IToolService
         Guid agentId,
         List<Guid> toolActionIds,
         CancellationToken cancellationToken = default);
+
+    Task<ToolActionDetailDto> ToggleToolActionEnabledAsync(
+        Guid userId,
+        Guid toolActionId,
+        bool isEnabled,
+        CancellationToken cancellationToken = default);
 }

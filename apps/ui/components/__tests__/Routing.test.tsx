@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Routes, Route, useLocation, Link, Navigate, Outlet } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useLocation, useNavigate, Link, Navigate, Outlet } from 'react-router-dom';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import * as authService from '../../services/authService';
 import * as workspaceService from '../../services/workspaceService';
@@ -40,6 +40,10 @@ vi.mock('../../services/signalRService', () => ({
   onModelPullFailed: vi.fn(),
   onAgentExecutionCompleted: vi.fn(),
   offAgentExecutionCompleted: vi.fn(),
+  onTicketStatusChanged: vi.fn(),
+  offTicketStatusChanged: vi.fn(),
+  onReconnected: vi.fn(),
+  offReconnected: vi.fn(),
   onConnectionStatusChange: vi.fn(),
   getConnectionStatus: vi.fn().mockReturnValue('connected'),
 }));
@@ -53,7 +57,13 @@ const mockUser = { id: 'user-1', name: 'Test User', email: 'test@example.com' };
 
 const LocationDisplay: React.FC = () => {
   const location = useLocation();
-  return <div data-testid="location-display">{location.pathname}</div>;
+  const navigate = useNavigate();
+  return (
+    <>
+      <div data-testid="location-display">{location.pathname}</div>
+      <button data-testid="go-back" onClick={() => navigate(-1)}>Back</button>
+    </>
+  );
 };
 
 const renderApp = (initialEntry: string = '/') => {
@@ -122,9 +132,7 @@ describe('Route-Based Navigation', () => {
         expect(screen.getByTestId('location-display').textContent).toBe('/workspaces/ws-a/agents');
       });
 
-      act(() => {
-        window.history.back();
-      });
+      await userEvent.click(screen.getByTestId('go-back'));
 
       await waitFor(() => {
         expect(screen.getByTestId('location-display').textContent).toBe('/workspaces/ws-a/tickets');

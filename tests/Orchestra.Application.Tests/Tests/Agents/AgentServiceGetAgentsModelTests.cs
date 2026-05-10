@@ -1,5 +1,7 @@
+using NSubstitute;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Common.Interfaces;
+using Orchestra.Application.McpServers.Interfaces;
 using Orchestra.Domain.Entities;
 using Orchestra.Tests.Shared.Builders;
 
@@ -19,10 +21,10 @@ public class AgentServiceGetAgentsModelTests
         IToolValidationService toolValidationService)
         BuildSut()
     {
-        var agentDataAccess        = Substitute.For<IAgentDataAccess>();
-        var authService            = Substitute.For<IWorkspaceAuthorizationService>();
-        var toolActionDataAccess   = Substitute.For<IAgentToolActionDataAccess>();
-        var toolValidationService  = Substitute.For<IToolValidationService>();
+        var agentDataAccess = Substitute.For<IAgentDataAccess>();
+        var authService = Substitute.For<IWorkspaceAuthorizationService>();
+        var toolActionDataAccess = Substitute.For<IAgentToolActionDataAccess>();
+        var toolValidationService = Substitute.For<IToolValidationService>();
 
         // Default stubs so MapToDtoAsync does not throw
         toolActionDataAccess
@@ -35,6 +37,7 @@ public class AgentServiceGetAgentsModelTests
         var service = new AgentService(
             agentDataAccess,
             toolActionDataAccess,
+            Substitute.For<IAgentMcpToolDataAccess>(),
             authService,
             toolValidationService,
             Substitute.For<IBuiltInAgentTemplateRegistry>(),
@@ -55,7 +58,7 @@ public class AgentServiceGetAgentsModelTests
     {
         // Arrange
         var (sut, agentDataAccess, _, _, _) = BuildSut();
-        var userId      = Guid.NewGuid();
+        var userId = Guid.NewGuid();
         var workspaceId = Guid.NewGuid();
 
         var agent = new AgentBuilder()
@@ -86,7 +89,7 @@ public class AgentServiceGetAgentsModelTests
     {
         // Arrange
         var (sut, agentDataAccess, _, _, _) = BuildSut();
-        var userId      = Guid.NewGuid();
+        var userId = Guid.NewGuid();
         var workspaceId = Guid.NewGuid();
 
         var agent = new AgentBuilder()
@@ -116,7 +119,7 @@ public class AgentServiceGetAgentsModelTests
     {
         // Arrange
         var (sut, agentDataAccess, _, _, _) = BuildSut();
-        var userId      = Guid.NewGuid();
+        var userId = Guid.NewGuid();
         var workspaceId = Guid.NewGuid();
 
         var agentGpt = new AgentBuilder()

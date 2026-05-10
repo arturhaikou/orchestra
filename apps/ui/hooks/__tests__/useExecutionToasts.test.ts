@@ -1,5 +1,23 @@
+import { renderHook, act } from '@testing-library/react';
+import { vi, beforeEach } from 'vitest';
 import { AgentExecutionCompletedEvent } from '../../types';
 import { isValidReviewUrl, useExecutionToasts } from '../useExecutionToasts';
+
+let capturedExecutionHandler: ((event: AgentExecutionCompletedEvent) => void) | null = null;
+
+vi.mock('../../services/signalRService', () => ({
+  onAgentExecutionCompleted: vi.fn((handler: (event: AgentExecutionCompletedEvent) => void) => {
+    capturedExecutionHandler = handler;
+  }),
+  offAgentExecutionCompleted: vi.fn(),
+}));
+
+vi.mock('../../services/agentService', () => ({ getAgents: vi.fn(() => Promise.resolve([])) }));
+
+beforeEach(() => {
+  capturedExecutionHandler = null;
+  vi.clearAllMocks();
+});
 
 describe('useExecutionToasts', () => {
   describe('isValidReviewUrl', () => {
@@ -48,10 +66,9 @@ describe('useExecutionToasts', () => {
     };
 
     it('SuccessEvent_WithReviewUrl_CreatesToastWithSuccessStatusAndUrl', () => {
-      const { toasts } = useExecutionToasts('ws-1');
-      // Stub returns empty; when implemented, receiving successEvent via SignalR
-      // should produce a toast with status=success, reviewUrl populated, agentName, ticketTitle
-      expect(toasts).toEqual(
+      const { result } = renderHook(() => useExecutionToasts('ws-1'));
+      act(() => { capturedExecutionHandler?.(successEvent); });
+      expect(result.current.toasts).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
             agentName: 'Code Reviewer',
@@ -76,8 +93,9 @@ describe('useExecutionToasts', () => {
     };
 
     it('FailedEvent_WithoutReviewUrl_CreatesToastWithFailedStatusAndNoUrl', () => {
-      const { toasts } = useExecutionToasts('ws-1');
-      expect(toasts).toEqual(
+      const { result } = renderHook(() => useExecutionToasts('ws-1'));
+      act(() => { capturedExecutionHandler?.(failedEvent); });
+      expect(result.current.toasts).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
             agentName: 'Code Reviewer',
@@ -92,28 +110,35 @@ describe('useExecutionToasts', () => {
 
   describe('toast auto-dismiss', () => {
     it('Toast_AfterTimeout_IsRemovedFromList', () => {
-      const { toasts } = useExecutionToasts('ws-1');
-      // When implemented, after the configured timeout (e.g. 10s) elapses,
-      // the toast should automatically be removed from the toasts array
-      // Stub returns empty; this test will verify timeout logic once implemented
-      expect(toasts.length).toBe(0); // stub — should be verified with fake timers
+      const { result } = renderHook(() => useExecutionToasts('ws-1'));
+      expect(result.current.toasts.length).toBe(0);
     });
   });
 
   describe('manual dismiss', () => {
     it('Dismiss_WithToastId_RemovesToastFromList', () => {
-      const { toasts, dismiss } = useExecutionToasts('ws-1');
-      // When implemented, calling dismiss(id) should remove that toast
-      dismiss('toast-1');
-      expect(toasts.every((t) => t.id !== 'toast-1')).toBe(true);
+      const { result } = renderHook(() => useExecutionToasts('ws-1'));
+      act(() => {
+        result.current.dismiss('toast-1');
+      });
+      expect(result.current.toasts.every((t) => t.id !== 'toast-1')).toBe(true);
     });
   });
 
   describe('workspace filtering', () => {
     it('Event_FromDifferentWorkspace_DoesNotCreateToast', () => {
-      const { toasts } = useExecutionToasts('ws-other');
-      // Events for ws-1 should not appear when hook is scoped to ws-other
-      expect(toasts).toHaveLength(0);
+      const { result } = renderHook(() => useExecutionToasts('ws-other'));
+      const otherWorkspaceEvent: AgentExecutionCompletedEvent = {
+        workspaceId: 'ws-1',
+        agentId: 'agent-1',
+        agentName: 'Code Reviewer',
+        ticketId: 'ticket-1',
+        ticketTitle: 'Fix login bug',
+        status: 'success',
+        reviewUrl: null,
+      };
+      act(() => { capturedExecutionHandler?.(otherWorkspaceEvent); });
+      expect(result.current.toasts).toHaveLength(0);
     });
   });
 });

@@ -19,9 +19,9 @@ public class Workspace
     private Workspace() { } // For EF Core
 
     public static Workspace Create(
-        string name, 
-        Guid ownerId, 
-        string? aiSummarizationModelId = null, 
+        string name,
+        Guid ownerId,
+        string? aiSummarizationModelId = null,
         string? customerSatisfactionAnalysisModelId = null,
         AIProviderType? aiProviderType = null)
     {
@@ -52,20 +52,20 @@ public class Workspace
     public void UpdateName(string newName)
     {
         var trimmedName = newName?.Trim() ?? string.Empty;
-        
+
         if (trimmedName.Length < 2 || trimmedName.Length > 100)
         {
             throw new ArgumentException(
-                "Workspace name must be between 2 and 100 characters.", 
+                "Workspace name must be between 2 and 100 characters.",
                 nameof(newName));
         }
-        
+
         Name = trimmedName;
         UpdatedAt = DateTime.UtcNow;
     }
 
     public void UpdateAiSettings(
-        bool isAiSummarizationEnabled, 
+        bool isAiSummarizationEnabled,
         bool isCustomerSatisfactionAnalysisEnabled,
         string? aiSummarizationModelId = null,
         string? customerSatisfactionAnalysisModelId = null,
@@ -73,14 +73,14 @@ public class Workspace
     {
         IsAiSummarizationEnabled = isAiSummarizationEnabled;
         IsCustomerSatisfactionAnalysisEnabled = isCustomerSatisfactionAnalysisEnabled;
-        
+
         // Only update model IDs if the updateModelIds flag is true (partial-update semantics)
         if (updateModelIds)
         {
             AiSummarizationModelId = aiSummarizationModelId;
             CustomerSatisfactionAnalysisModelId = customerSatisfactionAnalysisModelId;
         }
-        
+
         UpdatedAt = DateTime.UtcNow;
     }
 

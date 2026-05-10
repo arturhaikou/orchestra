@@ -1,5 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { useModalAction } from '../useModalAction';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 describe('useModalAction', () => {
   const mockOnSuccess = vi.fn();

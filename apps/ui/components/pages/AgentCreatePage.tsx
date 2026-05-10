@@ -6,7 +6,11 @@ import { createAgent } from '../../services/agentService';
 import { getTools } from '../../services/toolService';
 import { fetchWorkspaceModels } from '../../services/workspaceService';
 import AgentFormCapabilities from '../agents/AgentFormCapabilities';
-import AgentFormToolAuthorization, { ActionModalState } from '../agents/AgentFormToolAuthorization';
+import AgentToolSummarySection from '../agents/AgentToolSummarySection';
+import AddToolsModal from '../agents/AddToolsModal';
+import MarkdownPreviewToggle from '../agents/MarkdownPreviewToggle';
+import { getMcpServers } from '../../services/mcpServerService';
+import { McpServer, McpToolSelection, ToolCatalogueEntry } from '../../types';
 
 interface FormState {
   name: string;
@@ -40,17 +44,35 @@ const AgentCreatePage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [availableTools, setAvailableTools] = useState<Tool[]>([]);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
-  const [toolSearch, setToolSearch] = useState('');
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [configuringToolId, setConfiguringToolId] = useState<string | null>(null);
-  const [selectedActionIds, setSelectedActionIds] = useState<string[]>([]);
+  const [isAddToolsModalOpen, setIsAddToolsModalOpen] = useState(false);
+  const [openAtSourceId, setOpenAtSourceId] = useState<string | null>(null);
+  const [mcpServers, setMcpServers] = useState<McpServer[]>([]);
+  const [mcpSelections, setMcpSelections] = useState<McpToolSelection[]>([]);
 
   useEffect(() => {
     if (!workspaceId) return;
     getTools(workspaceId).then(setAvailableTools).catch(() => setAvailableTools([]));
     fetchWorkspaceModels(workspaceId).then(setAvailableModels).catch(() => setAvailableModels([]));
+    getMcpServers(workspaceId).then(setMcpServers).catch(() => setMcpServers([]));
   }, [workspaceId]);
+
+  const toolCatalogue = useMemo<ToolCatalogueEntry[]>(
+    () =>
+      availableTools.flatMap(tool =>
+        (tool.actions ?? []).map(action => ({
+          actionId: action.id,
+          actionName: action.name,
+          actionDescription: action.description,
+          dangerLevel: action.dangerLevel ?? 'Safe',
+          sourceId: tool.id,
+          sourceName: tool.name,
+          sourceType: tool.source ?? 'native',
+        }))
+      ),
+    [availableTools]
+  );
 
   const isReviewAgent = useMemo(() => {
     return availableTools.some(tool =>
@@ -86,6 +108,7 @@ const AgentCreatePage: React.FC = () => {
         role: formState.role.trim(),
         capabilities: formState.capabilities,
         toolActionIds: formState.toolActionIds,
+        mcpSelections: mcpSelections,
         customInstructions: isReviewAgent ? undefined : formState.customInstructions.trim(),
         projectPrinciples: isReviewAgent ? formState.projectPrinciples.trim() : undefined,
         model: formState.selectedModel === 'Default' ? null : formState.selectedModel,
@@ -123,61 +146,31 @@ const AgentCreatePage: React.FC = () => {
     setFormState(prev => ({ ...prev, capabilities: prev.capabilities.filter(c => c !== cap) }));
   };
 
-  const toggleTool = (toolId: string) => {
-    const tool = availableTools.find(t => t.id === toolId);
-    if (tool?.actions && tool.actions.length > 0) {
-      setConfiguringToolId(toolId);
-      setSelectedActionIds(formState.toolActionIds.filter(id => tool.actions!.some(a => a.id === id)));
-    } else {
-      setFormState(prev => ({
-        ...prev,
-        toolActionIds: prev.toolActionIds.includes(toolId)
-          ? prev.toolActionIds.filter(id => id !== toolId)
-          : [...prev.toolActionIds, toolId],
-      }));
-    }
+  const handleOpenModal = (sourceId?: string | null) => {
+    setOpenAtSourceId(sourceId ?? null);
+    setIsAddToolsModalOpen(true);
   };
 
-  const confirmActionSelection = () => {
-    const tool = availableTools.find(t => t.id === configuringToolId);
-    if (!tool) return;
-    const otherActionIds = formState.toolActionIds.filter(id =>
-      !tool.actions?.some(a => a.id === id)
+  const handleCommit = (ids: string[], newMcpSelections: McpToolSelection[]) => {
+    setFormState(prev => ({ ...prev, toolActionIds: ids }));
+    setMcpSelections(newMcpSelections.filter(s => s.toolNames.length > 0));
+    setIsAddToolsModalOpen(false);
+  };
+
+  const handleDiscard = () => setIsAddToolsModalOpen(false);
+
+  const handleRemoveSource = (sourceId: string) => {
+    const idsToRemove = new Set(
+      toolCatalogue.filter(e => e.sourceId === sourceId).map(e => e.actionId)
     );
-    setFormState(prev => ({ ...prev, toolActionIds: [...otherActionIds, ...selectedActionIds] }));
-    setConfiguringToolId(null);
-    setSelectedActionIds([]);
+    setFormState(prev => ({
+      ...prev,
+      toolActionIds: prev.toolActionIds.filter(id => !idsToRemove.has(id)),
+    }));
   };
 
-  const cancelActionSelection = () => {
-    setConfiguringToolId(null);
-    setSelectedActionIds([]);
-  };
-
-  const toggleActionId = (actionId: string) => {
-    setSelectedActionIds(prev =>
-      prev.includes(actionId) ? prev.filter(id => id !== actionId) : [...prev, actionId]
-    );
-  };
-
-  const actionModalState: ActionModalState | null = configuringToolId
-    ? {
-        toolName: availableTools.find(t => t.id === configuringToolId)?.name ?? '',
-        actions: availableTools.find(t => t.id === configuringToolId)?.actions ?? [],
-        selectedActionIds,
-      }
-    : null;
-
-  const filteredTools = availableTools.filter(tool =>
-    tool.name.toLowerCase().includes(toolSearch.toLowerCase()) ||
-    tool.description.toLowerCase().includes(toolSearch.toLowerCase())
-  );
-
-  const isToolSelected = (tool: Tool) => {
-    if (tool.actions && tool.actions.length > 0) {
-      return tool.actions.some(a => formState.toolActionIds.includes(a.id));
-    }
-    return formState.toolActionIds.includes(tool.id);
+  const handleRemoveMcpServer = (serverId: string) => {
+    setMcpSelections(prev => prev.filter(s => s.mcpServerId !== serverId));
   };
 
   return (
@@ -249,16 +242,14 @@ const AgentCreatePage: React.FC = () => {
             onRemoveCapability={removeCapability}
           />
 
-          <AgentFormToolAuthorization
-            toolSearch={toolSearch}
-            onToolSearchChange={setToolSearch}
-            filteredTools={filteredTools}
-            isToolSelected={isToolSelected}
-            onToggleTool={toggleTool}
-            actionModal={actionModalState}
-            onToggleActionId={toggleActionId}
-            onConfirmActions={confirmActionSelection}
-            onCancelActions={cancelActionSelection}
+          <AgentToolSummarySection
+            toolActionIds={formState.toolActionIds}
+            toolCatalogue={toolCatalogue}
+            mcpServers={mcpServers}
+            mcpSelections={mcpSelections}
+            onOpenModal={handleOpenModal}
+            onRemoveSource={handleRemoveSource}
+            onRemoveMcpServer={handleRemoveMcpServer}
           />
 
           {/* Instructions Section */}
@@ -283,13 +274,12 @@ const AgentCreatePage: React.FC = () => {
             ) : (
               <div>
                 <label htmlFor="custom-instructions" className="block text-sm font-medium text-text mb-1">Custom Instructions</label>
-                <textarea
+                <MarkdownPreviewToggle
                   id="custom-instructions"
                   value={formState.customInstructions}
-                  onChange={e => setFormState(prev => ({ ...prev, customInstructions: e.target.value }))}
+                  onChange={value => setFormState(prev => ({ ...prev, customInstructions: value }))}
                   onFocus={() => clearFieldError('customInstructions')}
                   rows={6}
-                  className="w-full px-3 py-2 bg-background border border-border rounded-md text-text text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-y"
                   placeholder="Describe the agent's behavior and guidelines..."
                 />
                 {validationErrors.customInstructions && (
@@ -298,6 +288,17 @@ const AgentCreatePage: React.FC = () => {
               </div>
             )}
           </section>
+
+          <AddToolsModal
+            isOpen={isAddToolsModalOpen}
+            initialToolActionIds={formState.toolActionIds}
+            toolCatalogue={toolCatalogue}
+            workspaceId={workspaceId!}
+            onCommit={handleCommit}
+            onDiscard={handleDiscard}
+            openAtSource={openAtSourceId}
+            initialMcpSelections={mcpSelections}
+          />
 
           {/* Form Actions */}
           <div className="flex justify-end gap-3 pt-4 border-t border-border">

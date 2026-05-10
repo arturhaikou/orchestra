@@ -59,7 +59,7 @@ public class AgentExecutionWorker : BackgroundService
 
     private async Task ProcessEligibleTicketsAsync(CancellationToken cancellationToken)
     {
-        using var scope = _serviceProvider.CreateScope();
+        await using var scope = _serviceProvider.CreateAsyncScope();
 
         var orchestrationService = scope.ServiceProvider
             .GetRequiredService<IAgentOrchestrationService>();

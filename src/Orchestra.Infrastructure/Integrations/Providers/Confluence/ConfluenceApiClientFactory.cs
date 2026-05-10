@@ -49,7 +49,7 @@ public class ConfluenceApiClientFactory
         }
 
         var httpClient = CreateAndConfigureHttpClient(integration);
-        
+
         // Detect type from URL: Cloud = *.atlassian.net, otherwise OnPremise
         var confluenceType = IntegrationTypeDetector.DetectConfluenceType(integration.Url);
 

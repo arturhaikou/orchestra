@@ -49,5 +49,8 @@ public enum ProviderType
     /// Internal tools that don't require external integration.
     /// Used for tool categories that are always available.
     /// </summary>
-    INTERNAL = 8
+    INTERNAL = 8,
+
+    FIGMA = 9,
+    MCP_GENERIC = 10
 }

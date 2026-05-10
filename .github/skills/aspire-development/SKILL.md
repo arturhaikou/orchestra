@@ -1,11 +1,7 @@
 ---
 name: aspire-development
-description: Expert guidance for .NET Aspire distributed application development. Use when adding integrations (databases, messaging, AI services), configuring AppHost orchestration, implementing service discovery, or troubleshooting Aspire applications. Emphasizes MCP tools for discovering up-to-date package information before implementation.
+description: IMPLEMENTATION SKILL — Add integrations, configure orchestration, or troubleshoot .NET Aspire distributed apps. USE FOR: adding database/messaging/AI/Azure NuGet integrations; configuring AppHost and service references; wiring service discovery; managing container resources; diagnosing Aspire startup or network errors. DO NOT USE FOR: general .NET coding (use default agent); non-Aspire Azure deployments. INVOKES: NuGet MCP tools to discover up-to-date package names and versions before every implementation.
 compatibility: Requires .NET Aspire workload, Aspire CLI, and network access for NuGet packages
-metadata:
-  author: unified-ai-tracker
-  version: "1.0"
-  aspire-version: "13.1.x"
 ---
 
 # .NET Aspire Development
@@ -40,13 +36,6 @@ Before implementing ANY Aspire integration:
 **For Aspire-Specific Queries** (integrations, packages, AppHost patterns):
 - `mcp_aspire_list_integrations` - List all available Aspire hosting integrations
 - `mcp_aspire_get_integration_docs(packageId, version)` - Get specific integration documentation
-
-**For General .NET Topics** (C#, EF Core, ASP.NET Core, etc.):
-- `mcp_microsoft_doc_microsoft_docs_search` - Search Microsoft Learn
-- `mcp_microsoft_doc_microsoft_code_sample_search` - Find code samples
-- `mcp_microsoft_doc_microsoft_docs_fetch` - Fetch complete documentation
-
-**DO NOT** use Microsoft documentation tools for Aspire integration discovery.
 
 ## Standard Workflow
 
@@ -103,51 +92,14 @@ Before implementing ANY Aspire integration:
    - Configure dependency injection
    - Set up connection handling
 
-### Phase 3: Execution & Validation
+### Phase 3: Validation
 
 1. **Build Solution**
    ```powershell
    dotnet build unifiedaitracker.slnx
    ```
 
-2. **Run with Aspire**
-   ```powershell
-   aspire run --project unifiedaitracker.AppHost
-   ```
-
-3. **Verify in Aspire Dashboard**
-   - Check all services start successfully
-   - Verify container health
-   - Review connection status
-   - Check logs for errors
-
-4. **Test Integration**
-   - Verify service discovery works
-   - Test data operations
-   - Validate telemetry and logs
-
 ## Quick Reference: Common Operations
-
-### Running Aspire Applications
-
-```powershell
-# Preferred method (from solution root)
-aspire run --project unifiedaitracker.AppHost
-
-# With specific configuration
-aspire run --project unifiedaitracker.AppHost --configuration Release
-
-# Alternative (from AppHost directory)
-cd unifiedaitracker.AppHost
-dotnet run
-```
-
-The Aspire Dashboard automatically opens (typically `http://localhost:15xxx`) providing:
-- Real-time service status
-- Container health and logs
-- Distributed traces
-- Metrics and telemetry
-- Service dependency graph
 
 ### Service Discovery Pattern
 
@@ -164,42 +116,6 @@ builder.Services.AddHttpClient<IMyService, MyService>(client =>
 });
 ```
 
-## Integration Categories (Overview)
-
-See [references/INTEGRATIONS.md](references/INTEGRATIONS.md) for the complete catalog (100+ integrations).
-
-**Major Categories:**
-- **Databases**: PostgreSQL, MySQL, MongoDB, SQL Server, Redis, Elasticsearch, etc.
-- **Messaging**: Kafka, RabbitMQ, Azure Service Bus, NATS, etc.
-- **AI Services**: Azure OpenAI, GitHub Models, Ollama, Cognitive Services
-- **Vector Databases**: Milvus, Qdrant, Meilisearch
-- **Azure Services**: Storage, Key Vault, Cosmos DB, Functions, etc.
-- **Language Runtimes**: JavaScript/Node.js, Python, Java, Golang, Rust
-- **Infrastructure**: Dapr, Orleans, Kubernetes, Docker
-- **Observability**: Seq, Application Insights, OpenTelemetry
-- **Development Tools**: Keycloak, Adminer, MailPit, etc.
-
-## Common Implementation Patterns
-
-See [references/PATTERNS.md](references/PATTERNS.md) for detailed patterns with code examples:
-
-- Adding database integrations (with persistence and admin UI)
-- Configuring Azure OpenAI
-- Adding Node.js/JavaScript services
-- Implementing service discovery
-- Container health checks
-- Environment variable configuration
-
-## Troubleshooting
-
-See [references/TROUBLESHOOTING.md](references/TROUBLESHOOTING.md) for detailed solutions.
-
-**Quick Checks:**
-- **Package not found**: Verify exact package ID with `mcp_aspire_list_integrations`
-- **Service discovery fails**: Check service names match AppHost configuration
-- **Container won't start**: Review logs in Aspire Dashboard
-- **Connection string issues**: Verify `WithReference()` calls and appsettings.json
-
 ## Integration Verification Checklist
 
 Before considering an integration complete:
@@ -215,30 +131,6 @@ Before considering an integration complete:
 - [ ] Logs show successful connection
 - [ ] No errors in Aspire Dashboard traces
 
-## Essential Commands
-
-```powershell
-# Discover integrations (use MCP tool)
-mcp_aspire_list_integrations
-
-# Get integration docs (use MCP tool)
-mcp_aspire_get_integration_docs(packageId, version)
-
-# Add package
-dotnet add package <PackageId> --version <Version>
-
-# Build solution
-dotnet build unifiedaitracker.slnx
-
-# Run Aspire application
-aspire run --project unifiedaitracker.AppHost
-
-# Create new Aspire project
-dotnet new aspire-apphost -n MyApp.AppHost
-
-# Update Aspire workload
-dotnet workload update
-```
 
 ## Best Practices
 
@@ -253,10 +145,6 @@ dotnet workload update
 
 ## Additional Resources
 
-- **[Integration Catalog](references/INTEGRATIONS.md)**: Complete list of 100+ available integrations
-- **[Implementation Patterns](references/PATTERNS.md)**: Code examples for common scenarios
-- **[Troubleshooting Guide](references/TROUBLESHOOTING.md)**: Solutions for common issues
-- **Aspire Dashboard**: Primary tool for monitoring and debugging (auto-opens on run)
 - **NuGet Package Pages**: Official documentation URLs provided by MCP tools
 
 ---

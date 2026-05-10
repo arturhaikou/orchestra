@@ -125,7 +125,7 @@ public class WorkspaceService : IWorkspaceService
     public async Task<WorkspaceDto[]> GetUserWorkspacesAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         var workspaces = await _workspaceDataAccess.GetUserWorkspacesAsync(userId, cancellationToken);
-        
+
         var dtos = new List<WorkspaceDto>(workspaces.Count);
         foreach (var w in workspaces)
         {
@@ -151,14 +151,14 @@ public class WorkspaceService : IWorkspaceService
     {
         // Retrieve workspace
         var workspace = await _workspaceDataAccess.GetByIdAsync(
-            workspaceId, 
+            workspaceId,
             cancellationToken);
-        
+
         if (workspace is null)
         {
             throw new WorkspaceNotFoundException(workspaceId);
         }
-        
+
         // Check membership first (security: don't leak existence to non-members)
         var isMember = await _workspaceDataAccess.IsUserMemberAsync(workspaceId, userId, cancellationToken);
         if (!isMember)
@@ -166,26 +166,26 @@ public class WorkspaceService : IWorkspaceService
             // Return 404 to non-members (don't leak workspace existence)
             throw new WorkspaceNotFoundException(workspaceId);
         }
-        
+
         // Verify ownership
         if (workspace.OwnerId != userId)
         {
             throw new UnauthorizedWorkspaceAccessException(
-                "You do not have permission to update this workspace", 
-                userId, 
+                "You do not have permission to update this workspace",
+                userId,
                 workspaceId);
         }
-        
+
         // Update using domain method (validates and sets UpdatedAt)
         workspace.UpdateName(request.Name);
 
         // Determine if model IDs should be updated (partial-update semantics)
         // If either AI setting or model ID field is present, we apply the update
-        bool shouldUpdateAiSettings = request.IsAiSummarizationEnabled.HasValue || 
+        bool shouldUpdateAiSettings = request.IsAiSummarizationEnabled.HasValue ||
                                       request.IsCustomerSatisfactionAnalysisEnabled.HasValue;
-        bool shouldUpdateModelIds = request.AiSummarizationModelId != null || 
+        bool shouldUpdateModelIds = request.AiSummarizationModelId != null ||
                                     request.CustomerSatisfactionAnalysisModelId != null;
-        
+
         if (shouldUpdateAiSettings || shouldUpdateModelIds)
         {
             workspace.UpdateAiSettings(
@@ -198,13 +198,13 @@ public class WorkspaceService : IWorkspaceService
 
         // Persist changes
         await _workspaceDataAccess.UpdateAsync(workspace, cancellationToken);
-        
+
         // Return DTO with model IDs — DefaultModelId sourced from AIProviderConfiguration
         var aiConfig = await _aiProviderRepository.GetByWorkspaceIdAsync(workspaceId, cancellationToken);
         return new WorkspaceDto(
-            workspace.Id.ToString(), 
-            workspace.Name, 
-            workspace.IsAiSummarizationEnabled, 
+            workspace.Id.ToString(),
+            workspace.Name,
+            workspace.IsAiSummarizationEnabled,
             workspace.IsCustomerSatisfactionAnalysisEnabled,
             workspace.AiSummarizationModelId,
             workspace.CustomerSatisfactionAnalysisModelId,
@@ -232,8 +232,8 @@ public class WorkspaceService : IWorkspaceService
         if (workspace.OwnerId != userId)
         {
             throw new UnauthorizedWorkspaceAccessException(
-                "You do not have permission to delete this workspace", 
-                userId, 
+                "You do not have permission to delete this workspace",
+                userId,
                 workspaceId);
         }
 

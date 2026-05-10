@@ -12,7 +12,7 @@ namespace Orchestra.Infrastructure.Persistence
         public AppDbContext CreateDbContext(string[] args)
         {
             var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
-            
+
             // Use PostgreSQL with a default local connection string for design-time operations.
             // The actual connection string will be overridden at runtime via Aspire configuration.
             optionsBuilder.UseNpgsql(

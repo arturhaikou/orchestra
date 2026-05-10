@@ -33,7 +33,7 @@ namespace Orchestra.Infrastructure.Integrations.Providers.Jira.Models
         public string Id { get; set; }
     }
 
-    public class  ParentField
+    public class ParentField
     {
         public string Key { get; set; }
     }

@@ -268,7 +268,7 @@ public static class AssertionExtensions
     /// </summary>
     public static void ShouldBeConnected(this Integration integration)
     {
-        Assert.True(integration.Connected);
+        Assert.True(integration.IsActive);
     }
 
     /// <summary>
@@ -276,6 +276,6 @@ public static class AssertionExtensions
     /// </summary>
     public static void ShouldBeDisconnected(this Integration integration)
     {
-        Assert.False(integration.Connected);
+        Assert.False(integration.IsActive);
     }
 }

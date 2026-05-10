@@ -5,6 +5,7 @@ import { Integration, IntegrationType } from '../types';
 import { getIntegrations, deleteIntegration } from '../services/integrationService';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 
+
 const Integrations: React.FC = () => {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const navigate = useNavigate();
@@ -12,6 +13,8 @@ const Integrations: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+
 
   const fetchAll = async () => {
     setIsLoading(true);
@@ -29,13 +32,15 @@ const Integrations: React.FC = () => {
     fetchAll();
   }, [workspaceId]);
 
+
+
   const categories = [
     { type: IntegrationType.TRACKER, label: 'Tracker Systems', icon: Layers, color: 'text-indigo-600' },
     { type: IntegrationType.KNOWLEDGE_BASE, label: 'Knowledge Bases', icon: Database, color: 'text-purple-600' },
     { type: IntegrationType.CODE_SOURCE, label: 'Code Sources', icon: GitBranch, color: 'text-blue-600' },
   ];
 
-  const TYPE_LABELS: Record<IntegrationType, string> = {
+  const TYPE_LABELS: Partial<Record<IntegrationType, string>> = {
     [IntegrationType.TRACKER]: 'Tracker',
     [IntegrationType.KNOWLEDGE_BASE]: 'Knowledge Base',
     [IntegrationType.CODE_SOURCE]: 'Code Source',
@@ -72,12 +77,14 @@ const Integrations: React.FC = () => {
           <h2 className="text-2xl font-bold text-text tracking-tight">Integrations</h2>
           <p className="text-textMuted text-sm mt-0.5">Manage your development ecosystem connections.</p>
         </div>
-        <button 
+        <div className="flex items-center gap-2">
+          <button
             onClick={() => navigate('new')}
             className="bg-primary hover:bg-primaryHover text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-semibold transition-all shadow-lg shadow-primary/20 active:scale-95"
-        >
+          >
             <Plus className="w-4 h-4" /> Add Connection
-        </button>
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -88,7 +95,7 @@ const Integrations: React.FC = () => {
         categories.map((category) => {
           const categoryIntegrations = integrations.filter(i => Array.isArray(i.types) && i.types.includes(category.type));
           const Icon = category.icon;
-          
+
           return (
             <div key={category.type} className="animate-fade-in">
               <div className="flex items-center justify-between mb-6 border-b border-border/50 pb-4">
@@ -117,7 +124,7 @@ const Integrations: React.FC = () => {
                             <div className="w-12 h-12 bg-surfaceHighlight border border-border/50 rounded-lg flex items-center justify-center shrink-0 shadow-inner">
                               {renderIcon(integration.provider || integration.icon)}
                             </div>
-                            
+
                             <div className="min-w-0">
                               <h4 className="text-[16px] font-bold text-text mb-0.5 truncate">{integration.name}</h4>
                               <p className="text-[12px] text-textMuted truncate opacity-70 mb-1">
@@ -154,7 +161,7 @@ const Integrations: React.FC = () => {
                         </div>
 
                         <div className="flex items-center gap-3">
-                          <button 
+                          <button
                               onClick={(e) => { e.stopPropagation(); setDeleteConfirmationId(integration.id); }}
                               className="text-textMuted hover:text-red-500 transition-colors p-1.5 rounded-md hover:bg-red-500/10"
                               title="Delete"
@@ -197,6 +204,7 @@ const Integrations: React.FC = () => {
           </div>
         </div>
       )}
+
     </div>
   );
 };
