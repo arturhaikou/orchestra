@@ -1,9 +1,9 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import { CopilotKit } from '@copilotkit/react-core';
-import { CopilotChat } from '@copilotkit/react-ui';
 import { Agent } from '../../types';
 import { getToken } from '../../services/authService';
+import AgentChatInner from './AgentChatInner';
 
 interface AgentChatModalProps {
   agent: Agent;
@@ -55,14 +55,7 @@ const AgentChatModal: React.FC<AgentChatModalProps> = ({ agent, workspaceId, onC
             }}
             agent={agent.id}
           >
-            <CopilotChat
-              className="h-full"
-              labels={{
-                title: agent.name,
-                initial: `Hi! I'm **${agent.name}**. How can I help you today?`,
-                placeholder: `Message ${agent.name}...`,
-              }}
-            />
+            <AgentChatInner agent={agent} />
           </CopilotKit>
         </div>
       </div>
