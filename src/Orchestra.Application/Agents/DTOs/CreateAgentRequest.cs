@@ -16,5 +16,6 @@ public record CreateAgentRequest(
     string? CustomInstructions,
     string? ProjectPrinciples,
     string? Model,
-    IReadOnlyList<McpToolSelectionDto>? McpSelections = null
+    IReadOnlyList<McpToolSelectionDto>? McpSelections = null,
+    string[]? SubAgentIds = null
 );

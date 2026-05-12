@@ -85,6 +85,13 @@ public class Agent
     public int? TemplateVersion { get; private set; }
 
     /// <summary>
+    /// Gets the identifier of the AI CLI integration bound to this agent at deployment time.
+    /// Non-null only for CLI-based built-in agents (e.g. Agentic Search).
+    /// Cleared automatically when the referenced integration is deleted (SetNull FK).
+    /// </summary>
+    public Guid? AiCliIntegrationId { get; private set; }
+
+    /// <summary>
     /// Private constructor to enforce factory method usage.
     /// </summary>
     private Agent() { }
@@ -245,6 +252,16 @@ public class Agent
     public void SetModel(string? model)
     {
         Model = model;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Binds or clears the AI CLI integration associated with this agent.
+    /// </summary>
+    /// <param name="integrationId">The CLI integration identifier, or null to clear.</param>
+    public void SetAiCliIntegrationId(Guid? integrationId)
+    {
+        AiCliIntegrationId = integrationId;
         UpdatedAt = DateTime.UtcNow;
     }
 }

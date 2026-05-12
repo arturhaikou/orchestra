@@ -10,6 +10,7 @@ public class BuiltInAgentTemplateRegistry : IBuiltInAgentTemplateRegistry
     public BuiltInAgentTemplateRegistry()
     {
         Register(CreateCodeReviewTemplate());
+        Register(CreateAgenticSearchTemplate());
     }
 
     public IReadOnlyList<BuiltInAgentTemplate> GetAll()
@@ -52,5 +53,37 @@ public class BuiltInAgentTemplateRegistry : IBuiltInAgentTemplateRegistry
                 { ProviderType.GITHUB, "review_pull_request" },
                 { ProviderType.GITLAB, "review_merge_request" }
             });
+    }
+
+    private static BuiltInAgentTemplate CreateAgenticSearchTemplate()
+    {
+        return new BuiltInAgentTemplate(
+            Identifier: "agentic-search",
+            Version: 1,
+            DisplayName: "Agentic Search Agent",
+            Role: "Codebase search and exploration specialist",
+            Capabilities: new[] { "Codebase Search", "Exploration", "Summarization" },
+            RequiredIntegrationType: null,
+            ToolActionMethodNames: Array.Empty<string>(),
+            LockedFields: new HashSet<string> { "name", "role", "capabilities", "tools" },
+            EditableFields: Array.Empty<string>(),
+            GuideTemplate: "Assign a ticket describing what to search for in the codebase. The agent will explore the code and return a comprehensive summary.",
+            ProviderLabelMap: null,
+            ProviderToolMethodMap: null,
+            IsCliAgent: true,
+            DefaultCustomInstructions:
+                """
+                You are an expert codebase exploration agent with read-only access to the repository.
+                Your mission is to thoroughly search the codebase and provide comprehensive, well-structured summaries.
+
+                Guidelines:
+                - Use read tools (read_file, list_dir, search_files, grep) to explore the repository.
+                - Never write, edit, create, or delete any files.
+                - Never execute shell commands beyond what is needed for searching.
+                - Start by understanding the high-level structure, then drill into relevant areas.
+                - Cite exact file paths and line numbers when referencing code.
+                - Synthesize findings into a clear, concise, and actionable summary.
+                - If the topic spans multiple modules, describe relationships and data flow.
+                """);
     }
 }

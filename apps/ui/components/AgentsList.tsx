@@ -14,6 +14,7 @@ import Toast from './Toast';
 import { useModalAction } from '../hooks/useModalAction';
 import LockedField from './agents/LockedField';
 import AgentCard from './agents/AgentCard';
+import AgentChatModal from './agents/AgentChatModal';
 import { isBuiltInAgent } from '../utils/builtInAgentUtils';
 
 interface AgentsListProps {}
@@ -57,6 +58,7 @@ const AgentsList: React.FC<AgentsListProps> = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [chatAgent, setChatAgent] = useState<Agent | null>(null);
   
   // Form State
   const [formState, setFormState] = useState({
@@ -303,13 +305,24 @@ const AgentsList: React.FC<AgentsListProps> = () => {
             <AgentCard
               key={agent.id}
               agent={agent}
+              allAgents={agents}
               openGuideId={openGuideId}
               onToggleGuide={(id) => setOpenGuideId(openGuideId === id ? null : id)}
               onDelete={setDeleteConfirmationId}
               onEdit={() => navigate(`/workspaces/${workspaceId}/agents/${agent.id}/edit`)}
+              onChat={(agent) => setChatAgent(agent)}
             />
           ))}
         </div>
+      )}
+
+      {/* Agent Chat Modal */}
+      {chatAgent && (
+        <AgentChatModal
+          agent={chatAgent}
+          workspaceId={workspaceId!}
+          onClose={() => setChatAgent(null)}
+        />
       )}
 
       {/* Delete Confirmation Modal */}

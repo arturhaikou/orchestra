@@ -39,12 +39,14 @@ public class AgentServiceCreateFromTemplateTests
             _agentDataAccess,
             _agentToolActionDataAccess,
             Substitute.For<IAgentMcpToolDataAccess>(),
+            Substitute.For<IAgentSubAgentDataAccess>(),
             _workspaceAuthorizationService,
             _toolValidationService,
             _templateRegistry,
             _availabilityResolver,
             _toolActionDataAccess,
-            _integrationDataAccess);
+            _integrationDataAccess,
+            Substitute.For<IAgentSubAgentAssignmentService>());
     }
 
     private static BuiltInAgentTemplate CreateCodeReviewTemplate()

@@ -1,9 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Lock, Info, Loader2, AlertTriangle, FileText, Eye, Pencil } from 'lucide-react';
+import { X, Lock, Info, Loader2, AlertTriangle, FileText, Eye, Pencil, Terminal } from 'lucide-react';
 import { marked } from 'marked';
-import { Agent, AgentTemplateDto } from '../types';
+import { Agent, AgentTemplateDto, AiCliIntegration, AiCliProviderType } from '../types';
 import { createAgentFromTemplate } from '../services/agentService';
+import { getCliIntegrations } from '../services/cliIntegrationService';
 import ModelSelector from './ModelSelector';
+
+const CLI_PROVIDER_LABELS: Record<AiCliProviderType, string> = {
+  [AiCliProviderType.GITHUB_COPILOT]: 'GitHub Copilot',
+  [AiCliProviderType.CLAUDE]: 'Claude',
+  [AiCliProviderType.GEMINI]: 'Gemini',
+};
 
 interface DeployBuiltInAgentModalProps {
   isOpen: boolean;
@@ -69,29 +76,53 @@ const DeployBuiltInAgentModal: React.FC<DeployBuiltInAgentModalProps> = ({
   defaultModel,
 }) => {
   const [projectPrinciples, setProjectPrinciples] = useState('');
+  const [customInstructions, setCustomInstructions] = useState('');
   const [selectedModel, setSelectedModel] = useState(defaultModel ?? 'Default');
   const [isDeploying, setIsDeploying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
+  const [cliIntegrations, setCliIntegrations] = useState<AiCliIntegration[]>([]);
+  const [selectedCliIntegrationId, setSelectedCliIntegrationId] = useState<string>('');
+  const [loadingIntegrations, setLoadingIntegrations] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
 
+  const needsPrinciples = template.editableFields.includes('projectPrinciples');
+  const needsCustomInstructions = template.editableFields.includes('customInstructions');
   const trimmedPrinciples = projectPrinciples.trim();
-  const isValid = trimmedPrinciples.length > 0;
+  const trimmedInstructions = customInstructions.trim();
+  const principlesValid = !needsPrinciples || trimmedPrinciples.length > 0;
+  const instructionsValid = !needsCustomInstructions || trimmedInstructions.length > 0;
+  const cliValid = !template.isCliAgent || selectedCliIntegrationId.length > 0;
+  const isValid = principlesValid && instructionsValid && cliValid;
 
   useEffect(() => {
     if (isOpen) {
       triggerRef.current = document.activeElement as HTMLElement;
       setProjectPrinciples('');
+      setCustomInstructions('');
       setSelectedModel(defaultModel ?? 'Default');
+      setSelectedCliIntegrationId('');
       setError(null);
       setPreviewMode(false);
       setIsDeploying(false);
+
+      if (template.isCliAgent) {
+        setLoadingIntegrations(true);
+        getCliIntegrations(workspaceId)
+          .then((integrations) => {
+            setCliIntegrations(integrations);
+            if (integrations.length === 1) setSelectedCliIntegrationId(integrations[0].id);
+          })
+          .catch(() => setCliIntegrations([]))
+          .finally(() => setLoadingIntegrations(false));
+      }
+
       setTimeout(() => textareaRef.current?.focus(), 100);
     } else {
       triggerRef.current?.focus();
     }
-  }, [isOpen, defaultModel]);
+  }, [isOpen, defaultModel, template.isCliAgent, workspaceId]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -115,8 +146,9 @@ const DeployBuiltInAgentModal: React.FC<DeployBuiltInAgentModalProps> = ({
       const agent = await createAgentFromTemplate({
         workspaceId,
         templateId: template.templateId,
-        projectPrinciples: trimmedPrinciples,
+        projectPrinciples: needsPrinciples ? trimmedPrinciples : '',
         model: modelOverride,
+        aiCliIntegrationId: template.isCliAgent ? selectedCliIntegrationId : undefined,
       });
 
       onDeployed(agent);
@@ -220,58 +252,155 @@ const DeployBuiltInAgentModal: React.FC<DeployBuiltInAgentModalProps> = ({
             </div>
           )}
 
-          <div>
-            <label className="text-xs font-bold text-textMuted uppercase tracking-widest">
-              Project Principles <span className="text-red-400">*</span>
-            </label>
-            <div className="flex gap-1 mt-1 mb-2">
-              <button
-                onClick={() => setPreviewMode(false)}
-                className={`text-xs px-3 py-1 rounded transition-colors ${
-                  !previewMode
-                    ? 'bg-primary/10 text-primary font-medium'
-                    : 'text-textMuted hover:text-text'
-                }`}
-                aria-pressed={!previewMode}
-              >
-                <Pencil className="w-3 h-3 inline mr-1" />
-                Write
-              </button>
-              <button
-                onClick={() => setPreviewMode(true)}
-                className={`text-xs px-3 py-1 rounded transition-colors ${
-                  previewMode
-                    ? 'bg-primary/10 text-primary font-medium'
-                    : 'text-textMuted hover:text-text'
-                }`}
-                aria-pressed={previewMode}
-              >
-                <Eye className="w-3 h-3 inline mr-1" />
-                Preview
-              </button>
+          {template.isCliAgent && (
+            <div>
+              <label className="text-xs font-bold text-textMuted uppercase tracking-widest flex items-center gap-1.5">
+                <Terminal className="w-3.5 h-3.5" />
+                CLI Integration <span className="text-red-400">*</span>
+              </label>
+              {loadingIntegrations ? (
+                <div className="flex items-center gap-2 mt-2 text-sm text-textMuted">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading integrations…
+                </div>
+              ) : cliIntegrations.length === 0 ? (
+                <div className="mt-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-yellow-300">
+                    No CLI integrations configured. Please add one in{' '}
+                    <span className="font-medium">Settings → CLI Integrations</span> first.
+                  </p>
+                </div>
+              ) : (
+                <select
+                  value={selectedCliIntegrationId}
+                  onChange={(e) => setSelectedCliIntegrationId(e.target.value)}
+                  disabled={isDeploying}
+                  className="mt-1 w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-text focus:outline-none focus:border-primary"
+                  aria-label="Select CLI integration"
+                  aria-required="true"
+                >
+                  <option value="">— Select a CLI integration —</option>
+                  {cliIntegrations.map((integration) => (
+                    <option key={integration.id} value={integration.id}>
+                      {integration.name} ({CLI_PROVIDER_LABELS[integration.provider]})
+                    </option>
+                  ))}
+                </select>
+              )}
+              {!cliValid && (
+                <p className="text-xs text-red-400 mt-1">A CLI integration is required.</p>
+              )}
             </div>
+          )}
 
-            {previewMode ? (
-              <div className="bg-background border border-border rounded-md p-3 min-h-[200px]">
-                <MarkdownPreview content={projectPrinciples} />
+          {needsCustomInstructions && (
+            <div>
+              <label className="text-xs font-bold text-textMuted uppercase tracking-widest">
+                Custom Instructions <span className="text-red-400">*</span>
+              </label>
+              <div className="flex gap-1 mt-1 mb-2">
+                <button
+                  onClick={() => setPreviewMode(false)}
+                  className={`text-xs px-3 py-1 rounded transition-colors ${
+                    !previewMode
+                      ? 'bg-primary/10 text-primary font-medium'
+                      : 'text-textMuted hover:text-text'
+                  }`}
+                  aria-pressed={!previewMode}
+                >
+                  <Pencil className="w-3 h-3 inline mr-1" />
+                  Write
+                </button>
+                <button
+                  onClick={() => setPreviewMode(true)}
+                  className={`text-xs px-3 py-1 rounded transition-colors ${
+                    previewMode
+                      ? 'bg-primary/10 text-primary font-medium'
+                      : 'text-textMuted hover:text-text'
+                  }`}
+                  aria-pressed={previewMode}
+                >
+                  <Eye className="w-3 h-3 inline mr-1" />
+                  Preview
+                </button>
               </div>
-            ) : (
-              <textarea
-                ref={textareaRef}
-                value={projectPrinciples}
-                onChange={(e) => setProjectPrinciples(e.target.value)}
-                placeholder="Describe your project's coding standards, review criteria, and principles in Markdown…"
-                className="w-full bg-background border border-border rounded-md p-3 font-mono text-sm text-text min-h-[200px] focus:outline-none focus:border-primary resize-y"
-                disabled={isDeploying}
-                aria-label="Project Principles markdown editor"
-                aria-required="true"
-              />
-            )}
+              {previewMode ? (
+                <div className="bg-background border border-border rounded-md p-3 min-h-[200px]">
+                  <MarkdownPreview content={customInstructions} />
+                </div>
+              ) : (
+                <textarea
+                  ref={textareaRef}
+                  value={customInstructions}
+                  onChange={(e) => setCustomInstructions(e.target.value)}
+                  placeholder="Provide any custom instructions for this agent in Markdown…"
+                  className="w-full bg-background border border-border rounded-md p-3 font-mono text-sm text-text min-h-[200px] focus:outline-none focus:border-primary resize-y"
+                  disabled={isDeploying}
+                  aria-label="Custom Instructions markdown editor"
+                  aria-required="true"
+                />
+              )}
+              {!instructionsValid && (
+                <p className="text-xs text-red-400 mt-1">Custom Instructions are required.</p>
+              )}
+            </div>
+          )}
 
-            {!isValid && (
-              <p className="text-xs text-red-400 mt-1">Project Principles are required.</p>
-            )}
-          </div>
+          {needsPrinciples && (
+            <div>
+              <label className="text-xs font-bold text-textMuted uppercase tracking-widest">
+                Project Principles <span className="text-red-400">*</span>
+              </label>
+              <div className="flex gap-1 mt-1 mb-2">
+                <button
+                  onClick={() => setPreviewMode(false)}
+                  className={`text-xs px-3 py-1 rounded transition-colors ${
+                    !previewMode
+                      ? 'bg-primary/10 text-primary font-medium'
+                      : 'text-textMuted hover:text-text'
+                  }`}
+                  aria-pressed={!previewMode}
+                >
+                  <Pencil className="w-3 h-3 inline mr-1" />
+                  Write
+                </button>
+                <button
+                  onClick={() => setPreviewMode(true)}
+                  className={`text-xs px-3 py-1 rounded transition-colors ${
+                    previewMode
+                      ? 'bg-primary/10 text-primary font-medium'
+                      : 'text-textMuted hover:text-text'
+                  }`}
+                  aria-pressed={previewMode}
+                >
+                  <Eye className="w-3 h-3 inline mr-1" />
+                  Preview
+                </button>
+              </div>
+
+              {previewMode ? (
+                <div className="bg-background border border-border rounded-md p-3 min-h-[200px]">
+                  <MarkdownPreview content={projectPrinciples} />
+                </div>
+              ) : (
+                <textarea
+                  ref={textareaRef}
+                  value={projectPrinciples}
+                  onChange={(e) => setProjectPrinciples(e.target.value)}
+                  placeholder="Describe your project's coding standards, review criteria, and principles in Markdown…"
+                  className="w-full bg-background border border-border rounded-md p-3 font-mono text-sm text-text min-h-[200px] focus:outline-none focus:border-primary resize-y"
+                  disabled={isDeploying}
+                  aria-label="Project Principles markdown editor"
+                  aria-required="true"
+                />
+              )}
+
+              {!principlesValid && (
+                <p className="text-xs text-red-400 mt-1">Project Principles are required.</p>
+              )}
+            </div>
+          )}
 
           <ModelSelector
             label="AI Model"

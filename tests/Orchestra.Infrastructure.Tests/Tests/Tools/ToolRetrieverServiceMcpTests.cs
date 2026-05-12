@@ -3,9 +3,11 @@ using Microsoft.Extensions.Logging;
 using NSubstitute.ExceptionExtensions;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.McpServers.Interfaces;
+using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
 using Orchestra.Domain.Exceptions;
 using Orchestra.Infrastructure.Tools;
+using Orchestra.Tests.Shared.Builders;
 
 namespace Orchestra.Infrastructure.Tests.Tests.Tools;
 
@@ -20,12 +22,22 @@ public class ToolRetrieverServiceMcpTests
     private readonly IAgentDataAccess _agentDataAccess = Substitute.For<IAgentDataAccess>();
     private readonly IProviderCredentialEncryptionService _encryptionService = Substitute.For<IProviderCredentialEncryptionService>();
     private readonly IMcpServerDataAccess _mcpServerDataAccess = Substitute.For<IMcpServerDataAccess>();
+    private readonly IAgentMcpToolDataAccess _agentMcpToolDataAccess = Substitute.For<IAgentMcpToolDataAccess>();
+    private readonly IAgentSubAgentDataAccess _agentSubAgentDataAccess = Substitute.For<IAgentSubAgentDataAccess>();
     private readonly IMcpClient _mcpClient = Substitute.For<IMcpClient>();
     private readonly ILogger<ToolRetrieverService> _logger = Substitute.For<ILogger<ToolRetrieverService>>();
     private readonly ToolRetrieverService _sut;
 
     public ToolRetrieverServiceMcpTests()
     {
+        _agentSubAgentDataAccess
+            .GetSubAgentIdsByParentAgentIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Guid>());
+
+        _agentMcpToolDataAccess
+            .GetByAgentIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(new List<AgentMcpTool>());
+
         _sut = new ToolRetrieverService(
             _serviceProvider,
             _toolActionDataAccess,
@@ -36,6 +48,9 @@ public class ToolRetrieverServiceMcpTests
             _agentDataAccess,
             _encryptionService,
             _mcpServerDataAccess,
+            _agentMcpToolDataAccess,
+            _agentSubAgentDataAccess,
+            Substitute.For<IChatClientResolver>(),
             _logger);
     }
 
@@ -47,12 +62,12 @@ public class ToolRetrieverServiceMcpTests
     public async Task GetAgentToolsAsync_WithMcpToolAction_ReturnsAIFunctionFromServer()
     {
         var workspaceId = Guid.NewGuid();
-        var integrationId = Guid.NewGuid();
+        var mcpServerId = Guid.NewGuid();
         var agentId = Guid.NewGuid();
 
         var mcpToolAction = new ToolActionBuilder()
             .WithMethodName("get_design_tokens")
-            .AsMcpTool(integrationId)
+            .AsMcpTool(Guid.NewGuid())
             .Build();
 
         var agent = new AgentBuilder()
@@ -60,17 +75,9 @@ public class ToolRetrieverServiceMcpTests
             .WithWorkspaceId(workspaceId)
             .Build();
 
-        var integration = new IntegrationBuilder()
-            .WithId(integrationId)
-            .WithWorkspaceId(workspaceId)
-            .WithMcpBacked(true)
-            .WithIsActive(true)
-            .WithMcpEndpointUrl("https://figma.mcp.example.com")
-            .Build();
-
         var serverTool = new FakeMcpToolDescriptor("get_design_tokens");
 
-        ArrangeMcpResolution(agentId, mcpToolAction, agent, integration, serverTool);
+        ArrangeLegacyMcpResolution(agentId, mcpToolAction, agent, mcpServerId, workspaceId, serverTool);
 
         var result = await _sut.GetAgentToolsAsync(agentId);
 
@@ -78,15 +85,16 @@ public class ToolRetrieverServiceMcpTests
     }
 
     // -------------------------------------------------------------------------
-    // Scenario 2: Group MCP tools by integration — single client reused (AC-2)
+    // Scenario 2: Group MCP tools by category — single client reused (AC-2)
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task GetAgentToolsAsync_WithFiveMcpToolsFromSameIntegration_CreatesOnlyOneMcpClient()
+    public async Task GetAgentToolsAsync_WithFiveMcpToolsFromSameMcpServer_CreatesOnlyOneMcpClient()
     {
         var workspaceId = Guid.NewGuid();
-        var integrationId = Guid.NewGuid();
+        var mcpServerId = Guid.NewGuid();
         var agentId = Guid.NewGuid();
+        var categoryId = Guid.NewGuid();
 
         var toolActionIds = new List<Guid>();
         var toolActions = new List<ToolAction>();
@@ -95,8 +103,9 @@ public class ToolRetrieverServiceMcpTests
         for (var i = 0; i < 5; i++)
         {
             var action = new ToolActionBuilder()
+                .WithToolCategoryId(categoryId)
                 .WithMethodName($"tool_{i}")
-                .AsMcpTool(integrationId)
+                .AsMcpTool(Guid.NewGuid())
                 .Build();
             toolActionIds.Add(action.Id);
             toolActions.Add(action);
@@ -104,10 +113,8 @@ public class ToolRetrieverServiceMcpTests
         }
 
         var agent = new AgentBuilder().WithId(agentId).WithWorkspaceId(workspaceId).Build();
-        var integration = new IntegrationBuilder()
-            .WithId(integrationId).WithWorkspaceId(workspaceId)
-            .WithMcpBacked(true).WithIsActive(true)
-            .WithMcpEndpointUrl("https://figma.mcp.example.com").Build();
+        var mcpServer = new McpServerBuilder().WithId(mcpServerId).WithWorkspaceId(workspaceId).WithEndpointUrl("https://mcp.example.com").Build();
+        var category = ToolCategory.CreateForMcpServer("Test", "desc", ProviderType.MCP_GENERIC, mcpServerId);
 
         _agentToolActionDataAccess
             .GetToolActionIdsByAgentIdAsync(agentId, Arg.Any<CancellationToken>())
@@ -117,9 +124,9 @@ public class ToolRetrieverServiceMcpTests
             _toolActionDataAccess.GetByIdAsync(action.Id, Arg.Any<CancellationToken>()).Returns(action);
 
         _agentDataAccess.GetByIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(agent);
-        _integrationDataAccess.GetByIdAsync(integrationId, Arg.Any<CancellationToken>()).Returns(integration);
-        _encryptionService.Decrypt(Arg.Any<string>()).Returns("decrypted-key");
-        _mcpClientFactory.GetOrCreateClientAsync(integrationId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+        _toolCategoryDataAccess.GetByIdAsync(categoryId, Arg.Any<CancellationToken>()).Returns(category);
+        _mcpServerDataAccess.GetByIdAsync(mcpServerId, Arg.Any<CancellationToken>()).Returns(mcpServer);
+        _mcpClientFactory.GetOrCreateClientAsync(mcpServerId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(_mcpClient);
         _mcpClient.ListToolsAsync(Arg.Any<CancellationToken>())
             .Returns(serverTools.AsEnumerable());
@@ -127,7 +134,7 @@ public class ToolRetrieverServiceMcpTests
         await _sut.GetAgentToolsAsync(agentId);
 
         await _mcpClientFactory.Received(1)
-            .GetOrCreateClientAsync(integrationId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+            .GetOrCreateClientAsync(mcpServerId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 
     // -------------------------------------------------------------------------
@@ -135,32 +142,30 @@ public class ToolRetrieverServiceMcpTests
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task GetAgentToolsAsync_WhenMcpServerUnreachable_SkipsMcpToolsAndReturnsEmptyForThatIntegration()
+    public async Task GetAgentToolsAsync_WhenMcpServerUnreachable_SkipsMcpToolsAndReturnsEmpty()
     {
         var workspaceId = Guid.NewGuid();
-        var integrationId = Guid.NewGuid();
+        var mcpServerId = Guid.NewGuid();
         var agentId = Guid.NewGuid();
 
         var mcpToolAction = new ToolActionBuilder()
             .WithMethodName("get_design_tokens")
-            .AsMcpTool(integrationId)
+            .AsMcpTool(Guid.NewGuid())
             .Build();
 
         var agent = new AgentBuilder().WithId(agentId).WithWorkspaceId(workspaceId).Build();
-        var integration = new IntegrationBuilder()
-            .WithId(integrationId).WithWorkspaceId(workspaceId)
-            .WithMcpBacked(true).WithIsActive(true)
-            .WithMcpEndpointUrl("https://figma.mcp.example.com").Build();
+        var mcpServer = new McpServerBuilder().WithId(mcpServerId).WithWorkspaceId(workspaceId).WithEndpointUrl("https://mcp.example.com").Build();
+        var category = ToolCategory.CreateForMcpServer("Test", "desc", ProviderType.MCP_GENERIC, mcpServerId);
 
         _agentToolActionDataAccess
             .GetToolActionIdsByAgentIdAsync(agentId, Arg.Any<CancellationToken>())
             .Returns(new List<Guid> { mcpToolAction.Id });
         _toolActionDataAccess.GetByIdAsync(mcpToolAction.Id, Arg.Any<CancellationToken>()).Returns(mcpToolAction);
         _agentDataAccess.GetByIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(agent);
-        _integrationDataAccess.GetByIdAsync(integrationId, Arg.Any<CancellationToken>()).Returns(integration);
-        _encryptionService.Decrypt(Arg.Any<string>()).Returns("decrypted-key");
+        _toolCategoryDataAccess.GetByIdAsync(mcpToolAction.ToolCategoryId, Arg.Any<CancellationToken>()).Returns(category);
+        _mcpServerDataAccess.GetByIdAsync(mcpServerId, Arg.Any<CancellationToken>()).Returns(mcpServer);
 
-        _mcpClientFactory.GetOrCreateClientAsync(integrationId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+        _mcpClientFactory.GetOrCreateClientAsync(mcpServerId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .ThrowsAsync(new HttpRequestException("Connection refused"));
 
         var result = await _sut.GetAgentToolsAsync(agentId);
@@ -172,22 +177,20 @@ public class ToolRetrieverServiceMcpTests
     public async Task GetAgentToolsAsync_WhenMcpServerUnreachable_ExecutionContinuesWithoutException()
     {
         var workspaceId = Guid.NewGuid();
-        var integrationId = Guid.NewGuid();
+        var mcpServerId = Guid.NewGuid();
         var agentId = Guid.NewGuid();
 
-        var mcpToolAction = new ToolActionBuilder().WithMethodName("tool_a").AsMcpTool(integrationId).Build();
+        var mcpToolAction = new ToolActionBuilder().WithMethodName("tool_a").AsMcpTool(Guid.NewGuid()).Build();
         var agent = new AgentBuilder().WithId(agentId).WithWorkspaceId(workspaceId).Build();
-        var integration = new IntegrationBuilder()
-            .WithId(integrationId).WithWorkspaceId(workspaceId)
-            .WithMcpBacked(true).WithIsActive(true)
-            .WithMcpEndpointUrl("https://unreachable.example.com").Build();
+        var mcpServer = new McpServerBuilder().WithId(mcpServerId).WithWorkspaceId(workspaceId).WithEndpointUrl("https://unreachable.example.com").Build();
+        var category = ToolCategory.CreateForMcpServer("Test", "desc", ProviderType.MCP_GENERIC, mcpServerId);
 
         _agentToolActionDataAccess.GetToolActionIdsByAgentIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(new List<Guid> { mcpToolAction.Id });
         _toolActionDataAccess.GetByIdAsync(mcpToolAction.Id, Arg.Any<CancellationToken>()).Returns(mcpToolAction);
         _agentDataAccess.GetByIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(agent);
-        _integrationDataAccess.GetByIdAsync(integrationId, Arg.Any<CancellationToken>()).Returns(integration);
-        _encryptionService.Decrypt(Arg.Any<string>()).Returns("key");
-        _mcpClientFactory.GetOrCreateClientAsync(integrationId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+        _toolCategoryDataAccess.GetByIdAsync(mcpToolAction.ToolCategoryId, Arg.Any<CancellationToken>()).Returns(category);
+        _mcpServerDataAccess.GetByIdAsync(mcpServerId, Arg.Any<CancellationToken>()).Returns(mcpServer);
+        _mcpClientFactory.GetOrCreateClientAsync(mcpServerId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .ThrowsAsync(new OperationCanceledException("Timeout"));
 
         var exception = await Record.ExceptionAsync(() => _sut.GetAgentToolsAsync(agentId));
@@ -203,25 +206,25 @@ public class ToolRetrieverServiceMcpTests
     public async Task GetAgentToolsAsync_WhenMcpToolNoLongerExistsOnServer_SkipsThatToolAndContinues()
     {
         var workspaceId = Guid.NewGuid();
-        var integrationId = Guid.NewGuid();
+        var mcpServerId = Guid.NewGuid();
         var agentId = Guid.NewGuid();
+        var categoryId = Guid.NewGuid();
 
         var removedAction = new ToolActionBuilder()
+            .WithToolCategoryId(categoryId)
             .WithMethodName("old_export_svg")
-            .AsMcpTool(integrationId)
+            .AsMcpTool(Guid.NewGuid())
             .Build();
 
         var existingAction = new ToolActionBuilder()
+            .WithToolCategoryId(categoryId)
             .WithMethodName("get_design_tokens")
-            .AsMcpTool(integrationId)
+            .AsMcpTool(Guid.NewGuid())
             .Build();
 
         var agent = new AgentBuilder().WithId(agentId).WithWorkspaceId(workspaceId).Build();
-        var integration = new IntegrationBuilder()
-            .WithId(integrationId).WithWorkspaceId(workspaceId)
-            .WithMcpBacked(true).WithIsActive(true)
-            .WithMcpEndpointUrl("https://figma.mcp.example.com").Build();
-
+        var mcpServer = new McpServerBuilder().WithId(mcpServerId).WithWorkspaceId(workspaceId).WithEndpointUrl("https://mcp.example.com").Build();
+        var category = ToolCategory.CreateForMcpServer("Test", "desc", ProviderType.MCP_GENERIC, mcpServerId);
         var serverTools = new List<IMcpToolDescriptor> { new FakeMcpToolDescriptor("get_design_tokens") };
 
         _agentToolActionDataAccess.GetToolActionIdsByAgentIdAsync(agentId, Arg.Any<CancellationToken>())
@@ -229,9 +232,9 @@ public class ToolRetrieverServiceMcpTests
         _toolActionDataAccess.GetByIdAsync(removedAction.Id, Arg.Any<CancellationToken>()).Returns(removedAction);
         _toolActionDataAccess.GetByIdAsync(existingAction.Id, Arg.Any<CancellationToken>()).Returns(existingAction);
         _agentDataAccess.GetByIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(agent);
-        _integrationDataAccess.GetByIdAsync(integrationId, Arg.Any<CancellationToken>()).Returns(integration);
-        _encryptionService.Decrypt(Arg.Any<string>()).Returns("key");
-        _mcpClientFactory.GetOrCreateClientAsync(integrationId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+        _toolCategoryDataAccess.GetByIdAsync(categoryId, Arg.Any<CancellationToken>()).Returns(category);
+        _mcpServerDataAccess.GetByIdAsync(mcpServerId, Arg.Any<CancellationToken>()).Returns(mcpServer);
+        _mcpClientFactory.GetOrCreateClientAsync(mcpServerId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(_mcpClient);
         _mcpClient.ListToolsAsync(Arg.Any<CancellationToken>()).Returns(serverTools.AsEnumerable());
 
@@ -241,35 +244,32 @@ public class ToolRetrieverServiceMcpTests
     }
 
     // -------------------------------------------------------------------------
-    // Scenario 5: Cross-workspace integration access rejected (AC-5)
+    // Scenario 5: Cross-workspace server access rejected (AC-5)
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task GetAgentToolsAsync_WithCrossWorkspaceIntegration_SkipsToolsWithWarning()
+    public async Task GetAgentToolsAsync_WithCrossWorkspaceMcpServer_SkipsToolsWithWarning()
     {
         var agentWorkspaceId = Guid.NewGuid();
         var foreignWorkspaceId = Guid.NewGuid();
-        var integrationId = Guid.NewGuid();
+        var mcpServerId = Guid.NewGuid();
         var agentId = Guid.NewGuid();
 
         var mcpToolAction = new ToolActionBuilder()
             .WithMethodName("get_design_tokens")
-            .AsMcpTool(integrationId)
+            .AsMcpTool(Guid.NewGuid())
             .Build();
 
         var agent = new AgentBuilder().WithId(agentId).WithWorkspaceId(agentWorkspaceId).Build();
-
-        var foreignIntegration = new IntegrationBuilder()
-            .WithId(integrationId)
-            .WithWorkspaceId(foreignWorkspaceId)
-            .WithMcpBacked(true).WithIsActive(true)
-            .WithMcpEndpointUrl("https://figma.mcp.example.com").Build();
+        var foreignServer = new McpServerBuilder().WithId(mcpServerId).WithWorkspaceId(foreignWorkspaceId).WithEndpointUrl("https://mcp.example.com").Build();
+        var category = ToolCategory.CreateForMcpServer("Test", "desc", ProviderType.MCP_GENERIC, mcpServerId);
 
         _agentToolActionDataAccess.GetToolActionIdsByAgentIdAsync(agentId, Arg.Any<CancellationToken>())
             .Returns(new List<Guid> { mcpToolAction.Id });
         _toolActionDataAccess.GetByIdAsync(mcpToolAction.Id, Arg.Any<CancellationToken>()).Returns(mcpToolAction);
         _agentDataAccess.GetByIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(agent);
-        _integrationDataAccess.GetByIdAsync(integrationId, Arg.Any<CancellationToken>()).Returns(foreignIntegration);
+        _toolCategoryDataAccess.GetByIdAsync(mcpToolAction.ToolCategoryId, Arg.Any<CancellationToken>()).Returns(category);
+        _mcpServerDataAccess.GetByIdAsync(mcpServerId, Arg.Any<CancellationToken>()).Returns(foreignServer);
 
         var result = await _sut.GetAgentToolsAsync(agentId);
 
@@ -279,28 +279,25 @@ public class ToolRetrieverServiceMcpTests
     }
 
     // -------------------------------------------------------------------------
-    // Edge case: Integration inactive — tools skipped
+    // Edge case: Category has no McpServerId — tools skipped
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task GetAgentToolsAsync_WhenIntegrationInactive_SkipsAllToolsFromThatIntegration()
+    public async Task GetAgentToolsAsync_WhenCategoryHasNoMcpServerId_SkipsAllToolsFromThatCategory()
     {
         var workspaceId = Guid.NewGuid();
-        var integrationId = Guid.NewGuid();
         var agentId = Guid.NewGuid();
 
-        var mcpToolAction = new ToolActionBuilder().WithMethodName("tool_x").AsMcpTool(integrationId).Build();
+        var mcpToolAction = new ToolActionBuilder().WithMethodName("tool_x").AsMcpTool(Guid.NewGuid()).Build();
         var agent = new AgentBuilder().WithId(agentId).WithWorkspaceId(workspaceId).Build();
-        var inactiveIntegration = new IntegrationBuilder()
-            .WithId(integrationId).WithWorkspaceId(workspaceId)
-            .WithMcpBacked(true).WithIsActive(false)
-            .WithMcpEndpointUrl("https://figma.mcp.example.com").Build();
+        // Category created WITHOUT McpServerId (McpServerId = null)
+        var categoryWithoutServer = ToolCategory.Create("No-server category", "desc", ProviderType.MCP_GENERIC, "SomeService");
 
         _agentToolActionDataAccess.GetToolActionIdsByAgentIdAsync(agentId, Arg.Any<CancellationToken>())
             .Returns(new List<Guid> { mcpToolAction.Id });
         _toolActionDataAccess.GetByIdAsync(mcpToolAction.Id, Arg.Any<CancellationToken>()).Returns(mcpToolAction);
         _agentDataAccess.GetByIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(agent);
-        _integrationDataAccess.GetByIdAsync(integrationId, Arg.Any<CancellationToken>()).Returns(inactiveIntegration);
+        _toolCategoryDataAccess.GetByIdAsync(mcpToolAction.ToolCategoryId, Arg.Any<CancellationToken>()).Returns(categoryWithoutServer);
 
         var result = await _sut.GetAgentToolsAsync(agentId);
 
@@ -308,28 +305,26 @@ public class ToolRetrieverServiceMcpTests
     }
 
     // -------------------------------------------------------------------------
-    // Edge case: Integration not MCP-backed — tools skipped
+    // Edge case: McpServer not found in DB — tools skipped
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task GetAgentToolsAsync_WhenIntegrationNotMcpBacked_SkipsAllToolsFromThatIntegration()
+    public async Task GetAgentToolsAsync_WhenMcpServerNotFoundInDb_SkipsAllToolsFromThatCategory()
     {
         var workspaceId = Guid.NewGuid();
-        var integrationId = Guid.NewGuid();
+        var mcpServerId = Guid.NewGuid();
         var agentId = Guid.NewGuid();
 
-        var mcpToolAction = new ToolActionBuilder().WithMethodName("tool_y").AsMcpTool(integrationId).Build();
+        var mcpToolAction = new ToolActionBuilder().WithMethodName("tool_y").AsMcpTool(Guid.NewGuid()).Build();
         var agent = new AgentBuilder().WithId(agentId).WithWorkspaceId(workspaceId).Build();
-        var nonMcpIntegration = new IntegrationBuilder()
-            .WithId(integrationId).WithWorkspaceId(workspaceId)
-            .WithMcpBacked(false).WithIsActive(true)
-            .Build();
+        var category = ToolCategory.CreateForMcpServer("Test", "desc", ProviderType.MCP_GENERIC, mcpServerId);
 
         _agentToolActionDataAccess.GetToolActionIdsByAgentIdAsync(agentId, Arg.Any<CancellationToken>())
             .Returns(new List<Guid> { mcpToolAction.Id });
         _toolActionDataAccess.GetByIdAsync(mcpToolAction.Id, Arg.Any<CancellationToken>()).Returns(mcpToolAction);
         _agentDataAccess.GetByIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(agent);
-        _integrationDataAccess.GetByIdAsync(integrationId, Arg.Any<CancellationToken>()).Returns(nonMcpIntegration);
+        _toolCategoryDataAccess.GetByIdAsync(mcpToolAction.ToolCategoryId, Arg.Any<CancellationToken>()).Returns(category);
+        _mcpServerDataAccess.GetByIdAsync(mcpServerId, Arg.Any<CancellationToken>()).Returns((McpServer?)null);
 
         var result = await _sut.GetAgentToolsAsync(agentId);
 
@@ -344,10 +339,12 @@ public class ToolRetrieverServiceMcpTests
     public async Task GetAgentToolsAsync_WithNoMcpTools_DoesNotCallMcpClientFactory()
     {
         var agentId = Guid.NewGuid();
+        var agent = new AgentBuilder().WithId(agentId).Build();
 
         _agentToolActionDataAccess
             .GetToolActionIdsByAgentIdAsync(agentId, Arg.Any<CancellationToken>())
             .Returns(new List<Guid>());
+        _agentDataAccess.GetByIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(agent);
 
         await _sut.GetAgentToolsAsync(agentId);
 
@@ -363,33 +360,31 @@ public class ToolRetrieverServiceMcpTests
     public async Task GetAgentToolsAsync_WithStdioMcpTool_CallsCreateStdioClientAndReturnsAIFunction()
     {
         var workspaceId = Guid.NewGuid();
-        var integrationId = Guid.NewGuid();
+        var mcpServerId = Guid.NewGuid();
         var agentId = Guid.NewGuid();
 
         var toolAction = new ToolActionBuilder()
             .WithMethodName("read_file")
-            .AsMcpTool(integrationId)
+            .AsMcpTool(Guid.NewGuid())
             .Build();
 
         var agent = new AgentBuilder().WithId(agentId).WithWorkspaceId(workspaceId).Build();
-
-        var stdioIntegration = new IntegrationBuilder()
-            .WithId(integrationId)
+        var stdioServer = new McpServerBuilder()
+            .WithId(mcpServerId)
             .WithWorkspaceId(workspaceId)
-            .WithMcpBacked(true)
-            .WithIsActive(true)
-            .WithMcpTransportType(McpTransportType.STDIO)
-            .WithMcpCommand("npx")
-            .WithMcpArgumentsJson("""["@modelcontextprotocol/server-filesystem"]""")
-            .WithMcpEncryptedEnvironmentVariables("encrypted_env_blob")
+            .WithCommand("npx")
+            .WithArguments("""["@modelcontextprotocol/server-filesystem"]""")
+            .WithEncryptedEnvironmentVariables("encrypted_env_blob")
             .Build();
+        var category = ToolCategory.CreateForMcpServer("Test", "desc", ProviderType.MCP_GENERIC, mcpServerId);
 
         _agentToolActionDataAccess
             .GetToolActionIdsByAgentIdAsync(agentId, Arg.Any<CancellationToken>())
             .Returns(new List<Guid> { toolAction.Id });
         _toolActionDataAccess.GetByIdAsync(toolAction.Id, Arg.Any<CancellationToken>()).Returns(toolAction);
         _agentDataAccess.GetByIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(agent);
-        _integrationDataAccess.GetByIdAsync(integrationId, Arg.Any<CancellationToken>()).Returns(stdioIntegration);
+        _toolCategoryDataAccess.GetByIdAsync(toolAction.ToolCategoryId, Arg.Any<CancellationToken>()).Returns(category);
+        _mcpServerDataAccess.GetByIdAsync(mcpServerId, Arg.Any<CancellationToken>()).Returns(stdioServer);
         _encryptionService.Decrypt("encrypted_env_blob").Returns("""{"PATH":"/usr/bin"}""");
         _mcpClientFactory
             .CreateStdioClientAsync("npx", Arg.Any<string[]?>(), Arg.Any<Dictionary<string, string>?>(), Arg.Any<CancellationToken>())
@@ -414,31 +409,30 @@ public class ToolRetrieverServiceMcpTests
     public async Task GetAgentToolsAsync_WhenStdioProcessFailsToStart_AgentExecutionContinuesWithoutException()
     {
         var workspaceId = Guid.NewGuid();
-        var integrationId = Guid.NewGuid();
+        var mcpServerId = Guid.NewGuid();
         var agentId = Guid.NewGuid();
 
         var toolAction = new ToolActionBuilder()
             .WithMethodName("run_command")
-            .AsMcpTool(integrationId)
+            .AsMcpTool(Guid.NewGuid())
             .Build();
 
         var agent = new AgentBuilder().WithId(agentId).WithWorkspaceId(workspaceId).Build();
-
-        var stdioIntegration = new IntegrationBuilder()
-            .WithId(integrationId)
+        var stdioServer = new McpServerBuilder()
+            .WithId(mcpServerId)
             .WithWorkspaceId(workspaceId)
-            .WithMcpBacked(true)
-            .WithIsActive(true)
-            .WithMcpTransportType(McpTransportType.STDIO)
-            .WithMcpCommand("nonexistent-command")
+            .WithCommand("nonexistent-command")
+            .WithArguments(null)
             .Build();
+        var category = ToolCategory.CreateForMcpServer("Test", "desc", ProviderType.MCP_GENERIC, mcpServerId);
 
         _agentToolActionDataAccess
             .GetToolActionIdsByAgentIdAsync(agentId, Arg.Any<CancellationToken>())
             .Returns(new List<Guid> { toolAction.Id });
         _toolActionDataAccess.GetByIdAsync(toolAction.Id, Arg.Any<CancellationToken>()).Returns(toolAction);
         _agentDataAccess.GetByIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(agent);
-        _integrationDataAccess.GetByIdAsync(integrationId, Arg.Any<CancellationToken>()).Returns(stdioIntegration);
+        _toolCategoryDataAccess.GetByIdAsync(toolAction.ToolCategoryId, Arg.Any<CancellationToken>()).Returns(category);
+        _mcpServerDataAccess.GetByIdAsync(mcpServerId, Arg.Any<CancellationToken>()).Returns(stdioServer);
         _encryptionService.Decrypt(Arg.Any<string>()).Returns("{}");
         _mcpClientFactory
             .CreateStdioClientAsync(Arg.Any<string>(), Arg.Any<string[]?>(), Arg.Any<Dictionary<string, string>?>(), Arg.Any<CancellationToken>())
@@ -469,12 +463,15 @@ public class ToolRetrieverServiceMcpTests
             .Build();
 
         var agent = new AgentBuilder().WithId(agentId).WithWorkspaceId(workspaceId).Build();
+        // Category with no McpServerId — simulates the orphaned/deleted state
+        var orphanedCategory = ToolCategory.Create("Orphaned", "desc", ProviderType.MCP_GENERIC, "SomeService");
 
         _agentToolActionDataAccess
             .GetToolActionIdsByAgentIdAsync(agentId, Arg.Any<CancellationToken>())
             .Returns(new List<Guid> { orphanedTool.Id });
         _toolActionDataAccess.GetByIdAsync(orphanedTool.Id, Arg.Any<CancellationToken>()).Returns(orphanedTool);
         _agentDataAccess.GetByIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(agent);
+        _toolCategoryDataAccess.GetByIdAsync(orphanedTool.ToolCategoryId, Arg.Any<CancellationToken>()).Returns(orphanedCategory);
 
         var result = await _sut.GetAgentToolsAsync(agentId);
 
@@ -485,17 +482,173 @@ public class ToolRetrieverServiceMcpTests
             .CreateStdioClientAsync(Arg.Any<string>(), Arg.Any<string[]?>(), Arg.Any<Dictionary<string, string>?>(), Arg.Any<CancellationToken>());
     }
 
+    // =========================================================================
+    // Connected MCP Tools (AgentMcpTools table) — new path
+    // =========================================================================
+
     // -------------------------------------------------------------------------
-    // Helpers
+    // Connected Scenario 1: Happy path — connected tool returned as AIFunction
     // -------------------------------------------------------------------------
 
-    private void ArrangeMcpResolution(
+    [Fact]
+    public async Task GetAgentToolsAsync_WithConnectedMcpTool_ReturnsAIFunction()
+    {
+        var workspaceId = Guid.NewGuid();
+        var mcpServerId = Guid.NewGuid();
+        var agentId = Guid.NewGuid();
+
+        var agent = new AgentBuilder().WithId(agentId).WithWorkspaceId(workspaceId).Build();
+        var mcpServer = new McpServerBuilder().WithId(mcpServerId).WithWorkspaceId(workspaceId).WithEndpointUrl("https://mcp.example.com").Build();
+        var connectedTool = AgentMcpTool.Create(agentId, mcpServerId, "list_issues");
+
+        _agentToolActionDataAccess.GetToolActionIdsByAgentIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(new List<Guid>());
+        _agentDataAccess.GetByIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(agent);
+        _agentMcpToolDataAccess.GetByAgentIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(new List<AgentMcpTool> { connectedTool });
+        _mcpServerDataAccess.GetByIdAsync(mcpServerId, Arg.Any<CancellationToken>()).Returns(mcpServer);
+        _mcpClientFactory.GetOrCreateClientAsync(mcpServerId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(_mcpClient);
+        _mcpClient.ListToolsAsync(Arg.Any<CancellationToken>())
+            .Returns(new List<IMcpToolDescriptor> { new FakeMcpToolDescriptor("list_issues") }.AsEnumerable());
+
+        var result = await _sut.GetAgentToolsAsync(agentId);
+
+        Assert.Single(result);
+    }
+
+    // -------------------------------------------------------------------------
+    // Connected Scenario 2: Tool name not on server — skipped with warning
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetAgentToolsAsync_WithConnectedMcpTool_WhenToolNotOnServer_SkipsWithWarning()
+    {
+        var workspaceId = Guid.NewGuid();
+        var mcpServerId = Guid.NewGuid();
+        var agentId = Guid.NewGuid();
+
+        var agent = new AgentBuilder().WithId(agentId).WithWorkspaceId(workspaceId).Build();
+        var mcpServer = new McpServerBuilder().WithId(mcpServerId).WithWorkspaceId(workspaceId).WithEndpointUrl("https://mcp.example.com").Build();
+        var connectedTool = AgentMcpTool.Create(agentId, mcpServerId, "deleted_tool");
+
+        _agentToolActionDataAccess.GetToolActionIdsByAgentIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(new List<Guid>());
+        _agentDataAccess.GetByIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(agent);
+        _agentMcpToolDataAccess.GetByAgentIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(new List<AgentMcpTool> { connectedTool });
+        _mcpServerDataAccess.GetByIdAsync(mcpServerId, Arg.Any<CancellationToken>()).Returns(mcpServer);
+        _mcpClientFactory.GetOrCreateClientAsync(mcpServerId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(_mcpClient);
+        _mcpClient.ListToolsAsync(Arg.Any<CancellationToken>())
+            .Returns(new List<IMcpToolDescriptor> { new FakeMcpToolDescriptor("other_tool") }.AsEnumerable());
+
+        var result = await _sut.GetAgentToolsAsync(agentId);
+
+        Assert.Empty(result);
+    }
+
+    // -------------------------------------------------------------------------
+    // Connected Scenario 3: Server workspace mismatch — skipped
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetAgentToolsAsync_WithConnectedMcpTool_WhenServerBelongsToDifferentWorkspace_SkipsTool()
+    {
+        var agentWorkspaceId = Guid.NewGuid();
+        var foreignWorkspaceId = Guid.NewGuid();
+        var mcpServerId = Guid.NewGuid();
+        var agentId = Guid.NewGuid();
+
+        var agent = new AgentBuilder().WithId(agentId).WithWorkspaceId(agentWorkspaceId).Build();
+        var foreignServer = new McpServerBuilder().WithId(mcpServerId).WithWorkspaceId(foreignWorkspaceId).WithEndpointUrl("https://mcp.example.com").Build();
+        var connectedTool = AgentMcpTool.Create(agentId, mcpServerId, "some_tool");
+
+        _agentToolActionDataAccess.GetToolActionIdsByAgentIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(new List<Guid>());
+        _agentDataAccess.GetByIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(agent);
+        _agentMcpToolDataAccess.GetByAgentIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(new List<AgentMcpTool> { connectedTool });
+        _mcpServerDataAccess.GetByIdAsync(mcpServerId, Arg.Any<CancellationToken>()).Returns(foreignServer);
+
+        var result = await _sut.GetAgentToolsAsync(agentId);
+
+        Assert.Empty(result);
+        await _mcpClientFactory.DidNotReceive()
+            .GetOrCreateClientAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    // -------------------------------------------------------------------------
+    // Connected Scenario 4: Server not found in DB — skipped, no exception
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetAgentToolsAsync_WithConnectedMcpTool_WhenServerNotFoundInDb_SkipsWithoutException()
+    {
+        var workspaceId = Guid.NewGuid();
+        var mcpServerId = Guid.NewGuid();
+        var agentId = Guid.NewGuid();
+
+        var agent = new AgentBuilder().WithId(agentId).WithWorkspaceId(workspaceId).Build();
+        var connectedTool = AgentMcpTool.Create(agentId, mcpServerId, "some_tool");
+
+        _agentToolActionDataAccess.GetToolActionIdsByAgentIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(new List<Guid>());
+        _agentDataAccess.GetByIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(agent);
+        _agentMcpToolDataAccess.GetByAgentIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(new List<AgentMcpTool> { connectedTool });
+        _mcpServerDataAccess.GetByIdAsync(mcpServerId, Arg.Any<CancellationToken>()).Returns((McpServer?)null);
+
+        var exception = await Record.ExceptionAsync(() => _sut.GetAgentToolsAsync(agentId));
+        var result = await _sut.GetAgentToolsAsync(agentId);
+
+        Assert.Null(exception);
+        Assert.Empty(result);
+    }
+
+    // -------------------------------------------------------------------------
+    // Connected Scenario 5: Both legacy ToolAction MCP + connected MCP → both returned
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetAgentToolsAsync_WithBothLegacyAndConnectedMcpTools_ReturnsBothAIFunctions()
+    {
+        var workspaceId = Guid.NewGuid();
+        var legacyMcpServerId = Guid.NewGuid();
+        var connectedMcpServerId = Guid.NewGuid();
+        var agentId = Guid.NewGuid();
+        var legacyMcpClient = Substitute.For<IMcpClient>();
+        var connectedMcpClient = Substitute.For<IMcpClient>();
+
+        var legacyToolAction = new ToolActionBuilder().WithMethodName("legacy_tool").AsMcpTool(Guid.NewGuid()).Build();
+        var agent = new AgentBuilder().WithId(agentId).WithWorkspaceId(workspaceId).Build();
+        var legacyServer = new McpServerBuilder().WithId(legacyMcpServerId).WithWorkspaceId(workspaceId).WithEndpointUrl("https://legacy.mcp.example.com").Build();
+        var legacyCategory = ToolCategory.CreateForMcpServer("Legacy", "desc", ProviderType.MCP_GENERIC, legacyMcpServerId);
+        var connectedServer = new McpServerBuilder().WithId(connectedMcpServerId).WithWorkspaceId(workspaceId).WithEndpointUrl("https://connected.mcp.example.com").Build();
+        var connectedTool = AgentMcpTool.Create(agentId, connectedMcpServerId, "connected_tool");
+
+        _agentToolActionDataAccess.GetToolActionIdsByAgentIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(new List<Guid> { legacyToolAction.Id });
+        _toolActionDataAccess.GetByIdAsync(legacyToolAction.Id, Arg.Any<CancellationToken>()).Returns(legacyToolAction);
+        _agentDataAccess.GetByIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(agent);
+        _toolCategoryDataAccess.GetByIdAsync(legacyToolAction.ToolCategoryId, Arg.Any<CancellationToken>()).Returns(legacyCategory);
+        _mcpServerDataAccess.GetByIdAsync(legacyMcpServerId, Arg.Any<CancellationToken>()).Returns(legacyServer);
+        _mcpServerDataAccess.GetByIdAsync(connectedMcpServerId, Arg.Any<CancellationToken>()).Returns(connectedServer);
+        _agentMcpToolDataAccess.GetByAgentIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(new List<AgentMcpTool> { connectedTool });
+        _mcpClientFactory.GetOrCreateClientAsync(legacyMcpServerId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(legacyMcpClient);
+        _mcpClientFactory.GetOrCreateClientAsync(connectedMcpServerId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(connectedMcpClient);
+        legacyMcpClient.ListToolsAsync(Arg.Any<CancellationToken>()).Returns(new List<IMcpToolDescriptor> { new FakeMcpToolDescriptor("legacy_tool") }.AsEnumerable());
+        connectedMcpClient.ListToolsAsync(Arg.Any<CancellationToken>()).Returns(new List<IMcpToolDescriptor> { new FakeMcpToolDescriptor("connected_tool") }.AsEnumerable());
+
+        var result = await _sut.GetAgentToolsAsync(agentId);
+
+        Assert.Equal(2, result.Count());
+    }
+
+    // =========================================================================
+    // Helpers
+    // =========================================================================
+
+    private void ArrangeLegacyMcpResolution(
         Guid agentId,
         ToolAction mcpToolAction,
         Agent agent,
-        Integration integration,
+        Guid mcpServerId,
+        Guid workspaceId,
         FakeMcpToolDescriptor serverTool)
     {
+        var mcpServer = new McpServerBuilder().WithId(mcpServerId).WithWorkspaceId(workspaceId).WithEndpointUrl("https://mcp.example.com").Build();
+        var category = ToolCategory.CreateForMcpServer("Test", "desc", ProviderType.MCP_GENERIC, mcpServerId);
+
         _agentToolActionDataAccess
             .GetToolActionIdsByAgentIdAsync(agentId, Arg.Any<CancellationToken>())
             .Returns(new List<Guid> { mcpToolAction.Id });
@@ -508,14 +661,16 @@ public class ToolRetrieverServiceMcpTests
             .GetByIdAsync(agentId, Arg.Any<CancellationToken>())
             .Returns(agent);
 
-        _integrationDataAccess
-            .GetByIdAsync(mcpToolAction.IntegrationId!.Value, Arg.Any<CancellationToken>())
-            .Returns(integration);
+        _toolCategoryDataAccess
+            .GetByIdAsync(mcpToolAction.ToolCategoryId, Arg.Any<CancellationToken>())
+            .Returns(category);
 
-        _encryptionService.Decrypt(Arg.Any<string>()).Returns("decrypted-key");
+        _mcpServerDataAccess
+            .GetByIdAsync(mcpServerId, Arg.Any<CancellationToken>())
+            .Returns(mcpServer);
 
         _mcpClientFactory
-            .GetOrCreateClientAsync(mcpToolAction.IntegrationId.Value, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .GetOrCreateClientAsync(mcpServerId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(_mcpClient);
 
         _mcpClient

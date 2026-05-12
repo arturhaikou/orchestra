@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Orchestra.Application.AiCliIntegrations.Interfaces;
 using Orchestra.Application.Agents.DTOs;
 using Orchestra.Application.Agents.Templates;
 using Orchestra.Application.Common.Exceptions;
@@ -13,6 +14,7 @@ public class TemplateAvailabilityResolver : ITemplateAvailabilityResolver
 {
     private readonly IIntegrationService _integrationService;
     private readonly IIntegrationDataAccess _integrationDataAccess;
+    private readonly IAiCliIntegrationDataAccess _aiCliIntegrationDataAccess;
     private readonly IAgentDataAccess _agentDataAccess;
     private readonly IToolActionDataAccess _toolActionDataAccess;
     private readonly ILogger<TemplateAvailabilityResolver> _logger;
@@ -21,6 +23,7 @@ public class TemplateAvailabilityResolver : ITemplateAvailabilityResolver
     public TemplateAvailabilityResolver(
         IIntegrationService integrationService,
         IIntegrationDataAccess integrationDataAccess,
+        IAiCliIntegrationDataAccess aiCliIntegrationDataAccess,
         IAgentDataAccess agentDataAccess,
         IToolActionDataAccess toolActionDataAccess,
         ILogger<TemplateAvailabilityResolver> logger,
@@ -28,6 +31,7 @@ public class TemplateAvailabilityResolver : ITemplateAvailabilityResolver
     {
         _integrationService = integrationService;
         _integrationDataAccess = integrationDataAccess;
+        _aiCliIntegrationDataAccess = aiCliIntegrationDataAccess;
         _agentDataAccess = agentDataAccess;
         _toolActionDataAccess = toolActionDataAccess;
         _logger = logger;
@@ -46,7 +50,7 @@ public class TemplateAvailabilityResolver : ITemplateAvailabilityResolver
         var results = new List<ResolvedTemplate>();
         foreach (var template in templates)
         {
-            var resolved = await ResolveTemplateAsync(template, integrations, deployedAgents, cancellationToken);
+            var resolved = await ResolveTemplateAsync(template, workspaceId, integrations, deployedAgents, cancellationToken);
             results.Add(resolved);
         }
 
@@ -55,13 +59,14 @@ public class TemplateAvailabilityResolver : ITemplateAvailabilityResolver
 
     private async Task<ResolvedTemplate> ResolveTemplateAsync(
         BuiltInAgentTemplate template,
+        Guid workspaceId,
         List<IntegrationDto> integrations,
         List<Agent> deployedAgents,
         CancellationToken cancellationToken)
     {
         try
         {
-            return await ResolveTemplateCoreAsync(template, integrations, deployedAgents, cancellationToken);
+            return await ResolveTemplateCoreAsync(template, workspaceId, integrations, deployedAgents, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -72,6 +77,7 @@ public class TemplateAvailabilityResolver : ITemplateAvailabilityResolver
 
     private async Task<ResolvedTemplate> ResolveTemplateCoreAsync(
         BuiltInAgentTemplate template,
+        Guid workspaceId,
         List<IntegrationDto> integrations,
         List<Agent> deployedAgents,
         CancellationToken cancellationToken)
@@ -79,6 +85,9 @@ public class TemplateAvailabilityResolver : ITemplateAvailabilityResolver
         var alreadyDeployed = CheckAlreadyDeployed(template, deployedAgents);
         if (alreadyDeployed is not null)
             return alreadyDeployed;
+
+        if (template.IsCliAgent)
+            return await ResolveCliTemplateAsync(template, workspaceId, cancellationToken);
 
         var matchedProviders = FindMatchedProviders(template, integrations);
         if (matchedProviders.Count == 0)
@@ -101,6 +110,36 @@ public class TemplateAvailabilityResolver : ITemplateAvailabilityResolver
             resolvedGuide);
     }
 
+    private async Task<ResolvedTemplate> ResolveCliTemplateAsync(
+        BuiltInAgentTemplate template,
+        Guid workspaceId,
+        CancellationToken cancellationToken)
+    {
+        var cliIntegrations = await _aiCliIntegrationDataAccess.GetByWorkspaceIdAsync(
+            workspaceId, cancellationToken);
+
+        if (cliIntegrations.Count == 0)
+        {
+            return new ResolvedTemplate(
+                template.Identifier,
+                TemplateAvailabilityStatus.Unavailable,
+                "Requires a GitHub Copilot CLI integration. Configure one in Settings \u2192 AI CLI Integrations.",
+                ExistingAgentId: null,
+                ResolvedToolActions: new List<ResolvedToolAction>(),
+                ProviderLabels: new List<ProviderLabel>(),
+                ResolvedGuide: template.GuideTemplate);
+        }
+
+        return new ResolvedTemplate(
+            template.Identifier,
+            TemplateAvailabilityStatus.Available,
+            UnavailabilityReason: null,
+            ExistingAgentId: null,
+            ResolvedToolActions: new List<ResolvedToolAction>(),
+            ProviderLabels: new List<ProviderLabel>(),
+            ResolvedGuide: template.GuideTemplate);
+    }
+
     private static ResolvedTemplate? CheckAlreadyDeployed(BuiltInAgentTemplate template, List<Agent> deployedAgents)
     {
         var existing = deployedAgents.FirstOrDefault(a => a.TemplateIdentifier == template.Identifier);
@@ -119,6 +158,9 @@ public class TemplateAvailabilityResolver : ITemplateAvailabilityResolver
 
     private static List<ProviderType> FindMatchedProviders(BuiltInAgentTemplate template, List<IntegrationDto> integrations)
     {
+        if (template.RequiredIntegrationType is null || template.ProviderToolMethodMap is null)
+            return new List<ProviderType>();
+
         var requiredType = template.RequiredIntegrationType.ToString();
 
         return integrations
@@ -190,7 +232,9 @@ public class TemplateAvailabilityResolver : ITemplateAvailabilityResolver
 
     private static ResolvedTemplate CreateUnavailableResult(BuiltInAgentTemplate template)
     {
-        var typeName = FormatIntegrationTypeName(template.RequiredIntegrationType);
+        var typeName = template.RequiredIntegrationType.HasValue
+            ? FormatIntegrationTypeName(template.RequiredIntegrationType.Value)
+            : "required";
         return new ResolvedTemplate(
             template.Identifier,
             TemplateAvailabilityStatus.Unavailable,
@@ -218,8 +262,20 @@ public class TemplateAvailabilityResolver : ITemplateAvailabilityResolver
         BuiltInAgentTemplate template,
         CancellationToken cancellationToken = default)
     {
-        await EnsureRequiredIntegrationActiveAsync(workspaceId, template.RequiredIntegrationType, cancellationToken);
+        if (template.IsCliAgent)
+            await EnsureCliIntegrationActiveAsync(workspaceId, cancellationToken);
+        else if (template.RequiredIntegrationType.HasValue)
+            await EnsureRequiredIntegrationActiveAsync(workspaceId, template.RequiredIntegrationType.Value, cancellationToken);
+
         await EnsureTemplateNotDeployedAsync(workspaceId, template.Identifier, cancellationToken);
+    }
+
+    private async Task EnsureCliIntegrationActiveAsync(Guid workspaceId, CancellationToken cancellationToken)
+    {
+        var cliIntegrations = await _aiCliIntegrationDataAccess.GetByWorkspaceIdAsync(workspaceId, cancellationToken);
+        if (cliIntegrations.Count == 0)
+            throw new IntegrationRequiredException(
+                "A GitHub Copilot CLI integration is required to deploy this template. Configure one in Settings \u2192 AI CLI Integrations.");
     }
 
     private async Task EnsureRequiredIntegrationActiveAsync(
@@ -234,6 +290,7 @@ public class TemplateAvailabilityResolver : ITemplateAvailabilityResolver
             throw new IntegrationRequiredException(
                 "A Code Source integration (GitHub or GitLab) is required to deploy this template.");
     }
+
 
     private async Task EnsureTemplateNotDeployedAsync(
         Guid workspaceId,
@@ -255,3 +312,4 @@ public class TemplateAvailabilityResolver : ITemplateAvailabilityResolver
             .Aggregate((a, b) => $"{a} {b}");
     }
 }
+

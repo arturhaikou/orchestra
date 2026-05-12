@@ -3,9 +3,11 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Text.Json.Serialization;
 using Orchestra.Infrastructure.Hubs;
+using Orchestra.Infrastructure.Agents;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
 using Orchestra.Application.Common;
+using Microsoft.Agents.AI.Hosting.AGUI.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -97,6 +99,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
+builder.Services.AddAGUI();
+
 builder.Services.AddSignalR();
 
 // Configure CORS for Aspire UI integration
@@ -149,6 +153,12 @@ app.UseCors("AllowAspireUI");
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// AG-UI streaming endpoint: /workspaces/{workspaceId}/agents/{agentId}
+// Dynamically resolves the agent per request using the workspace AI provider and tools.
+var dynamicAgent = app.Services.GetRequiredService<DynamicWorkspaceAgent>();
+app.MapAGUI("/workspaces/{workspaceId}/agents/{agentId}", dynamicAgent)
+   .RequireAuthorization();
 
 app.MapHub<NotificationHub>("/hubs/notifications");
 

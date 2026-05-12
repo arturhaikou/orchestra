@@ -62,6 +62,15 @@ public class AgentConfiguration : IEntityTypeConfiguration<Agent>
         builder.Property(a => a.TemplateVersion)
             .IsRequired(false);
 
+        builder.Property(a => a.AiCliIntegrationId)
+            .IsRequired(false);
+
+        builder.HasOne<AiCliIntegration>()
+            .WithMany()
+            .HasForeignKey(a => a.AiCliIntegrationId)
+            .OnDelete(DeleteBehavior.SetNull)
+            .IsRequired(false);
+
         builder.HasIndex(a => new { a.WorkspaceId, a.TemplateIdentifier })
             .IsUnique()
             .HasFilter("\"TemplateIdentifier\" IS NOT NULL")

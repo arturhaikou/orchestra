@@ -11,6 +11,9 @@ import IntegrationEditPage from './components/pages/IntegrationEditPage';
 import EditMcpServerPage from './components/pages/EditMcpServerPage';
 import CreateMcpServerPage from './components/pages/CreateMcpServerPage';
 import McpServersPage from './components/pages/McpServersPage';
+import CliIntegrationsPage from './components/pages/CliIntegrationsPage';
+import CreateCliIntegrationPage from './components/pages/CreateCliIntegrationPage';
+import EditCliIntegrationPage from './components/pages/EditCliIntegrationPage';
 import TicketCreatePage from './components/pages/TicketCreatePage';
 import TicketDetailPage from './components/pages/TicketDetailPage';
 import TicketEditPage from './components/pages/TicketEditPage';
@@ -139,6 +142,9 @@ const App: React.FC = () => {
           <Route path="mcp-servers/new" element={<CreateMcpServerPage />} />
           <Route path="mcp-servers/:serverId/edit" element={<EditMcpServerPage />} />
           <Route path="mcp-servers" element={<McpServersPage />} />
+          <Route path="cli-integrations/new" element={<CreateCliIntegrationPage />} />
+          <Route path="cli-integrations/:integrationId/edit" element={<EditCliIntegrationPage />} />
+          <Route path="cli-integrations" element={<CliIntegrationsPage />} />
 
           <Route path="integrations/new/mcp" element={<RedirectToMcpNew />} />
           <Route path="integrations/:integrationId/edit/mcp" element={<RedirectToMcpEdit />} />

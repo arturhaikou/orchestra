@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Loader2, AlertTriangle } from 'lucide-react';
-import { Tool } from '../../types';
-import { createAgent } from '../../services/agentService';
+import { Loader2, AlertTriangle, Plus, X } from 'lucide-react';
+import { Agent, Tool } from '../../types';
+import { createAgent, getAgents } from '../../services/agentService';
 import { getTools } from '../../services/toolService';
 import { fetchWorkspaceModels } from '../../services/workspaceService';
 import AgentFormCapabilities from '../agents/AgentFormCapabilities';
 import AgentToolSummarySection from '../agents/AgentToolSummarySection';
 import AddToolsModal from '../agents/AddToolsModal';
+import AddSubAgentsModal from '../agents/AddSubAgentsModal';
 import MarkdownPreviewToggle from '../agents/MarkdownPreviewToggle';
 import { getMcpServers } from '../../services/mcpServerService';
 import { McpServer, McpToolSelection, ToolCatalogueEntry } from '../../types';
@@ -50,12 +51,16 @@ const AgentCreatePage: React.FC = () => {
   const [openAtSourceId, setOpenAtSourceId] = useState<string | null>(null);
   const [mcpServers, setMcpServers] = useState<McpServer[]>([]);
   const [mcpSelections, setMcpSelections] = useState<McpToolSelection[]>([]);
+  const [allAgents, setAllAgents] = useState<Agent[]>([]);
+  const [selectedSubAgentIds, setSelectedSubAgentIds] = useState<string[]>([]);
+  const [isSubAgentsModalOpen, setIsSubAgentsModalOpen] = useState(false);
 
   useEffect(() => {
     if (!workspaceId) return;
     getTools(workspaceId).then(setAvailableTools).catch(() => setAvailableTools([]));
     fetchWorkspaceModels(workspaceId).then(setAvailableModels).catch(() => setAvailableModels([]));
     getMcpServers(workspaceId).then(setMcpServers).catch(() => setMcpServers([]));
+    getAgents(workspaceId).then(setAllAgents).catch(() => setAllAgents([]));
   }, [workspaceId]);
 
   const toolCatalogue = useMemo<ToolCatalogueEntry[]>(
@@ -112,6 +117,7 @@ const AgentCreatePage: React.FC = () => {
         customInstructions: isReviewAgent ? undefined : formState.customInstructions.trim(),
         projectPrinciples: isReviewAgent ? formState.projectPrinciples.trim() : undefined,
         model: formState.selectedModel === 'Default' ? null : formState.selectedModel,
+        subAgentIds: selectedSubAgentIds,
       });
       navigate(`/workspaces/${workspaceId}/agents`);
     } catch (error: any) {
@@ -252,6 +258,44 @@ const AgentCreatePage: React.FC = () => {
             onRemoveMcpServer={handleRemoveMcpServer}
           />
 
+          {/* Sub-Agents Section */}
+          <section className="space-y-3">
+            <h2 className="text-lg font-semibold text-text">Sub-Agents</h2>
+            {selectedSubAgentIds.length > 0 && (
+              <div className="space-y-2">
+                {selectedSubAgentIds.map(id => {
+                  const subAgent = allAgents.find(a => a.id === id);
+                  if (!subAgent) return null;
+                  return (
+                    <div key={id} className="flex items-center gap-3 px-3 py-2 bg-surfaceHighlight border border-border rounded-lg">
+                      <img src={subAgent.avatarUrl} alt={subAgent.name} className="w-8 h-8 rounded-full border border-border object-cover flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-text truncate">{subAgent.name}</p>
+                        <p className="text-xs text-textMuted truncate">{subAgent.role}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedSubAgentIds(prev => prev.filter(i => i !== id))}
+                        className="text-textMuted hover:text-red-400 transition-colors p-1 rounded hover:bg-red-500/10 flex-shrink-0"
+                        aria-label={`Remove ${subAgent.name}`}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setIsSubAgentsModalOpen(true)}
+              className="flex items-center gap-2 px-3 py-2 border border-dashed border-border rounded-lg text-sm text-textMuted hover:text-primary hover:border-primary/50 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Add Sub-Agent
+            </button>
+          </section>
+
           {/* Instructions Section */}
           <section className="space-y-4">
             <h2 className="text-lg font-semibold text-text">Instructions</h2>
@@ -298,6 +342,14 @@ const AgentCreatePage: React.FC = () => {
             onDiscard={handleDiscard}
             openAtSource={openAtSourceId}
             initialMcpSelections={mcpSelections}
+          />
+
+          <AddSubAgentsModal
+            isOpen={isSubAgentsModalOpen}
+            allAgents={allAgents}
+            alreadySelectedIds={selectedSubAgentIds}
+            onCommit={ids => { setSelectedSubAgentIds(ids); setIsSubAgentsModalOpen(false); }}
+            onDiscard={() => setIsSubAgentsModalOpen(false)}
           />
 
           {/* Form Actions */}

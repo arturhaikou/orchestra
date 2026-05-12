@@ -4,4 +4,5 @@ public record CreateAgentFromTemplateRequest(
     Guid WorkspaceId,
     string TemplateId,
     string ProjectPrinciples,
-    string? Model);
+    string? Model,
+    Guid? AiCliIntegrationId = null);

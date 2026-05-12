@@ -10,7 +10,9 @@ public record AgentTemplateDto(
     IReadOnlyList<string> Capabilities,
     string ToolLabel,
     string UsageGuide,
-    int TemplateVersion
+    int TemplateVersion,
+    bool IsCliAgent,
+    IReadOnlyList<string> EditableFields
 );
 
 public record TemplatePrerequisiteDto(

@@ -15,6 +15,7 @@ public record AgentDto(
     string[] ToolActionIds,     // Used for create/update operations
     string[] ToolCategories,    // Unique category names for display
     string[] McpServerNames,    // MCP server names assigned to this agent
+    string[] SubAgentIds,       // IDs of agents assigned as sub-agents of this agent
     string AvatarUrl,
     string? CustomInstructions,
     string? ProjectPrinciples,
@@ -22,5 +23,6 @@ public record AgentDto(
     string? TemplateIdentifier,
     int? TemplateVersion,
     bool IsBuiltIn,
-    string? Guide = null
+    string? Guide = null,
+    string? AiCliIntegrationId = null
 );

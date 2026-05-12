@@ -18,6 +18,8 @@ vi.mock('../../services/agentService', () => ({
   deleteAgent: vi.fn(),
   getAgentTemplates: vi.fn(),
   createAgentFromTemplate: vi.fn(),
+  saveAgentToolAssignments: vi.fn(),
+  getAgentMcpAssignments: vi.fn().mockResolvedValue({ nativeToolActionIds: [], mcpAssignments: [] }),
 }));
 
 vi.mock('../../services/toolService', () => ({
@@ -54,6 +56,7 @@ const mockAgent: Agent = {
   capabilities: ['chat', 'email'],
   toolActionIds: ['action-1'],
   toolCategories: ['TRACKER'],
+  subAgentIds: [],
   avatarUrl: '/avatar.png',
   customInstructions: 'Help customers with their issues',
   projectPrinciples: '',
@@ -72,6 +75,7 @@ const mockBuiltInAgent: Agent = {
   capabilities: ['code-review'],
   toolActionIds: ['action-review'],
   toolCategories: ['CODE'],
+  subAgentIds: [],
   avatarUrl: '/avatar.png',
   customInstructions: '',
   projectPrinciples: 'Follow SOLID principles',
@@ -136,6 +140,7 @@ describe('AgentEditPage', () => {
     vi.clearAllMocks();
     vi.mocked(agentService.getAgent).mockResolvedValue(mockAgent);
     vi.mocked(agentService.updateAgent).mockResolvedValue({ ...mockAgent, role: 'Updated Role' });
+    vi.mocked(agentService.getAgents).mockResolvedValue([]);
     vi.mocked(toolService.getTools).mockResolvedValue(mockTools);
     vi.mocked(workspaceService.fetchWorkspaceModels).mockResolvedValue(['gpt-4', 'gpt-3.5-turbo']);
     vi.mocked(mcpServerService.getMcpServers).mockResolvedValue([]);
@@ -455,6 +460,76 @@ describe('AgentEditPage', () => {
 
       const previewButton = screen.queryByRole('button', { name: /preview/i });
       expect(previewButton).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Sub-Agents', () => {
+    const mockSubAgent = {
+      id: 'sub-agent-1',
+      workspaceId: 'ws-test',
+      name: 'Helper Bot',
+      role: 'Assistant',
+      status: 'IDLE' as const,
+      capabilities: ['help'],
+      toolActionIds: [],
+      toolCategories: [],
+      subAgentIds: [],
+      avatarUrl: '/avatar.png',
+    };
+
+    it('renders_add_sub_agent_button_on_edit_page', async () => {
+      renderAgentEditPage();
+
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('Support Bot')).toBeInTheDocument();
+      });
+
+      expect(screen.getByRole('button', { name: /add sub-agent/i })).toBeInTheDocument();
+    });
+
+    it('pre_populates_sub_agents_from_loaded_agent', async () => {
+      vi.mocked(agentService.getAgent).mockResolvedValue({
+        ...mockAgent,
+        subAgentIds: ['sub-agent-1'],
+      });
+      vi.mocked(agentService.getAgents).mockResolvedValue([mockSubAgent]);
+
+      renderAgentEditPage();
+
+      await waitFor(() => {
+        expect(screen.getByText('Helper Bot')).toBeInTheDocument();
+      });
+    });
+
+    it('opens_sub_agents_modal_when_add_sub_agent_is_clicked', async () => {
+      const user = userEvent.setup();
+      renderAgentEditPage();
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /add sub-agent/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /add sub-agent/i }));
+
+      expect(screen.getByRole('dialog', { name: /select sub-agents/i })).toBeInTheDocument();
+    });
+
+    it('includes_subAgentIds_in_update_payload', async () => {
+      const user = userEvent.setup();
+      renderAgentEditPage();
+
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('Customer Support')).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /save/i }));
+
+      await waitFor(() => {
+        expect(agentService.updateAgent).toHaveBeenCalledWith(
+          'agent-1',
+          expect.objectContaining({ subAgentIds: [] })
+        );
+      });
     });
   });
 });

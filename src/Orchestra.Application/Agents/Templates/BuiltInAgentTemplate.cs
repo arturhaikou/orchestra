@@ -8,10 +8,12 @@ public record BuiltInAgentTemplate(
     string DisplayName,
     string Role,
     IReadOnlyList<string> Capabilities,
-    IntegrationType RequiredIntegrationType,
+    IntegrationType? RequiredIntegrationType,
     IReadOnlyList<string> ToolActionMethodNames,
     IReadOnlySet<string> LockedFields,
     IReadOnlyList<string> EditableFields,
     string GuideTemplate,
-    IReadOnlyDictionary<ProviderType, string> ProviderLabelMap,
-    IReadOnlyDictionary<ProviderType, string> ProviderToolMethodMap);
+    IReadOnlyDictionary<ProviderType, string>? ProviderLabelMap,
+    IReadOnlyDictionary<ProviderType, string>? ProviderToolMethodMap,
+    bool IsCliAgent = false,
+    string? DefaultCustomInstructions = null);

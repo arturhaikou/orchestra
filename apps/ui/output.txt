@@ -1,0 +1,218 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.5 [39m[90mD:/orchestra/apps/ui[39m
+
+ [32mΓ£ô[39m components/__tests__/AddSubAgentsModal.test.tsx[2m > [22mAddSubAgentsModal[2m > [22mRendering[2m > [22mrenders_nothing_when_closed[32m 56[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AddSubAgentsModal.test.tsx[2m > [22mAddSubAgentsModal[2m > [22mRendering[2m > [22mrenders_dialog_when_open[33m 301[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AddSubAgentsModal.test.tsx[2m > [22mAddSubAgentsModal[2m > [22mRendering[2m > [22mrenders_all_selectable_agents_as_cards[32m 57[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AddSubAgentsModal.test.tsx[2m > [22mAddSubAgentsModal[2m > [22mRendering[2m > [22mrenders_empty_state_when_no_agents_available[32m 22[2mms[22m[39m
+stderr | components/__tests__/AgentEditPage.test.tsx > AgentEditPage > Scenario 1: Navigate to agent edit page > displays_agent_current_data_in_form_fields
+ΓÜá∩╕Å React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+ΓÜá∩╕Å React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+ [31m├ù[39m components/__tests__/AgentEditPage.test.tsx[2m > [22mAgentEditPage[2m > [22mScenario 1: Navigate to agent edit page[2m > [22mdisplays_agent_current_data_in_form_fields[32m 88[2mms[22m[39m
+[31m   ΓåÆ [vitest] No "getAgentMcpAssignments" export is defined on the "../../services/agentService" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+[39m
+ [32mΓ£ô[39m components/__tests__/AddSubAgentsModal.test.tsx[2m > [22mAddSubAgentsModal[2m > [22mSelf-exclusion[2m > [22mexcludes_the_agent_being_edited_from_the_list[32m 21[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AddSubAgentsModal.test.tsx[2m > [22mAddSubAgentsModal[2m > [22mPre-selection[2m > [22mpre_selects_already_assigned_agents[32m 184[2mms[22m[39m
+stderr | components/__tests__/AgentCreatePage.test.tsx > AgentCreatePage > Scenario 1: Form rendering > renders_agent_creation_form_with_required_fields
+ΓÜá∩╕Å React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+ΓÜá∩╕Å React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+ [31m├ù[39m components/__tests__/AgentEditPage.test.tsx[2m > [22mAgentEditPage[2m > [22mScenario 1: Navigate to agent edit page[2m > [22mshows_loading_state_before_data_loads[32m 14[2mms[22m[39m
+[31m   ΓåÆ [vitest] No "getAgentMcpAssignments" export is defined on the "../../services/agentService" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+[39m
+ [31m├ù[39m components/__tests__/AgentEditPage.test.tsx[2m > [22mAgentEditPage[2m > [22mScenario 1: Navigate to agent edit page[2m > [22mrenders_page_title_with_edit_agent[32m 11[2mms[22m[39m
+[31m   ΓåÆ [vitest] No "getAgentMcpAssignments" export is defined on the "../../services/agentService" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+[39m
+ [31m├ù[39m components/__tests__/AgentEditPage.test.tsx[2m > [22mAgentEditPage[2m > [22mScenario 2: Successfully update an agent[2m > [22mupdates_agent_and_navigates_to_agents_list[32m 13[2mms[22m[39m
+[31m   ΓåÆ [vitest] No "getAgentMcpAssignments" export is defined on the "../../services/agentService" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+[39m
+ [31m├ù[39m components/__tests__/AgentEditPage.test.tsx[2m > [22mAgentEditPage[2m > [22mScenario 2: Successfully update an agent[2m > [22mshows_saving_spinner_during_submission[32m 10[2mms[22m[39m
+[31m   ΓåÆ [vitest] No "getAgentMcpAssignments" export is defined on the "../../services/agentService" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+[39m
+ [31m├ù[39m components/__tests__/AgentEditPage.test.tsx[2m > [22mAgentEditPage[2m > [22mScenario 2: Successfully update an agent[2m > [22mshows_error_toast_on_save_failure[32m 9[2mms[22m[39m
+[31m   ΓåÆ [vitest] No "getAgentMcpAssignments" export is defined on the "../../services/agentService" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+[39m
+ [31m├ù[39m components/__tests__/AgentEditPage.test.tsx[2m > [22mAgentEditPage[2m > [22mScenario 3: Cancel editing without changes[2m > [22mnavigates_to_agents_list_on_cancel[32m 11[2mms[22m[39m
+[31m   ΓåÆ [vitest] No "getAgentMcpAssignments" export is defined on the "../../services/agentService" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+[39m
+ [31m├ù[39m components/__tests__/AgentEditPage.test.tsx[2m > [22mAgentEditPage[2m > [22mScenario 3: Cancel editing without changes[2m > [22mdoes_not_call_updateAgent_on_cancel[32m 13[2mms[22m[39m
+[31m   ΓåÆ [vitest] No "getAgentMcpAssignments" export is defined on the "../../services/agentService" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+[39m
+ [31m├ù[39m components/__tests__/AgentEditPage.test.tsx[2m > [22mAgentEditPage[2m > [22mScenario 4: Agent not found[2m > [22mdisplays_error_state_when_agent_not_found[32m 9[2mms[22m[39m
+[31m   ΓåÆ [vitest] No "getAgentMcpAssignments" export is defined on the "../../services/agentService" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+[39m
+ [31m├ù[39m components/__tests__/AgentEditPage.test.tsx[2m > [22mAgentEditPage[2m > [22mScenario 4: Agent not found[2m > [22mprovides_link_to_return_to_agents_list[32m 9[2mms[22m[39m
+[31m   ΓåÆ [vitest] No "getAgentMcpAssignments" export is defined on the "../../services/agentService" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+[39m
+ [31m├ù[39m components/__tests__/AgentEditPage.test.tsx[2m > [22mAgentEditPage[2m > [22mScenario 4: Agent not found[2m > [22mnavigates_to_agents_list_when_return_link_clicked[32m 11[2mms[22m[39m
+[31m   ΓåÆ [vitest] No "getAgentMcpAssignments" export is defined on the "../../services/agentService" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+[39m
+ [32mΓ£ô[39m components/__tests__/AgentCreatePage.test.tsx[2m > [22mAgentCreatePage[2m > [22mScenario 1: Form rendering[2m > [22mrenders_agent_creation_form_with_required_fields[32m 232[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AgentCreatePage.test.tsx[2m > [22mAgentCreatePage[2m > [22mScenario 1: Form rendering[2m > [22mloads_available_tools_on_mount[32m 44[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AgentCreatePage.test.tsx[2m > [22mAgentCreatePage[2m > [22mScenario 1: Form rendering[2m > [22mloads_available_models_on_mount[32m 29[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AddSubAgentsModal.test.tsx[2m > [22mAddSubAgentsModal[2m > [22mPre-selection[2m > [22mshows_checkmark_on_pre_selected_agent[32m 111[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AddSubAgentsModal.test.tsx[2m > [22mAddSubAgentsModal[2m > [22mSelection behaviour[2m > [22mtoggling_a_card_increments_the_count[32m 254[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AddSubAgentsModal.test.tsx[2m > [22mAddSubAgentsModal[2m > [22mSelection behaviour[2m > [22mtoggling_a_selected_card_decrements_the_count[32m 207[2mms[22m[39m
+ [31m├ù[39m components/__tests__/AgentEditPage.test.tsx[2m > [22mAgentEditPage[2m > [22mFR-005 ΓÇö Scenario 7: Edit page loads existing selections as cards[2m > [22mshows_summary_card_for_pre_existing_tool_selections_on_page_load[32m 9[2mms[22m[39m
+[31m   ΓåÆ [vitest] No "getAgentMcpAssignments" export is defined on the "../../services/agentService" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+[39m
+ [31m├ù[39m components/__tests__/AgentEditPage.test.tsx[2m > [22mAgentEditPage[2m > [22mFR-005 ΓÇö Scenario 7: Edit page loads existing selections as cards[2m > [22mshows_correct_3_of_5_count_on_loaded_card[32m 9[2mms[22m[39m
+[31m   ΓåÆ [vitest] No "getAgentMcpAssignments" export is defined on the "../../services/agentService" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+[39m
+ [31m├ù[39m components/__tests__/AgentEditPage.test.tsx[2m > [22mAgentEditPage[2m > [22mFR-005 ΓÇö Scenario 7: Edit page loads existing selections as cards[2m > [22mrenders_add_tools_button_alongside_pre_loaded_card[32m 7[2mms[22m[39m
+[31m   ΓåÆ [vitest] No "getAgentMcpAssignments" export is defined on the "../../services/agentService" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+[39m
+ [31m├ù[39m components/__tests__/AgentEditPage.test.tsx[2m > [22mAgentEditPage[2m > [22mScenario 5: Built-in agent shows locked fields[2m > [22mrenders_name_as_read_only_for_built_in_agent[32m 15[2mms[22m[39m
+[31m   ΓåÆ [vitest] No "getAgentMcpAssignments" export is defined on the "../../services/agentService" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+[39m
+ [31m├ù[39m components/__tests__/AgentEditPage.test.tsx[2m > [22mAgentEditPage[2m > [22mScenario 5: Built-in agent shows locked fields[2m > [22mrenders_role_as_read_only_for_built_in_agent[32m 6[2mms[22m[39m
+[31m   ΓåÆ [vitest] No "getAgentMcpAssignments" export is defined on the "../../services/agentService" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+[39m
+ [31m├ù[39m components/__tests__/AgentEditPage.test.tsx[2m > [22mAgentEditPage[2m > [22mScenario 5: Built-in agent shows locked fields[2m > [22mallows_editing_project_principles_for_built_in_agent[32m 6[2mms[22m[39m
+[31m   ΓåÆ [vitest] No "getAgentMcpAssignments" export is defined on the "../../services/agentService" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+[39m
+ [31m├ù[39m components/__tests__/AgentEditPage.test.tsx[2m > [22mAgentEditPage[2m > [22mScenario 5: Built-in agent shows locked fields[2m > [22mallows_editing_model_for_built_in_agent[32m 5[2mms[22m[39m
+[31m   ΓåÆ [vitest] No "getAgentMcpAssignments" export is defined on the "../../services/agentService" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+[39m
+ [31m├ù[39m components/__tests__/AgentEditPage.test.tsx[2m > [22mAgentEditPage[2m > [22mScenario 5: Built-in agent shows locked fields[2m > [22mshows_info_banner_about_locked_fields[32m 5[2mms[22m[39m
+[31m   ΓåÆ [vitest] No "getAgentMcpAssignments" export is defined on the "../../services/agentService" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+[39m
+ [31m├ù[39m components/__tests__/AgentEditPage.test.tsx[2m > [22mAgentEditPage[2m > [22mFR-007 ΓÇö Custom Instructions Markdown Preview Toggle on Edit page[2m > [22mrenders_edit_write_and_preview_toggle_buttons_near_custom_instructions_field[32m 6[2mms[22m[39m
+[31m   ΓåÆ [vitest] No "getAgentMcpAssignments" export is defined on the "../../services/agentService" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+[39m
+ [31m├ù[39m components/__tests__/AgentEditPage.test.tsx[2m > [22mAgentEditPage[2m > [22mFR-007 ΓÇö Custom Instructions Markdown Preview Toggle on Edit page[2m > [22mcustom_instructions_textarea_shows_preloaded_agent_value_in_edit_mode[32m 5[2mms[22m[39m
+[31m   ΓåÆ [vitest] No "getAgentMcpAssignments" export is defined on the "../../services/agentService" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+[39m
+ [31m├ù[39m components/__tests__/AgentEditPage.test.tsx[2m > [22mAgentEditPage[2m > [22mFR-007 ΓÇö Custom Instructions Markdown Preview Toggle on Edit page[2m > [22mswitching_to_preview_mode_does_not_clear_the_loaded_custominstructions_value[32m 6[2mms[22m[39m
+[31m   ΓåÆ [vitest] No "getAgentMcpAssignments" export is defined on the "../../services/agentService" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+[39m
+ [31m├ù[39m components/__tests__/AgentEditPage.test.tsx[2m > [22mAgentEditPage[2m > [22mFR-007 ΓÇö Custom Instructions Markdown Preview Toggle on Edit page[2m > [22mdoes_not_render_toggle_buttons_when_agent_is_builtin[32m 5[2mms[22m[39m
+[31m   ΓåÆ [vitest] No "getAgentMcpAssignments" export is defined on the "../../services/agentService" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+[39m
+ [31m├ù[39m components/__tests__/AgentEditPage.test.tsx[2m > [22mAgentEditPage[2m > [22mSub-Agents[2m > [22mrenders_add_sub_agent_button_on_edit_page[32m 6[2mms[22m[39m
+[31m   ΓåÆ [vitest] No "getAgentMcpAssignments" export is defined on the "../../services/agentService" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+[39m
+ [31m├ù[39m components/__tests__/AgentEditPage.test.tsx[2m > [22mAgentEditPage[2m > [22mSub-Agents[2m > [22mpre_populates_sub_agents_from_loaded_agent[32m 6[2mms[22m[39m
+[31m   ΓåÆ [vitest] No "getAgentMcpAssignments" export is defined on the "../../services/agentService" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+[39m
+ [31m├ù[39m components/__tests__/AgentEditPage.test.tsx[2m > [22mAgentEditPage[2m > [22mSub-Agents[2m > [22mopens_sub_agents_modal_when_add_sub_agent_is_clicked[32m 9[2mms[22m[39m
+[31m   ΓåÆ [vitest] No "getAgentMcpAssignments" export is defined on the "../../services/agentService" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+[39m
+ [31m├ù[39m components/__tests__/AgentEditPage.test.tsx[2m > [22mAgentEditPage[2m > [22mSub-Agents[2m > [22mincludes_subAgentIds_in_update_payload[32m 5[2mms[22m[39m
+[31m   ΓåÆ [vitest] No "getAgentMcpAssignments" export is defined on the "../../services/agentService" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+[39m
+ [32mΓ£ô[39m components/__tests__/AddSubAgentsModal.test.tsx[2m > [22mAddSubAgentsModal[2m > [22mSelection behaviour[2m > [22mselecting_multiple_agents_updates_count[33m 310[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AddSubAgentsModal.test.tsx[2m > [22mAddSubAgentsModal[2m > [22mCommit[2m > [22mcalls_onCommit_with_selected_ids_on_confirm[32m 246[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AddSubAgentsModal.test.tsx[2m > [22mAddSubAgentsModal[2m > [22mCommit[2m > [22mcalls_onCommit_with_empty_array_when_no_agents_selected[32m 103[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AddSubAgentsModal.test.tsx[2m > [22mAddSubAgentsModal[2m > [22mCommit[2m > [22mcalls_onCommit_with_pre_selected_ids_when_unchanged[32m 140[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AddSubAgentsModal.test.tsx[2m > [22mAddSubAgentsModal[2m > [22mDiscard[2m > [22mcalls_onDiscard_when_cancel_button_clicked[32m 111[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AddSubAgentsModal.test.tsx[2m > [22mAddSubAgentsModal[2m > [22mDiscard[2m > [22mcalls_onDiscard_when_close_button_clicked[32m 126[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AddSubAgentsModal.test.tsx[2m > [22mAddSubAgentsModal[2m > [22mDiscard[2m > [22mcalls_onDiscard_when_escape_key_pressed[32m 61[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AgentCreatePage.test.tsx[2m > [22mAgentCreatePage[2m > [22mScenario 2: Successfully create an agent[2m > [22mcreates_agent_and_navigates_to_agents_list_on_save[33m 1402[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AgentCreatePage.test.tsx[2m > [22mAgentCreatePage[2m > [22mScenario 3: Cancel agent creation[2m > [22mnavigates_to_agents_list_on_cancel_without_creating[32m 142[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AgentCreatePage.test.tsx[2m > [22mAgentCreatePage[2m > [22mScenario 4: Validation error on required field[2m > [22mshows_validation_error_when_name_is_empty[33m 642[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AgentCreatePage.test.tsx[2m > [22mAgentCreatePage[2m > [22mScenario 4: Validation error on required field[2m > [22mshows_validation_error_when_instructions_are_empty[33m 533[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AgentCreatePage.test.tsx[2m > [22mAgentCreatePage[2m > [22mReview agent detection[2m > [22mswitches_to_project_principles_when_review_tool_selected[32m 20[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AgentCreatePage.test.tsx[2m > [22mAgentCreatePage[2m > [22mFR-005 ΓÇö Tool Summary Section on Create page[2m > [22mshows_empty_state_prompt_when_no_tools_are_selected[32m 14[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AgentCreatePage.test.tsx[2m > [22mAgentCreatePage[2m > [22mFR-005 ΓÇö Tool Summary Section on Create page[2m > [22mrenders_add_tools_button_on_initial_load[32m 19[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AgentCreatePage.test.tsx[2m > [22mAgentCreatePage[2m > [22mError handling[2m > [22mshows_error_toast_when_api_returns_400[33m 779[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AgentCreatePage.test.tsx[2m > [22mAgentCreatePage[2m > [22mError handling[2m > [22mpreserves_form_data_on_api_error[33m 696[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AgentCreatePage.test.tsx[2m > [22mAgentCreatePage[2m > [22mFR-007 ΓÇö Custom Instructions Markdown Preview Toggle[2m > [22mrenders_the_edit_write_toggle_button_in_custom_instructions_section[32m 47[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AgentCreatePage.test.tsx[2m > [22mAgentCreatePage[2m > [22mFR-007 ΓÇö Custom Instructions Markdown Preview Toggle[2m > [22mrenders_the_preview_toggle_button_in_custom_instructions_section[32m 25[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AgentCreatePage.test.tsx[2m > [22mAgentCreatePage[2m > [22mFR-007 ΓÇö Custom Instructions Markdown Preview Toggle[2m > [22mcustom_instructions_textarea_is_visible_by_default_edit_mode_is_active[32m 16[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AgentCreatePage.test.tsx[2m > [22mAgentCreatePage[2m > [22mFR-007 ΓÇö Custom Instructions Markdown Preview Toggle[2m > [22mform_isdirty_computation_is_unaffected_by_toggle_mode[33m 428[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AgentCreatePage.test.tsx[2m > [22mAgentCreatePage[2m > [22mSub-Agents[2m > [22mrenders_add_sub_agent_button[32m 23[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AgentCreatePage.test.tsx[2m > [22mAgentCreatePage[2m > [22mSub-Agents[2m > [22mopens_sub_agents_modal_when_add_sub_agent_is_clicked[32m 92[2mms[22m[39m
+ [32mΓ£ô[39m components/__tests__/AgentCreatePage.test.tsx[2m > [22mAgentCreatePage[2m > [22mSub-Agents[2m > [22mincludes_subAgentIds_in_create_payload[33m 628[2mms[22m[39m
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ» Failed Tests 27 ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+
+ FAIL  components/__tests__/AgentEditPage.test.tsx > AgentEditPage > Scenario 1: Navigate to agent edit page > displays_agent_current_data_in_form_fields
+ FAIL  components/__tests__/AgentEditPage.test.tsx > AgentEditPage > Scenario 1: Navigate to agent edit page > shows_loading_state_before_data_loads
+ FAIL  components/__tests__/AgentEditPage.test.tsx > AgentEditPage > Scenario 1: Navigate to agent edit page > renders_page_title_with_edit_agent
+ FAIL  components/__tests__/AgentEditPage.test.tsx > AgentEditPage > Scenario 2: Successfully update an agent > updates_agent_and_navigates_to_agents_list
+ FAIL  components/__tests__/AgentEditPage.test.tsx > AgentEditPage > Scenario 2: Successfully update an agent > shows_saving_spinner_during_submission
+ FAIL  components/__tests__/AgentEditPage.test.tsx > AgentEditPage > Scenario 2: Successfully update an agent > shows_error_toast_on_save_failure
+ FAIL  components/__tests__/AgentEditPage.test.tsx > AgentEditPage > Scenario 3: Cancel editing without changes > navigates_to_agents_list_on_cancel
+ FAIL  components/__tests__/AgentEditPage.test.tsx > AgentEditPage > Scenario 3: Cancel editing without changes > does_not_call_updateAgent_on_cancel
+ FAIL  components/__tests__/AgentEditPage.test.tsx > AgentEditPage > Scenario 4: Agent not found > displays_error_state_when_agent_not_found
+ FAIL  components/__tests__/AgentEditPage.test.tsx > AgentEditPage > Scenario 4: Agent not found > provides_link_to_return_to_agents_list
+ FAIL  components/__tests__/AgentEditPage.test.tsx > AgentEditPage > Scenario 4: Agent not found > navigates_to_agents_list_when_return_link_clicked
+ FAIL  components/__tests__/AgentEditPage.test.tsx > AgentEditPage > FR-005 ΓÇö Scenario 7: Edit page loads existing selections as cards > shows_summary_card_for_pre_existing_tool_selections_on_page_load
+ FAIL  components/__tests__/AgentEditPage.test.tsx > AgentEditPage > FR-005 ΓÇö Scenario 7: Edit page loads existing selections as cards > shows_correct_3_of_5_count_on_loaded_card
+ FAIL  components/__tests__/AgentEditPage.test.tsx > AgentEditPage > FR-005 ΓÇö Scenario 7: Edit page loads existing selections as cards > renders_add_tools_button_alongside_pre_loaded_card
+ FAIL  components/__tests__/AgentEditPage.test.tsx > AgentEditPage > Scenario 5: Built-in agent shows locked fields > renders_name_as_read_only_for_built_in_agent
+ FAIL  components/__tests__/AgentEditPage.test.tsx > AgentEditPage > Scenario 5: Built-in agent shows locked fields > renders_role_as_read_only_for_built_in_agent
+ FAIL  components/__tests__/AgentEditPage.test.tsx > AgentEditPage > Scenario 5: Built-in agent shows locked fields > allows_editing_project_principles_for_built_in_agent
+ FAIL  components/__tests__/AgentEditPage.test.tsx > AgentEditPage > Scenario 5: Built-in agent shows locked fields > allows_editing_model_for_built_in_agent
+ FAIL  components/__tests__/AgentEditPage.test.tsx > AgentEditPage > Scenario 5: Built-in agent shows locked fields > shows_info_banner_about_locked_fields
+ FAIL  components/__tests__/AgentEditPage.test.tsx > AgentEditPage > FR-007 ΓÇö Custom Instructions Markdown Preview Toggle on Edit page > renders_edit_write_and_preview_toggle_buttons_near_custom_instructions_field
+ FAIL  components/__tests__/AgentEditPage.test.tsx > AgentEditPage > FR-007 ΓÇö Custom Instructions Markdown Preview Toggle on Edit page > custom_instructions_textarea_shows_preloaded_agent_value_in_edit_mode
+ FAIL  components/__tests__/AgentEditPage.test.tsx > AgentEditPage > FR-007 ΓÇö Custom Instructions Markdown Preview Toggle on Edit page > switching_to_preview_mode_does_not_clear_the_loaded_custominstructions_value
+ FAIL  components/__tests__/AgentEditPage.test.tsx > AgentEditPage > FR-007 ΓÇö Custom Instructions Markdown Preview Toggle on Edit page > does_not_render_toggle_buttons_when_agent_is_builtin
+ FAIL  components/__tests__/AgentEditPage.test.tsx > AgentEditPage > Sub-Agents > renders_add_sub_agent_button_on_edit_page
+ FAIL  components/__tests__/AgentEditPage.test.tsx > AgentEditPage > Sub-Agents > pre_populates_sub_agents_from_loaded_agent
+ FAIL  components/__tests__/AgentEditPage.test.tsx > AgentEditPage > Sub-Agents > opens_sub_agents_modal_when_add_sub_agent_is_clicked
+ FAIL  components/__tests__/AgentEditPage.test.tsx > AgentEditPage > Sub-Agents > includes_subAgentIds_in_update_payload
+Error: [vitest] No "getAgentMcpAssignments" export is defined on the "../../services/agentService" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+vi.mock(import("../../services/agentService"), async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    // your mocked methods
+  }
+})
+
+ Γ¥» hooks/useAgentMcpAssignments.ts:25:5
+     23|     setHasError(false);
+     24|
+     25|     getAgentMcpAssignments(agentId)
+       |     ^
+     26|       .then((data) => {
+     27|         if (controller.signal.aborted) return;
+ Γ¥» Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25989:20
+ Γ¥» runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:874:13
+ Γ¥» commitHookEffectListMount node_modules/react-dom/cjs/react-dom-client.development.js:13249:29
+ Γ¥» commitHookPassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:13336:11
+ Γ¥» commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom-client.development.js:15484:13
+ Γ¥» recursivelyTraversePassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:15439:11
+ Γ¥» commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom-client.development.js:15718:11
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[1/27]ΓÄ»
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m2 passed[39m[22m[90m (3)[39m
+[2m      Tests [22m [1m[31m27 failed[39m[22m[2m | [22m[1m[32m35 passed[39m[22m[90m (62)[39m
+[2m   Start at [22m 22:40:51
+[2m   Duration [22m 9.31s[2m (transform 1.64s, setup 1.11s, import 3.18s, tests 8.46s, environment 4.50s)[22m
+

@@ -13,33 +13,39 @@ public class AgentService : IAgentService
     private readonly IAgentDataAccess _agentDataAccess;
     private readonly IAgentToolActionDataAccess _agentToolActionDataAccess;
     private readonly IAgentMcpToolDataAccess _agentMcpToolDataAccess;
+    private readonly IAgentSubAgentDataAccess _agentSubAgentDataAccess;
     private readonly IWorkspaceAuthorizationService _workspaceAuthorizationService;
     private readonly IToolValidationService _toolValidationService;
     private readonly IBuiltInAgentTemplateRegistry _templateRegistry;
     private readonly ITemplateAvailabilityResolver _availabilityResolver;
     private readonly IToolActionDataAccess _toolActionDataAccess;
     private readonly IIntegrationDataAccess _integrationDataAccess;
+    private readonly IAgentSubAgentAssignmentService _subAgentAssignmentService;
 
     public AgentService(
         IAgentDataAccess agentDataAccess,
         IAgentToolActionDataAccess agentToolActionDataAccess,
         IAgentMcpToolDataAccess agentMcpToolDataAccess,
+        IAgentSubAgentDataAccess agentSubAgentDataAccess,
         IWorkspaceAuthorizationService workspaceAuthorizationService,
         IToolValidationService toolValidationService,
         IBuiltInAgentTemplateRegistry templateRegistry,
         ITemplateAvailabilityResolver availabilityResolver,
         IToolActionDataAccess toolActionDataAccess,
-        IIntegrationDataAccess integrationDataAccess)
+        IIntegrationDataAccess integrationDataAccess,
+        IAgentSubAgentAssignmentService subAgentAssignmentService)
     {
         _agentDataAccess = agentDataAccess ?? throw new ArgumentNullException(nameof(agentDataAccess));
         _agentToolActionDataAccess = agentToolActionDataAccess ?? throw new ArgumentNullException(nameof(agentToolActionDataAccess));
         _agentMcpToolDataAccess = agentMcpToolDataAccess ?? throw new ArgumentNullException(nameof(agentMcpToolDataAccess));
+        _agentSubAgentDataAccess = agentSubAgentDataAccess ?? throw new ArgumentNullException(nameof(agentSubAgentDataAccess));
         _workspaceAuthorizationService = workspaceAuthorizationService ?? throw new ArgumentNullException(nameof(workspaceAuthorizationService));
         _toolValidationService = toolValidationService ?? throw new ArgumentNullException(nameof(toolValidationService));
         _templateRegistry = templateRegistry ?? throw new ArgumentNullException(nameof(templateRegistry));
         _availabilityResolver = availabilityResolver ?? throw new ArgumentNullException(nameof(availabilityResolver));
         _toolActionDataAccess = toolActionDataAccess ?? throw new ArgumentNullException(nameof(toolActionDataAccess));
         _integrationDataAccess = integrationDataAccess ?? throw new ArgumentNullException(nameof(integrationDataAccess));
+        _subAgentAssignmentService = subAgentAssignmentService ?? throw new ArgumentNullException(nameof(subAgentAssignmentService));
     }
 
     public async Task<AgentDto> CreateAgentAsync(Guid userId, CreateAgentRequest request, CancellationToken cancellationToken = default)
@@ -131,6 +137,22 @@ public class AgentService : IAgentService
             }
         }
 
+        // 6.6. Assign sub-agents if provided
+        if (request.SubAgentIds != null && request.SubAgentIds.Length > 0)
+        {
+            var subAgentGuids = request.SubAgentIds
+                .Select(id => Guid.TryParse(id, out var guid) ? guid : Guid.Empty)
+                .Where(guid => guid != Guid.Empty)
+                .ToList();
+
+            if (subAgentGuids.Count > 0)
+                await _subAgentAssignmentService.AssignSubAgentsAsync(
+                    agent.Id,
+                    subAgentGuids,
+                    request.WorkspaceId,
+                    cancellationToken);
+        }
+
         // 7. Map to DTO and return
         return await MapToDtoAsync(agent, cancellationToken);
     }
@@ -154,10 +176,15 @@ public class AgentService : IAgentService
         if (hasTemplateAgents)
             preResolvedLabel = await ResolveProviderLabelAsync(workspaceId, cancellationToken);
 
+        // 4. Batch-load all sub-agent assignments for the workspace in a single query
+        var subAgentMap = await _agentSubAgentDataAccess.GetSubAgentIdsByWorkspaceIdAsync(
+            workspaceId, cancellationToken) ?? new Dictionary<Guid, List<Guid>>();
+
         var agentDtos = new List<AgentDto>();
         foreach (var agent in agents)
         {
-            var dto = await MapToDtoAsync(agent, cancellationToken, preResolvedLabel);
+            subAgentMap.TryGetValue(agent.Id, out var subAgentIds);
+            var dto = await MapToDtoAsync(agent, cancellationToken, preResolvedLabel, subAgentIds);
             agentDtos.Add(dto);
         }
         return agentDtos;
@@ -311,6 +338,27 @@ public class AgentService : IAgentService
             }
         }
 
+        // 8b. Update sub-agent assignments if provided (null = no-op, empty = remove all)
+        if (request.SubAgentIds != null)
+        {
+            await _agentSubAgentDataAccess.RemoveAllSubAgentsAsync(agentId, cancellationToken);
+
+            if (request.SubAgentIds.Length > 0)
+            {
+                var subAgentGuids = request.SubAgentIds
+                    .Select(id => Guid.TryParse(id, out var guid) ? guid : Guid.Empty)
+                    .Where(guid => guid != Guid.Empty)
+                    .ToList();
+
+                if (subAgentGuids.Count > 0)
+                    await _subAgentAssignmentService.AssignSubAgentsAsync(
+                        agentId,
+                        subAgentGuids,
+                        agent.WorkspaceId,
+                        cancellationToken);
+            }
+        }
+
         // 9. Map to DTO and return
         return await MapToDtoAsync(agent, cancellationToken);
     }
@@ -343,17 +391,26 @@ public class AgentService : IAgentService
         var template = _templateRegistry.GetByIdentifier(request.TemplateId)
             ?? throw new TemplateNotFoundException(request.TemplateId);
 
-        ValidateProjectPrinciples(request.ProjectPrinciples);
+        if (!template.IsCliAgent)
+            ValidateProjectPrinciples(request.ProjectPrinciples);
 
         await _availabilityResolver.ValidatePrerequisitesAsync(request.WorkspaceId, template, cancellationToken);
 
-        var toolActionIds = await ResolveToolActionIdsFromProviders(request.WorkspaceId, template, cancellationToken);
-
         var agent = CreateAgentFromTemplate(request, template);
+
+        if (template.IsCliAgent && !request.AiCliIntegrationId.HasValue)
+            throw new ArgumentException("A CLI integration must be selected to deploy this agent.");
+
+        if (template.IsCliAgent && request.AiCliIntegrationId.HasValue)
+            agent.SetAiCliIntegrationId(request.AiCliIntegrationId.Value);
 
         await _agentDataAccess.AddAsync(agent, cancellationToken);
 
-        await ValidateAndAssignToolActions(request.WorkspaceId, agent.Id, toolActionIds, cancellationToken);
+        if (!template.IsCliAgent)
+        {
+            var toolActionIds = await ResolveToolActionIdsFromProviders(request.WorkspaceId, template, cancellationToken);
+            await ValidateAndAssignToolActions(request.WorkspaceId, agent.Id, toolActionIds, cancellationToken);
+        }
 
         return await MapToDtoAsync(agent, cancellationToken);
     }
@@ -423,8 +480,8 @@ public class AgentService : IAgentService
             name: template.DisplayName,
             role: template.Role,
             capabilities: template.Capabilities,
-            customInstructions: null,
-            projectPrinciples: request.ProjectPrinciples,
+            customInstructions: template.IsCliAgent ? template.DefaultCustomInstructions : null,
+            projectPrinciples: template.IsCliAgent ? null : request.ProjectPrinciples,
             model: request.Model,
             templateIdentifier: template.Identifier,
             templateVersion: template.Version);
@@ -442,7 +499,8 @@ public class AgentService : IAgentService
     private async Task<AgentDto> MapToDtoAsync(
         Agent agent,
         CancellationToken cancellationToken,
-        string? preResolvedLabel = null)
+        string? preResolvedLabel = null,
+        List<Guid>? preloadedSubAgentIds = null)
     {
         var toolActionIds = await _agentToolActionDataAccess.GetToolActionIdsByAgentIdAsync(
             agent.Id, cancellationToken);
@@ -452,6 +510,10 @@ public class AgentService : IAgentService
 
         var mcpServerNames = await _agentMcpToolDataAccess.GetMcpServerNamesByAgentIdAsync(
             agent.Id, cancellationToken);
+
+        var subAgentIds = preloadedSubAgentIds
+            ?? await _agentSubAgentDataAccess.GetSubAgentIdsByParentAgentIdAsync(agent.Id, cancellationToken)
+            ?? [];
 
         var guide = await ResolveGuideAsync(agent, cancellationToken, preResolvedLabel);
 
@@ -471,6 +533,7 @@ public class AgentService : IAgentService
             ToolActionIds: toolActionIds.Select(id => id.ToString()).ToArray(),
             ToolCategories: toolCategories.ToArray(),
             McpServerNames: mcpServerNames,
+            SubAgentIds: subAgentIds.Select(id => id.ToString()).ToArray(),
             AvatarUrl: agent.AvatarUrl,
             CustomInstructions: agent.CustomInstructions,
             ProjectPrinciples: agent.ProjectPrinciples,
@@ -478,7 +541,8 @@ public class AgentService : IAgentService
             TemplateIdentifier: agent.TemplateIdentifier,
             TemplateVersion: agent.TemplateVersion,
             IsBuiltIn: agent.TemplateIdentifier != null,
-            Guide: guide
+            Guide: guide,
+            AiCliIntegrationId: agent.AiCliIntegrationId?.ToString()
         );
     }
 
@@ -528,7 +592,7 @@ public class AgentService : IAgentService
 
         var toolLabel = resolved.ProviderLabels.Count > 0
             ? string.Join(" / ", resolved.ProviderLabels.Select(p => p.Label).Distinct())
-            : template != null
+            : template?.ProviderLabelMap != null
                 ? string.Join(" / ", template.ProviderLabelMap.Values.Distinct())
                 : string.Empty;
 
@@ -542,7 +606,9 @@ public class AgentService : IAgentService
             Capabilities: template?.Capabilities ?? Array.Empty<string>(),
             ToolLabel: toolLabel,
             UsageGuide: resolved.ResolvedGuide ?? string.Empty,
-            TemplateVersion: template?.Version ?? 0);
+            TemplateVersion: template?.Version ?? 0,
+            IsCliAgent: template?.IsCliAgent ?? false,
+            EditableFields: template?.EditableFields ?? Array.Empty<string>());
     }
 
     private static IReadOnlyList<TemplatePrerequisiteDto> MapPrerequisites(ResolvedTemplate resolved)

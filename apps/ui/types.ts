@@ -109,6 +109,7 @@ export interface Agent {
   toolActionIds: string[]; // List of authorized tool action IDs (for create/update)
   toolCategories: string[]; // Unique category names for display
   mcpServerNames?: string[]; // MCP server names assigned to this agent
+  subAgentIds: string[]; // IDs of agents assigned as sub-agents
   avatarUrl: string;
   customInstructions?: string;
   projectPrinciples?: string; // Non-null only for agents with a review tool assigned
@@ -118,6 +119,7 @@ export interface Agent {
   isBuiltIn?: boolean;
   guide?: string | null;
   integrationStatus?: IntegrationStatus | null;
+  aiCliIntegrationId?: string | null;
 }
 
 export interface TemplatePrerequisiteDto {
@@ -143,6 +145,8 @@ export interface AgentTemplateDto {
   capabilities: string[];
   toolLabel: string;
   usageGuide: string;
+  isCliAgent: boolean;
+  editableFields: string[];
 }
 
 export interface CreateAgentFromTemplateRequest {
@@ -150,6 +154,7 @@ export interface CreateAgentFromTemplateRequest {
   templateId: string;
   projectPrinciples: string;
   model?: string;
+  aiCliIntegrationId?: string;
 }
 
 export interface Job {
@@ -201,6 +206,46 @@ export interface Integration {
   toolCount?: number;
   mcpTransportType?: 'HTTP' | 'STDIO';
   mcpCommand?: string;
+}
+
+export enum AiCliProviderType {
+  GITHUB_COPILOT = 'GITHUB_COPILOT',
+  CLAUDE = 'CLAUDE',
+  GEMINI = 'GEMINI',
+}
+
+export interface AiCliIntegration {
+  id: string;
+  workspaceId: string;
+  name: string;
+  provider: AiCliProviderType;
+  useLoggedInUser: boolean;
+  workingDirectory: string;
+  modelId?: string | null;
+  cliPath?: string | null;
+  createdAt: string;
+  updatedAt?: string | null;
+}
+
+export interface CreateCliIntegrationRequest {
+  workspaceId: string;
+  name: string;
+  provider: AiCliProviderType;
+  credential?: string;
+  useLoggedInUser: boolean;
+  workingDirectory: string;
+  modelId?: string | null;
+  cliPath?: string | null;
+}
+
+export interface UpdateCliIntegrationRequest {
+  workspaceId: string;
+  name: string;
+  credential?: string;
+  useLoggedInUser: boolean;
+  workingDirectory: string;
+  modelId?: string | null;
+  cliPath?: string | null;
 }
 
 export interface ToolCategory {

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.Reflection;
+using Microsoft.Agents.AI;
 using Orchestra.Application.CodeReview.Models;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.McpServers.Interfaces;
@@ -25,10 +26,14 @@ public class ToolRetrieverService : IToolRetrieverService
     private readonly IAgentDataAccess _agentDataAccess;
     private readonly IProviderCredentialEncryptionService _encryptionService;
     private readonly IMcpServerDataAccess _mcpServerDataAccess;
+    private readonly IAgentMcpToolDataAccess _agentMcpToolDataAccess;
+    private readonly IAgentSubAgentDataAccess _agentSubAgentDataAccess;
+    private readonly IChatClientResolver _chatClientResolver;
     private readonly ILogger<ToolRetrieverService> _logger;
 
     private const string ReviewPullRequestActionName = "review_pull_request";
     private const string ReviewMergeRequestActionName = "review_merge_request";
+    private const int MaxSubAgentDepth = 3;
 
     private static readonly Dictionary<string, Type> ServiceTypeMap = new()
     {
@@ -49,6 +54,9 @@ public class ToolRetrieverService : IToolRetrieverService
         IAgentDataAccess agentDataAccess,
         IProviderCredentialEncryptionService encryptionService,
         IMcpServerDataAccess mcpServerDataAccess,
+        IAgentMcpToolDataAccess agentMcpToolDataAccess,
+        IAgentSubAgentDataAccess agentSubAgentDataAccess,
+        IChatClientResolver chatClientResolver,
         ILogger<ToolRetrieverService> logger)
     {
         _serviceProvider = serviceProvider;
@@ -60,6 +68,9 @@ public class ToolRetrieverService : IToolRetrieverService
         _agentDataAccess = agentDataAccess;
         _encryptionService = encryptionService;
         _mcpServerDataAccess = mcpServerDataAccess;
+        _agentMcpToolDataAccess = agentMcpToolDataAccess;
+        _agentSubAgentDataAccess = agentSubAgentDataAccess;
+        _chatClientResolver = chatClientResolver;
         _logger = logger;
     }
 
@@ -69,26 +80,45 @@ public class ToolRetrieverService : IToolRetrieverService
         string? projectPrinciples = null,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Retrieving tools for agent {AgentId}", agentId);
+        return await GetAgentToolsInternalAsync(agentId, modelIdentifier, projectPrinciples, depth: MaxSubAgentDepth, cancellationToken);
+    }
+
+    private async Task<IEnumerable<AIFunction>> GetAgentToolsInternalAsync(
+        Guid agentId,
+        string? modelIdentifier,
+        string? projectPrinciples,
+        int depth,
+        CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Retrieving tools for agent {AgentId} (depth {Depth})", agentId, depth);
+
+        var agent = await _agentDataAccess.GetByIdAsync(agentId, cancellationToken);
+        if (agent is null)
+        {
+            _logger.LogWarning("Agent {AgentId} not found; returning empty tool list", agentId);
+            return [];
+        }
 
         var toolActionIds = await _agentToolActionDataAccess
             .GetToolActionIdsByAgentIdAsync(agentId, cancellationToken);
 
-        if (!toolActionIds.Any())
-        {
-            _logger.LogInformation("No tools assigned to agent {AgentId}", agentId);
-            return Enumerable.Empty<AIFunction>();
-        }
-
-        var toolActions = await LoadToolActionsAsync(toolActionIds, cancellationToken);
+        var toolActions = toolActionIds.Count > 0
+            ? await LoadToolActionsAsync(toolActionIds, cancellationToken)
+            : new List<ToolAction>();
 
         var nativeActions = toolActions.Where(a => !a.IsMcpTool).ToList();
         var mcpActions = toolActions.Where(a => a.IsMcpTool).ToList();
 
         var nativeAiFunctions = await ResolveNativeToolsAsync(nativeActions, modelIdentifier, projectPrinciples, cancellationToken);
-        var mcpAiFunctions = await ResolveMcpToolsIfAnyAsync(agentId, mcpActions, cancellationToken);
+        var mcpAiFunctions = await ResolveMcpToolsIfAnyAsync(agent.WorkspaceId, mcpActions, cancellationToken);
+        var connectedMcpFunctions = await ResolveConnectedMcpToolsAsync(agentId, agent.WorkspaceId, cancellationToken);
+        var subAgentFunctions = await ResolveSubAgentToolsAsync(agentId, depth, cancellationToken);
 
-        var allFunctions = nativeAiFunctions.Concat(mcpAiFunctions).ToList();
+        var allFunctions = nativeAiFunctions
+            .Concat(mcpAiFunctions)
+            .Concat(connectedMcpFunctions)
+            .Concat(subAgentFunctions)
+            .ToList();
 
         _logger.LogInformation("Retrieved {Count} tools for agent {AgentId}", allFunctions.Count, agentId);
 
@@ -172,21 +202,182 @@ public class ToolRetrieverService : IToolRetrieverService
     }
 
     private async Task<List<AIFunction>> ResolveMcpToolsIfAnyAsync(
-        Guid agentId,
+        Guid agentWorkspaceId,
         List<ToolAction> mcpActions,
         CancellationToken cancellationToken)
     {
         if (mcpActions.Count == 0)
             return [];
 
-        var agent = await _agentDataAccess.GetByIdAsync(agentId, cancellationToken);
-        if (agent is null)
+        return await ResolveMcpToolsAsync(mcpActions, agentWorkspaceId, cancellationToken);
+    }
+
+    private async Task<List<AIFunction>> ResolveConnectedMcpToolsAsync(
+        Guid agentId,
+        Guid agentWorkspaceId,
+        CancellationToken cancellationToken)
+    {
+        var connectedTools = await _agentMcpToolDataAccess.GetByAgentIdAsync(agentId, cancellationToken);
+        if (connectedTools.Count == 0)
+            return [];
+
+        var groups = connectedTools.GroupBy(t => t.McpServerId);
+
+        var tasks = groups.Select(g =>
+            ResolveConnectedMcpToolsForServerAsync(g.Key, g.Select(t => t.ToolName).ToList(), agentWorkspaceId, cancellationToken));
+
+        var results = await Task.WhenAll(tasks);
+        return results.SelectMany(r => r).ToList();
+    }
+
+    private async Task<List<AIFunction>> ResolveConnectedMcpToolsForServerAsync(
+        Guid mcpServerId,
+        IReadOnlyList<string> toolNames,
+        Guid agentWorkspaceId,
+        CancellationToken cancellationToken)
+    {
+        var mcpServer = await _mcpServerDataAccess.GetByIdAsync(mcpServerId, cancellationToken);
+        if (mcpServer is null)
         {
-            _logger.LogWarning("Agent {AgentId} not found; skipping MCP tool resolution", agentId);
+            _logger.LogWarning("Connected MCP server {McpServerId} not found; skipping tools", mcpServerId);
             return [];
         }
 
-        return await ResolveMcpToolsAsync(mcpActions, agent.WorkspaceId, cancellationToken);
+        if (mcpServer.WorkspaceId != agentWorkspaceId)
+        {
+            _logger.LogWarning(
+                "Cross-workspace access denied: connected MCP server {McpServerId} belongs to workspace {McpServerWorkspace}, agent is in {AgentWorkspace}",
+                mcpServerId, mcpServer.WorkspaceId, agentWorkspaceId);
+            return [];
+        }
+
+        var mcpClient = await ConnectToMcpServerAsync(mcpServer, cancellationToken);
+        if (mcpClient is null)
+            return [];
+
+        return await MatchConnectedToolsAsync(mcpClient, toolNames, cancellationToken);
+    }
+
+    private async Task<List<AIFunction>> MatchConnectedToolsAsync(
+        IMcpClient mcpClient,
+        IReadOnlyList<string> toolNames,
+        CancellationToken cancellationToken)
+    {
+        IEnumerable<IMcpToolDescriptor> serverTools;
+
+        try
+        {
+            serverTools = await mcpClient.ListToolsAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to list tools from connected MCP server");
+            return [];
+        }
+
+        var serverToolLookup = serverTools.ToDictionary(t => t.Name, StringComparer.OrdinalIgnoreCase);
+        var aiFunctions = new List<AIFunction>();
+
+        foreach (var toolName in toolNames)
+        {
+            if (!serverToolLookup.TryGetValue(toolName, out var serverTool))
+            {
+                _logger.LogWarning("Connected MCP tool '{ToolName}' no longer exists on server; skipping", toolName);
+                continue;
+            }
+
+            aiFunctions.Add(serverTool.AsAIFunction());
+        }
+
+        return aiFunctions;
+    }
+
+    private async Task<List<AIFunction>> ResolveSubAgentToolsAsync(
+        Guid parentAgentId,
+        int depth,
+        CancellationToken cancellationToken)
+    {
+        if (depth <= 0)
+        {
+            _logger.LogWarning(
+                "Maximum sub-agent recursion depth reached for agent {AgentId}; skipping further sub-agents",
+                parentAgentId);
+            return [];
+        }
+
+        var subAgentIds = await _agentSubAgentDataAccess
+            .GetSubAgentIdsByParentAgentIdAsync(parentAgentId, cancellationToken);
+
+        if (subAgentIds.Count == 0)
+            return [];
+
+        var aiFunctions = new List<AIFunction>();
+
+        foreach (var subAgentId in subAgentIds)
+        {
+            var subAgentFunction = await BuildSubAgentAIFunctionAsync(subAgentId, depth - 1, cancellationToken);
+            if (subAgentFunction is not null)
+                aiFunctions.Add(subAgentFunction);
+        }
+
+        return aiFunctions;
+    }
+
+    private async Task<AIFunction?> BuildSubAgentAIFunctionAsync(
+        Guid subAgentId,
+        int depth,
+        CancellationToken cancellationToken)
+    {
+        var subAgent = await _agentDataAccess.GetByIdAsync(subAgentId, cancellationToken);
+        if (subAgent is null)
+        {
+            _logger.LogWarning("Sub-agent {SubAgentId} not found; skipping", subAgentId);
+            return null;
+        }
+
+        if (string.IsNullOrEmpty(subAgent.Model))
+        {
+            _logger.LogWarning(
+                "Sub-agent {SubAgentId} has no model configured; skipping",
+                subAgentId);
+            return null;
+        }
+
+        try
+        {
+            var chatClient = await _chatClientResolver.ResolveAsync(
+                subAgent.WorkspaceId,
+                subAgent.Model,
+                cancellationToken);
+
+            var subAgentTools = await GetAgentToolsInternalAsync(
+                subAgentId,
+                subAgent.Model,
+                subAgent.ProjectPrinciples,
+                depth,
+                cancellationToken);
+
+            var agentInstance = new ChatClientAgent(
+                chatClient,
+                instructions: subAgent.CustomInstructions ?? subAgent.ProjectPrinciples,
+                name: subAgent.Name,
+                tools: subAgentTools.ToArray());
+
+            var aiFunction = agentInstance.AsAIFunction();
+
+            _logger.LogDebug(
+                "Created sub-agent AIFunction for agent {SubAgentName} ({SubAgentId})",
+                subAgent.Name, subAgentId);
+
+            return aiFunction;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Failed to build sub-agent AIFunction for agent {SubAgentId}; skipping",
+                subAgentId);
+            return null;
+        }
     }
 
     private async Task<List<AIFunction>> ResolveMcpToolsAsync(
@@ -313,7 +504,7 @@ public class ToolRetrieverService : IToolRetrieverService
         if (string.IsNullOrEmpty(mcpArgumentsJson))
             return null;
 
-        return System.Text.Json.JsonSerializer.Deserialize<string[]>(mcpArgumentsJson);
+        return mcpArgumentsJson.Split(' ', StringSplitOptions.RemoveEmptyEntries);
     }
 
     private async Task<List<AIFunction>> MatchAndConvertToolsAsync(

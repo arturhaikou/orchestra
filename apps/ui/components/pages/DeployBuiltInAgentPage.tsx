@@ -1,10 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Loader2, AlertTriangle, ArrowLeft } from 'lucide-react';
-import { AgentTemplateDto } from '../../types';
+import { Loader2, AlertTriangle, ArrowLeft, Terminal } from 'lucide-react';
+import { AgentTemplateDto, AiCliIntegration, AiCliProviderType } from '../../types';
 import { getAgentTemplates, createAgentFromTemplate } from '../../services/agentService';
+import { getCliIntegrations } from '../../services/cliIntegrationService';
+import { fetchWorkspaceModels } from '../../services/workspaceService';
 import Toast from '../Toast';
 import TemplateDetailsCard from '../agents/TemplateDetailsCard';
+
+const CLI_PROVIDER_LABELS: Record<AiCliProviderType, string> = {
+  [AiCliProviderType.GITHUB_COPILOT]: 'GitHub Copilot',
+  [AiCliProviderType.CLAUDE]: 'Claude',
+  [AiCliProviderType.GEMINI]: 'Gemini',
+};
 
 type PageState = 'LOADING' | 'READY' | 'ALREADY_DEPLOYED' | 'UNMET_PREREQUISITES' | 'NOT_FOUND' | 'ERROR';
 
@@ -17,6 +25,14 @@ const DeployBuiltInAgentPage: React.FC = () => {
   const [isDeploying, setIsDeploying] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
+
+  const [projectPrinciples, setProjectPrinciples] = useState('');
+  const [customInstructions, setCustomInstructions] = useState('');
+  const [cliIntegrations, setCliIntegrations] = useState<AiCliIntegration[]>([]);
+  const [selectedCliIntegrationId, setSelectedCliIntegrationId] = useState<string>('');
+  const [loadingIntegrations, setLoadingIntegrations] = useState(false);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string>('Default');
 
   const agentsPath = `/workspaces/${workspaceId}/agents`;
 
@@ -36,6 +52,22 @@ const DeployBuiltInAgentPage: React.FC = () => {
       }
       setTemplate(found);
       setPageState(resolvePageState(found));
+
+      if (found.isCliAgent) {
+        setLoadingIntegrations(true);
+        getCliIntegrations(workspaceId!)
+          .then((integrations) => {
+            setCliIntegrations(integrations);
+            if (integrations.length === 1) setSelectedCliIntegrationId(integrations[0].id);
+          })
+          .catch(() => setCliIntegrations([]))
+          .finally(() => setLoadingIntegrations(false));
+      } else {
+        // Fetch available models for non-CLI agents
+        fetchWorkspaceModels(workspaceId!)
+          .then((models) => setAvailableModels(models))
+          .catch(() => setAvailableModels([]));
+      }
     } catch (error) {
       setFetchError(error instanceof Error ? error.message : 'Failed to load template');
       setPageState('ERROR');
@@ -53,9 +85,16 @@ const DeployBuiltInAgentPage: React.FC = () => {
   };
 
   const handleDeploy = async () => {
+    if (!template) return;
     setIsDeploying(true);
     try {
-      await createAgentFromTemplate({ workspaceId: workspaceId!, templateId: templateId!, projectPrinciples: '' });
+      await createAgentFromTemplate({
+        workspaceId: workspaceId!,
+        templateId: templateId!,
+        projectPrinciples: template.editableFields.includes('projectPrinciples') ? projectPrinciples.trim() : '',
+        model: !template.isCliAgent && selectedModel !== 'Default' ? selectedModel : undefined,
+        aiCliIntegrationId: template.isCliAgent ? selectedCliIntegrationId : undefined,
+      });
       setToast({ message: 'Agent deployed successfully', type: 'success' });
       navigate(agentsPath);
     } catch (error) {
@@ -65,6 +104,11 @@ const DeployBuiltInAgentPage: React.FC = () => {
   };
 
   const handleCancel = () => navigate(agentsPath);
+
+  const isDeployReady = !template ? false
+    : (!template.isCliAgent || selectedCliIntegrationId.length > 0)
+    && (!template.editableFields.includes('projectPrinciples') || projectPrinciples.trim().length > 0)
+    && (!template.editableFields.includes('customInstructions') || customInstructions.trim().length > 0);
 
   if (pageState === 'LOADING') {
     return (
@@ -125,10 +169,104 @@ const DeployBuiltInAgentPage: React.FC = () => {
 
       {template && <TemplateDetailsCard template={template} />}
 
+      {template && pageState === 'READY' && (
+        <div className="mt-6 space-y-6">
+          {template.isCliAgent && (
+            <div>
+              <label className="block text-sm font-semibold mb-1 flex items-center gap-1.5">
+                <Terminal className="w-4 h-4" />
+                CLI Integration <span className="text-red-500">*</span>
+              </label>
+              {loadingIntegrations ? (
+                <div className="flex items-center gap-2 text-sm text-textMuted">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading integrations…
+                </div>
+              ) : cliIntegrations.length === 0 ? (
+                <div className="bg-yellow-50 border border-yellow-300 text-yellow-800 rounded-lg px-4 py-3 flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm">
+                    No CLI integrations configured. Please add one in{' '}
+                    <strong>Settings → CLI Integrations</strong> first.
+                  </p>
+                </div>
+              ) : (
+                <select
+                  value={selectedCliIntegrationId}
+                  onChange={(e) => setSelectedCliIntegrationId(e.target.value)}
+                  disabled={isDeploying}
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:border-primary"
+                  aria-label="Select CLI integration"
+                >
+                  <option value="">— Select a CLI integration —</option>
+                  {cliIntegrations.map((integration) => (
+                    <option key={integration.id} value={integration.id}>
+                      {integration.name} ({CLI_PROVIDER_LABELS[integration.provider]})
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+
+          {!template.isCliAgent && (
+            <div>
+              <label className="block text-sm font-semibold mb-1">Model</label>
+              <select
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                disabled={isDeploying}
+                className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:border-primary"
+                aria-label="Select model"
+              >
+                <option value="Default">Default</option>
+                {availableModels.map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {template.editableFields.includes('customInstructions') && (
+            <div>
+              <label className="block text-sm font-semibold mb-1">
+                Custom Instructions <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={customInstructions}
+                onChange={(e) => setCustomInstructions(e.target.value)}
+                placeholder="Provide any custom instructions for this agent…"
+                rows={6}
+                disabled={isDeploying}
+                className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background font-mono focus:outline-none focus:border-primary resize-y"
+              />
+            </div>
+          )}
+
+          {template.editableFields.includes('projectPrinciples') && (
+            <div>
+              <label className="block text-sm font-semibold mb-1">
+                Project Principles <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={projectPrinciples}
+                onChange={(e) => setProjectPrinciples(e.target.value)}
+                placeholder="Describe your project's coding standards, review criteria, and principles…"
+                rows={6}
+                disabled={isDeploying}
+                className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background font-mono focus:outline-none focus:border-primary resize-y"
+              />
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex gap-3 mt-8">
         <button
           onClick={handleDeploy}
-          disabled={pageState !== 'READY' || isDeploying}
+          disabled={pageState !== 'READY' || isDeploying || !isDeployReady}
           className="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
         >
           {isDeploying && <Loader2 className="w-4 h-4 animate-spin" />}

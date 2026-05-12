@@ -36,12 +36,14 @@ public class AgentServiceTemplateDataTests
             agentDataAccess,
             toolActionDataAccess,
             Substitute.For<IAgentMcpToolDataAccess>(),
+            Substitute.For<IAgentSubAgentDataAccess>(),
             authService,
             toolValidationService,
             templateRegistry,
             Substitute.For<ITemplateAvailabilityResolver>(),
             Substitute.For<IToolActionDataAccess>(),
-            integrationDataAccess);
+            integrationDataAccess,
+            Substitute.For<IAgentSubAgentAssignmentService>());
 
         return (service, agentDataAccess, templateRegistry, integrationDataAccess);
     }

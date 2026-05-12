@@ -237,7 +237,7 @@ internal sealed class McpToolDiscoveryService : IMcpToolDiscoveryService
         if (string.IsNullOrEmpty(mcpArgumentsJson))
             return null;
 
-        return System.Text.Json.JsonSerializer.Deserialize<string[]>(mcpArgumentsJson);
+        return mcpArgumentsJson.Split(' ', StringSplitOptions.RemoveEmptyEntries);
     }
 
     private async Task<List<(ToolAction?, IMcpToolDescriptor?, string)>> ApplyDiff(

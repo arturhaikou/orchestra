@@ -18,6 +18,8 @@ namespace Orchestra.Infrastructure.Persistence
 
         public DbSet<AgentToolAction> AgentToolActions { get; set; } = null!;
 
+        public DbSet<AgentSubAgent> AgentSubAgents { get; set; } = null!;
+
         public DbSet<Integration> Integrations => Set<Integration>();
 
         public DbSet<McpServer> McpServers { get; set; } = null!;
@@ -38,6 +40,8 @@ namespace Orchestra.Infrastructure.Persistence
 
         public DbSet<AIProviderConfiguration> AIProviderConfigurations { get; set; } = null!;
 
+        public DbSet<AiCliIntegration> AiCliIntegrations { get; set; } = null!;
+
         public DbSet<DataProtectionKey> DataProtectionKeys { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -52,6 +56,7 @@ namespace Orchestra.Infrastructure.Persistence
             modelBuilder.ApplyConfiguration(new Configurations.UserWorkspaceConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.AgentConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.AgentToolActionConfiguration());
+            modelBuilder.ApplyConfiguration(new Configurations.AgentSubAgentConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.IntegrationConfiguration(Database.ProviderName?.Contains("InMemory") == true));
             modelBuilder.ApplyConfiguration(new Configurations.McpServerConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.AgentMcpToolConfiguration());
@@ -62,6 +67,7 @@ namespace Orchestra.Infrastructure.Persistence
             modelBuilder.ApplyConfiguration(new Configurations.ToolCategoryConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.ToolActionConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.AIProviderConfigurationConfiguration());
+            modelBuilder.ApplyConfiguration(new Configurations.AiCliIntegrationConfiguration());
         }
     }
 }

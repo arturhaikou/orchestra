@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, Bot, Brain, Sparkles, Trash2, Wrench } from 'lucide-react';
+import { Settings, Bot, Brain, Sparkles, Trash2, Wrench, MessageCircle, Users } from 'lucide-react';
 import { Agent } from '../../types';
 import { isBuiltInAgent } from '../../utils/builtInAgentUtils';
 import BuiltInBadge from './BuiltInBadge';
@@ -9,10 +9,12 @@ import GuidePanel from './GuidePanel';
 
 interface AgentCardProps {
   agent: Agent;
+  allAgents: Agent[];
   openGuideId: string | null;
   onToggleGuide: (agentId: string) => void;
   onDelete: (agentId: string) => void;
   onEdit: (agent: Agent) => void;
+  onChat: (agent: Agent) => void;
 }
 
 const StatusIndicator: React.FC<{ status: string }> = ({ status }) => (
@@ -78,7 +80,28 @@ const ModelSection: React.FC<{ model?: string | null }> = ({ model }) => (
   </div>
 );
 
-const AgentCard: React.FC<AgentCardProps> = ({ agent, openGuideId, onToggleGuide, onDelete, onEdit }) => {
+const SubAgentsSection: React.FC<{ subAgentIds: string[]; allAgents: Agent[] }> = ({ subAgentIds, allAgents }) => {
+  const subAgents = subAgentIds
+    .map(id => allAgents.find(a => a.id === id))
+    .filter((a): a is Agent => a !== undefined);
+
+  return (
+    <div className="space-y-2">
+      <div className="text-[10px] font-bold text-textMuted uppercase tracking-widest flex items-center gap-1.5">
+        <Users className="w-3 h-3" /> Sub-Agents
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {subAgents.length > 0 ? subAgents.map(agent => (
+          <span key={agent.id} className="text-[10px] bg-violet-500/10 border border-violet-500/20 text-violet-400 px-2 py-0.5 rounded flex items-center gap-1">
+            <Bot className="w-2.5 h-2.5" /> {agent.name}
+          </span>
+        )) : <span className="text-[10px] text-textMuted italic">None assigned</span>}
+      </div>
+    </div>
+  );
+};
+
+const AgentCard: React.FC<AgentCardProps> = ({ agent, allAgents, openGuideId, onToggleGuide, onDelete, onEdit, onChat }) => {
   const builtIn = isBuiltInAgent(agent);
 
   return (
@@ -108,6 +131,7 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, openGuideId, onToggleGuide
           <CapabilitiesSection capabilities={agent.capabilities} />
           <ToolingSection toolCategories={agent.toolCategories} mcpServerNames={agent.mcpServerNames} />
           <ModelSection model={agent.model} />
+          <SubAgentsSection subAgentIds={agent.subAgentIds ?? []} allAgents={allAgents} />
         </div>
 
         <div className="pt-4 mt-4 border-t border-border flex items-center justify-between">
@@ -116,6 +140,13 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, openGuideId, onToggleGuide
             {builtIn && (
                 <GuideButton onClick={() => onToggleGuide(agent.id)} />
             )}
+            <button
+                onClick={() => onChat(agent)}
+                className="text-textMuted hover:text-primary transition-colors p-1.5 rounded hover:bg-surfaceHighlight"
+                title="Chat with Agent"
+            >
+                <MessageCircle className="w-4 h-4" />
+            </button>
             <button 
                 onClick={() => onDelete(agent.id)}
                 className="text-textMuted hover:text-red-500 transition-colors p-1.5 rounded hover:bg-surfaceHighlight"

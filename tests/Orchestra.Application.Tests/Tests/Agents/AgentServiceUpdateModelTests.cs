@@ -41,12 +41,14 @@ public class AgentServiceUpdateModelTests
             agentDataAccess,
             toolActionDataAccess,
             Substitute.For<IAgentMcpToolDataAccess>(),
+            Substitute.For<IAgentSubAgentDataAccess>(),
             authService,
             toolValidationService,
             Substitute.For<IBuiltInAgentTemplateRegistry>(),
             Substitute.For<ITemplateAvailabilityResolver>(),
             Substitute.For<IToolActionDataAccess>(),
-            Substitute.For<IIntegrationDataAccess>());
+            Substitute.For<IIntegrationDataAccess>(),
+            Substitute.For<IAgentSubAgentAssignmentService>());
 
         return (service, agentDataAccess, authService, toolActionDataAccess, toolValidationService);
     }

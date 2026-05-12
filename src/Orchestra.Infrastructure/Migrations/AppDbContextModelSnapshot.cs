@@ -86,6 +86,9 @@ namespace Orchestra.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("AiCliIntegrationId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("AvatarUrl")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -139,6 +142,8 @@ namespace Orchestra.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AiCliIntegrationId");
+
                     b.HasIndex("WorkspaceId");
 
                     b.HasIndex("WorkspaceId", "TemplateIdentifier")
@@ -172,6 +177,22 @@ namespace Orchestra.Infrastructure.Migrations
                     b.ToTable("AgentMcpTools", (string)null);
                 });
 
+            modelBuilder.Entity("Orchestra.Domain.Entities.AgentSubAgent", b =>
+                {
+                    b.Property<Guid>("ParentAgentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SubAgentId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("ParentAgentId", "SubAgentId");
+
+                    b.HasIndex("SubAgentId")
+                        .HasDatabaseName("IX_AgentSubAgents_SubAgentId");
+
+                    b.ToTable("AgentSubAgents", (string)null);
+                });
+
             modelBuilder.Entity("Orchestra.Domain.Entities.AgentToolAction", b =>
                 {
                     b.Property<Guid>("AgentId")
@@ -186,6 +207,63 @@ namespace Orchestra.Infrastructure.Migrations
                         .HasDatabaseName("IX_AgentToolActions_ToolActionId");
 
                     b.ToTable("AgentToolActions", (string)null);
+                });
+
+            modelBuilder.Entity("Orchestra.Domain.Entities.AiCliIntegration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CliPath")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EncryptedCredential")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ModelId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("UseLoggedInUser")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("WorkingDirectory")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkspaceId")
+                        .HasDatabaseName("IX_AiCliIntegrations_WorkspaceId");
+
+                    b.HasIndex("WorkspaceId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("IX_AiCliIntegrations_WorkspaceId_Name");
+
+                    b.ToTable("AiCliIntegrations", (string)null);
                 });
 
             modelBuilder.Entity("Orchestra.Domain.Entities.Integration", b =>
@@ -803,6 +881,11 @@ namespace Orchestra.Infrastructure.Migrations
 
             modelBuilder.Entity("Orchestra.Domain.Entities.Agent", b =>
                 {
+                    b.HasOne("Orchestra.Domain.Entities.AiCliIntegration", null)
+                        .WithMany()
+                        .HasForeignKey("AiCliIntegrationId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Orchestra.Domain.Entities.Workspace", null)
                         .WithMany()
                         .HasForeignKey("WorkspaceId")
@@ -825,6 +908,21 @@ namespace Orchestra.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Orchestra.Domain.Entities.AgentSubAgent", b =>
+                {
+                    b.HasOne("Orchestra.Domain.Entities.Agent", null)
+                        .WithMany()
+                        .HasForeignKey("ParentAgentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Orchestra.Domain.Entities.Agent", null)
+                        .WithMany()
+                        .HasForeignKey("SubAgentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Orchestra.Domain.Entities.AgentToolAction", b =>
                 {
                     b.HasOne("Orchestra.Domain.Entities.Agent", null)
@@ -836,6 +934,15 @@ namespace Orchestra.Infrastructure.Migrations
                     b.HasOne("Orchestra.Domain.Entities.ToolAction", null)
                         .WithMany()
                         .HasForeignKey("ToolActionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Orchestra.Domain.Entities.AiCliIntegration", b =>
+                {
+                    b.HasOne("Orchestra.Domain.Entities.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

@@ -1,4 +1,5 @@
 using NSubstitute;
+using Orchestra.Application.AiCliIntegrations.Interfaces;
 using Orchestra.Application.Agents.DTOs;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Agents.Templates;
@@ -18,6 +19,7 @@ public class ValidatePrerequisitesTests
 
     private readonly IIntegrationService _integrationService = Substitute.For<IIntegrationService>();
     private readonly IIntegrationDataAccess _integrationDataAccess = Substitute.For<IIntegrationDataAccess>();
+    private readonly IAiCliIntegrationDataAccess _aiCliIntegrationDataAccess = Substitute.For<IAiCliIntegrationDataAccess>();
     private readonly IAgentDataAccess _agentDataAccess = Substitute.For<IAgentDataAccess>();
     private readonly IToolActionDataAccess _toolActionDataAccess = Substitute.For<IToolActionDataAccess>();
     private readonly ILogger<TemplateAvailabilityResolver> _logger = Substitute.For<ILogger<TemplateAvailabilityResolver>>();
@@ -28,6 +30,7 @@ public class ValidatePrerequisitesTests
         return new TemplateAvailabilityResolver(
             _integrationService,
             _integrationDataAccess,
+            _aiCliIntegrationDataAccess,
             _agentDataAccess,
             _toolActionDataAccess,
             _logger,

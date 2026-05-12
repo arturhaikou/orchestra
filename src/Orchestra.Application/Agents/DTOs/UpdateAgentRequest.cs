@@ -17,5 +17,6 @@ public record UpdateAgentRequest(
     string[]? ToolActionIds,
     string? CustomInstructions,
     string? ProjectPrinciples,
-    Optional<string?> Model = default
+    Optional<string?> Model = default,
+    string[]? SubAgentIds = null
 );

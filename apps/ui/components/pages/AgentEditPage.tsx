@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Loader2, AlertTriangle, Info } from 'lucide-react';
+import { Loader2, AlertTriangle, Info, Plus, X } from 'lucide-react';
 import { Agent, Tool } from '../../types';
-import { getAgent, updateAgent, saveAgentToolAssignments } from '../../services/agentService';
+import { getAgent, updateAgent, saveAgentToolAssignments, getAgents } from '../../services/agentService';
 import { getTools } from '../../services/toolService';
 import { fetchWorkspaceModels } from '../../services/workspaceService';
 import Toast from '../Toast';
@@ -10,6 +10,7 @@ import LockedField from '../agents/LockedField';
 import AgentFormCapabilities from '../agents/AgentFormCapabilities';
 import AgentToolSummarySection from '../agents/AgentToolSummarySection';
 import AddToolsModal from '../agents/AddToolsModal';
+import AddSubAgentsModal from '../agents/AddSubAgentsModal';
 import MarkdownPreviewToggle from '../agents/MarkdownPreviewToggle';
 import { getMcpServers } from '../../services/mcpServerService';
 import { useAgentMcpAssignments } from '../../hooks/useAgentMcpAssignments';
@@ -48,6 +49,9 @@ const AgentEditPage: React.FC = () => {
   const [openAtSourceId, setOpenAtSourceId] = useState<string | null>(null);
   const [mcpServers, setMcpServers] = useState<McpServer[]>([]);
   const [mcpSelections, setMcpSelections] = useState<McpToolSelection[]>([]);
+  const [allAgents, setAllAgents] = useState<Agent[]>([]);
+  const [selectedSubAgentIds, setSelectedSubAgentIds] = useState<string[]>([]);
+  const [isSubAgentsModalOpen, setIsSubAgentsModalOpen] = useState(false);
 
   const { assignments: mcpAssignments } = useAgentMcpAssignments(agentId, !!agentId);
 
@@ -57,6 +61,7 @@ const AgentEditPage: React.FC = () => {
     getTools(workspaceId).then(setAvailableTools).catch(() => setAvailableTools([]));
     fetchWorkspaceModels(workspaceId).then(setAvailableModels).catch(() => setAvailableModels([]));
     getMcpServers(workspaceId).then(setMcpServers).catch(() => setMcpServers([]));
+    getAgents(workspaceId).then(setAllAgents).catch(() => setAllAgents([]));
   }, [workspaceId, agentId]);
 
   useEffect(() => {
@@ -74,6 +79,7 @@ const AgentEditPage: React.FC = () => {
     try {
       const loaded = await getAgent(agentId!);
       setAgent(loaded);
+      setSelectedSubAgentIds(loaded.subAgentIds ?? []);
       setFormState({
         name: loaded.name,
         role: loaded.role,
@@ -149,24 +155,50 @@ const AgentEditPage: React.FC = () => {
   };
 
   const buildUpdatePayload = (): Partial<Agent> => {
-    const payload: Partial<Agent> = {
-      role: formState.role.trim(),
-      capabilities: formState.capabilities,
-      toolActionIds: formState.toolActionIds,
-    };
-    if (!isBuiltIn) {
+    const payload: Partial<Agent> = {};
+
+    // Only include fields if they've changed (to avoid locked field violations on built-in agents)
+    if (!isBuiltIn && formState.name.trim() !== agent?.name) {
       payload.name = formState.name.trim();
     }
+
+    // For built-in agents, don't include role, capabilities, or toolActionIds
+    // (they're locked fields). For custom agents, include them if changed.
+    if (!isBuiltIn) {
+      if (formState.role.trim() !== agent?.role) {
+        payload.role = formState.role.trim();
+      }
+      if (JSON.stringify(formState.capabilities.sort()) !== JSON.stringify((agent?.capabilities || []).sort())) {
+        payload.capabilities = formState.capabilities;
+      }
+      if (JSON.stringify(formState.toolActionIds.sort()) !== JSON.stringify((agent?.toolActionIds || []).sort())) {
+        payload.toolActionIds = formState.toolActionIds;
+      }
+    }
+
+    // Sub-agents
+    if (JSON.stringify(selectedSubAgentIds.sort()) !== JSON.stringify((agent?.subAgentIds || []).sort())) {
+      payload.subAgentIds = selectedSubAgentIds;
+    }
+
+    // Instructions
     if (isReviewAgent) {
-      payload.projectPrinciples = formState.projectPrinciples.trim();
+      if (formState.projectPrinciples.trim() !== (agent?.projectPrinciples || '')) {
+        payload.projectPrinciples = formState.projectPrinciples.trim();
+      }
     } else {
-      payload.customInstructions = formState.customInstructions.trim();
+      if (formState.customInstructions.trim() !== (agent?.customInstructions || '')) {
+        payload.customInstructions = formState.customInstructions.trim();
+      }
     }
-    if (formState.selectedModel === 'Default') {
-      payload.model = null;
-    } else {
-      payload.model = formState.selectedModel;
+
+    // Model - always include if changed
+    const newModel = formState.selectedModel === 'Default' ? null : formState.selectedModel;
+    const originalModel = agent?.model || null;
+    if (newModel !== originalModel) {
+      payload.model = newModel;
     }
+
     return payload;
   };
 
@@ -336,6 +368,44 @@ const AgentEditPage: React.FC = () => {
             />
           )}
 
+          {/* Sub-Agents Section */}
+          <section className="space-y-3">
+            <h2 className="text-lg font-semibold text-text">Sub-Agents</h2>
+            {selectedSubAgentIds.length > 0 && (
+              <div className="space-y-2">
+                {selectedSubAgentIds.map(id => {
+                  const subAgent = allAgents.find(a => a.id === id);
+                  if (!subAgent) return null;
+                  return (
+                    <div key={id} className="flex items-center gap-3 px-3 py-2 bg-surfaceHighlight border border-border rounded-lg">
+                      <img src={subAgent.avatarUrl} alt={subAgent.name} className="w-8 h-8 rounded-full border border-border object-cover flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-text truncate">{subAgent.name}</p>
+                        <p className="text-xs text-textMuted truncate">{subAgent.role}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedSubAgentIds(prev => prev.filter(i => i !== id))}
+                        className="text-textMuted hover:text-red-400 transition-colors p-1 rounded hover:bg-red-500/10 flex-shrink-0"
+                        aria-label={`Remove ${subAgent.name}`}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setIsSubAgentsModalOpen(true)}
+              className="flex items-center gap-2 px-3 py-2 border border-dashed border-border rounded-lg text-sm text-textMuted hover:text-primary hover:border-primary/50 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Add Sub-Agent
+            </button>
+          </section>
+
           <section className="space-y-4">
             <h2 className="text-lg font-semibold text-text">Instructions</h2>
             {isReviewAgent ? (
@@ -370,6 +440,15 @@ const AgentEditPage: React.FC = () => {
             onDiscard={handleDiscard}
             openAtSource={openAtSourceId}
             initialMcpSelections={mcpSelections}
+          />
+
+          <AddSubAgentsModal
+            isOpen={isSubAgentsModalOpen}
+            allAgents={allAgents}
+            excludeAgentId={agentId}
+            alreadySelectedIds={selectedSubAgentIds}
+            onCommit={ids => { setSelectedSubAgentIds(ids); setIsSubAgentsModalOpen(false); }}
+            onDiscard={() => setIsSubAgentsModalOpen(false)}
           />
 
           <div className="flex justify-end gap-3 pt-4 border-t border-border">

@@ -113,6 +113,8 @@ public static class Extensions
         builder.Services.AddScoped<IToolService, ToolService>();
         builder.Services.AddScoped<IToolCategoryDataAccess, ToolCategoryDataAccess>();
         builder.Services.AddScoped<IAgentToolActionDataAccess, AgentToolActionDataAccess>();
+        builder.Services.AddScoped<IAgentSubAgentDataAccess, AgentSubAgentDataAccess>();
+        builder.Services.AddScoped<IAgentSubAgentAssignmentService, AgentSubAgentAssignmentService>();
         builder.Services.AddScoped<IToolActionDataAccess, ToolActionDataAccess>();
 
         // Ticket Provider Infrastructure
@@ -200,6 +202,13 @@ public static class Extensions
         builder.Services.AddScoped<IMcpServerCommandService, McpServerCommandService>();
         builder.Services.AddScoped<IMcpServerToolFetcher, McpServerToolFetcher>();
 
+        // AI CLI integrations
+        builder.Services.AddScoped<Orchestra.Application.AiCliIntegrations.Interfaces.IAiCliIntegrationDataAccess, Orchestra.Infrastructure.AiCliIntegrations.AiCliIntegrationDataAccess>();
+        builder.Services.AddScoped<Orchestra.Application.AiCliIntegrations.Interfaces.IAiCliIntegrationCommandService, Orchestra.Application.AiCliIntegrations.AiCliIntegrationCommandService>();
+        builder.Services.AddScoped<Orchestra.Application.AiCliIntegrations.Interfaces.IAiCliIntegrationQueryService, Orchestra.Application.AiCliIntegrations.AiCliIntegrationQueryService>();
+        builder.Services.AddScoped<Orchestra.Infrastructure.AiCliIntegrations.IAiCliClientFactory, Orchestra.Infrastructure.AiCliIntegrations.AiCliClientFactory>();
+        builder.Services.AddScoped<Orchestra.Application.AiCliIntegrations.Interfaces.ICopilotModelDiscoveryService, Orchestra.Infrastructure.AiCliIntegrations.CopilotModelDiscoveryService>();
+
         // Agent Execution Services
         builder.Services.Configure<AgentExecutionSettings>(
             builder.Configuration.GetSection(AgentExecutionSettings.SectionName));
@@ -208,6 +217,11 @@ public static class Extensions
         builder.Services.AddScoped<IAgentContextBuilder, AgentContextBuilder>();
         builder.Services.AddScoped<ITicketAgentExecutionDataAccess, TicketAgentExecutionDataAccess>();
         builder.Services.AddScoped<INotificationService, NotificationService>();
+
+        // AG-UI streaming endpoint services
+        builder.Services.AddHttpContextAccessor();
+        builder.Services.AddScoped<IAgentAGUIBuildService, AgentAGUIBuildService>();
+        builder.Services.AddSingleton<DynamicWorkspaceAgent>();
 
         return builder;
     }

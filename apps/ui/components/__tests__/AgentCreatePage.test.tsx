@@ -75,6 +75,7 @@ const mockCreatedAgent = {
   capabilities: ['coding'],
   toolActionIds: [],
   toolCategories: [],
+  subAgentIds: [],
   avatarUrl: '/avatar.png',
   customInstructions: 'Build features',
 };
@@ -104,6 +105,7 @@ describe('AgentCreatePage', () => {
     vi.mocked(toolService.getTools).mockResolvedValue(mockTools);
     vi.mocked(workspaceService.fetchWorkspaceModels).mockResolvedValue(['gpt-4', 'gpt-3.5-turbo']);
     vi.mocked(agentService.createAgent).mockResolvedValue(mockCreatedAgent);
+    vi.mocked(agentService.getAgents).mockResolvedValue([]);
     vi.mocked(mcpServerService.getMcpServers).mockResolvedValue([]);
   });
 
@@ -360,6 +362,70 @@ describe('AgentCreatePage', () => {
       }
 
       expect(textarea).toHaveValue('Test instructions');
+    });
+  });
+
+  describe('Sub-Agents', () => {
+    const mockExistingAgent = {
+      id: 'existing-agent-1',
+      workspaceId: 'ws-test',
+      name: 'Helper Bot',
+      role: 'Assistant',
+      status: 'IDLE' as const,
+      capabilities: ['help'],
+      toolActionIds: [],
+      toolCategories: [],
+      subAgentIds: [],
+      avatarUrl: '/avatar.png',
+    };
+
+    beforeEach(() => {
+      vi.mocked(agentService.getAgents).mockResolvedValue([mockExistingAgent]);
+    });
+
+    it('renders_add_sub_agent_button', async () => {
+      renderAgentCreatePage();
+
+      await waitFor(() => {
+        expect(screen.getByText(/create agent/i)).toBeInTheDocument();
+      });
+
+      expect(screen.getByRole('button', { name: /add sub-agent/i })).toBeInTheDocument();
+    });
+
+    it('opens_sub_agents_modal_when_add_sub_agent_is_clicked', async () => {
+      const user = userEvent.setup();
+      renderAgentCreatePage();
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /add sub-agent/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /add sub-agent/i }));
+
+      expect(screen.getByRole('dialog', { name: /select sub-agents/i })).toBeInTheDocument();
+    });
+
+    it('includes_subAgentIds_in_create_payload', async () => {
+      vi.mocked(agentService.getAgents).mockResolvedValue([mockExistingAgent]);
+      const user = userEvent.setup();
+      renderAgentCreatePage();
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/name/i)).toBeInTheDocument();
+      });
+
+      await user.type(screen.getByLabelText(/name/i), 'Test Agent');
+      await user.type(screen.getByLabelText(/role/i), 'Developer');
+      await user.type(screen.getByLabelText(/custom instructions/i), 'Do stuff');
+
+      await user.click(screen.getByRole('button', { name: /save/i }));
+
+      await waitFor(() => {
+        expect(agentService.createAgent).toHaveBeenCalledWith('ws-test', expect.objectContaining({
+          subAgentIds: [],
+        }));
+      });
     });
   });
 });

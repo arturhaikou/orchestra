@@ -10,6 +10,9 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@ag-ui/client": "^0.0.53",
+    "@copilotkit/react-core": "^1.57.1",
+    "@copilotkit/react-ui": "^1.57.1",
     "@microsoft/signalr": "^8.0.0",
     "lucide-react": "^0.555.0",
     "marked": "15.0.0",

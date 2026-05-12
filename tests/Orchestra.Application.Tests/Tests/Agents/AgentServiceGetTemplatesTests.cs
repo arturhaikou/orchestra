@@ -26,12 +26,14 @@ public class AgentServiceGetTemplatesTests
             _agentDataAccess,
             _agentToolActionDataAccess,
             Substitute.For<IAgentMcpToolDataAccess>(),
+            Substitute.For<IAgentSubAgentDataAccess>(),
             _authService,
             _toolValidationService,
             _templateRegistry,
             _availabilityResolver,
             Substitute.For<IToolActionDataAccess>(),
-            Substitute.For<IIntegrationDataAccess>());
+            Substitute.For<IIntegrationDataAccess>(),
+            Substitute.For<IAgentSubAgentAssignmentService>());
     }
 
     [Fact]

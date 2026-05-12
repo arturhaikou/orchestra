@@ -93,6 +93,6 @@ audit/
 .spec-workflow/
 
 research/
-
+*/node_modules/
 *.lscache
 # End of file

@@ -13,6 +13,11 @@ export default defineConfig(({ mode }) => {
         process.env.services__api__https__0 ||  // .NET Aspire format (HTTPS)
         process.env.api_https ||                // JavaScript format (HTTPS)
         'http://localhost:5075';                // Local fallback
+
+    const copilotRuntimeUrl =
+        process.env.services__copilotruntime__http__0 ||
+        process.env.copilotruntime_http ||
+        'http://localhost:3001';
     
     return {
       server: {
@@ -22,6 +27,7 @@ export default defineConfig(({ mode }) => {
       plugins: [react()],
       define: {
         'import.meta.env.VITE_API_URL': JSON.stringify(apiUrl),
+        'import.meta.env.VITE_COPILOTKIT_RUNTIME_URL': JSON.stringify(copilotRuntimeUrl),
         'process.env.API_KEY': JSON.stringify(env.SUMMARIZATION_API_KEY),
         'process.env.SUMMARIZATION_API_KEY': JSON.stringify(env.SUMMARIZATION_API_KEY)
       },
