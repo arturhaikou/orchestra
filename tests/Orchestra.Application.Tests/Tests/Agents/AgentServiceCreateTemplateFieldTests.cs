@@ -35,6 +35,8 @@ public class AgentServiceCreateTemplateFieldTests
             toolActionDataAccess,
             Substitute.For<IAgentMcpToolDataAccess>(),
             Substitute.For<IAgentSubAgentDataAccess>(),
+            Substitute.For<IAgentSkillDataAccess>(),
+            Substitute.For<ISkillDataAccess>(),
             authService,
             toolValidationService,
             Substitute.For<IBuiltInAgentTemplateRegistry>(),

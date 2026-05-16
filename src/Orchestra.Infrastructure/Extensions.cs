@@ -223,6 +223,11 @@ public static class Extensions
         builder.Services.AddScoped<IAgentAGUIBuildService, AgentAGUIBuildService>();
         builder.Services.AddSingleton<DynamicWorkspaceAgent>();
 
+        // Skills
+        builder.Services.AddScoped<ISkillDataAccess, Orchestra.Infrastructure.Skills.SkillDataAccess>();
+        builder.Services.AddScoped<IAgentSkillDataAccess, Orchestra.Infrastructure.Skills.AgentSkillDataAccess>();
+        builder.Services.AddScoped<Orchestra.Application.Skills.Services.ISkillService, Orchestra.Application.Skills.Services.SkillService>();
+
         return builder;
     }
 

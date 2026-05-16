@@ -2,11 +2,13 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.Reflection;
 using Microsoft.Agents.AI;
+using Orchestra.Application.Agents.Templates;
 using Orchestra.Application.CodeReview.Models;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.McpServers.Interfaces;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
+using Orchestra.Infrastructure.AiCliIntegrations;
 using Orchestra.Infrastructure.Tools.Services;
 
 namespace Orchestra.Infrastructure.Tools;
@@ -29,6 +31,8 @@ public class ToolRetrieverService : IToolRetrieverService
     private readonly IAgentMcpToolDataAccess _agentMcpToolDataAccess;
     private readonly IAgentSubAgentDataAccess _agentSubAgentDataAccess;
     private readonly IChatClientResolver _chatClientResolver;
+    private readonly IBuiltInAgentTemplateRegistry _templateRegistry;
+    private readonly IAiCliClientFactory _cliClientFactory;
     private readonly ILogger<ToolRetrieverService> _logger;
 
     private const string ReviewPullRequestActionName = "review_pull_request";
@@ -57,6 +61,8 @@ public class ToolRetrieverService : IToolRetrieverService
         IAgentMcpToolDataAccess agentMcpToolDataAccess,
         IAgentSubAgentDataAccess agentSubAgentDataAccess,
         IChatClientResolver chatClientResolver,
+        IBuiltInAgentTemplateRegistry templateRegistry,
+        IAiCliClientFactory cliClientFactory,
         ILogger<ToolRetrieverService> logger)
     {
         _serviceProvider = serviceProvider;
@@ -71,6 +77,8 @@ public class ToolRetrieverService : IToolRetrieverService
         _agentMcpToolDataAccess = agentMcpToolDataAccess;
         _agentSubAgentDataAccess = agentSubAgentDataAccess;
         _chatClientResolver = chatClientResolver;
+        _templateRegistry = templateRegistry;
+        _cliClientFactory = cliClientFactory;
         _logger = logger;
     }
 
@@ -323,6 +331,64 @@ public class ToolRetrieverService : IToolRetrieverService
         return aiFunctions;
     }
 
+    private bool IsCliAgent(Agent agent)
+    {
+        if (string.IsNullOrEmpty(agent.TemplateIdentifier))
+            return false;
+
+        try
+        {
+            var template = _templateRegistry.GetByIdentifier(agent.TemplateIdentifier);
+            return template?.IsCliAgent == true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Failed to look up template {TemplateIdentifier} for agent {AgentId}; treating as non-CLI",
+                agent.TemplateIdentifier, agent.Id);
+            return false;
+        }
+    }
+
+    private async Task<AIFunction?> BuildCliSubAgentAIFunctionAsync(
+        Agent subAgent,
+        int depth,
+        CancellationToken cancellationToken)
+    {
+        if (subAgent.AiCliIntegrationId is null)
+        {
+            _logger.LogWarning(
+                "CLI sub-agent {SubAgentId} has no AiCliIntegrationId configured; skipping",
+                subAgent.Id);
+            return null;
+        }
+
+        try
+        {
+            var cliClient = await _cliClientFactory.CreateReadOnlyClientAsync(
+                subAgent.AiCliIntegrationId.Value,
+                cancellationToken);
+
+            var instructions = subAgent.CustomInstructions ?? subAgent.ProjectPrinciples;
+            var readOnlyAgent = cliClient.AsReadOnlyAgent(instructions, subAgent.Name);
+
+            var aiFunction = readOnlyAgent.AsAIFunction();
+
+            _logger.LogDebug(
+                "Created CLI sub-agent AIFunction for agent {SubAgentName} ({SubAgentId})",
+                subAgent.Name, subAgent.Id);
+
+            return aiFunction;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Failed to build CLI sub-agent AIFunction for agent {SubAgentId}; skipping",
+                subAgent.Id);
+            return null;
+        }
+    }
+
     private async Task<AIFunction?> BuildSubAgentAIFunctionAsync(
         Guid subAgentId,
         int depth,
@@ -335,10 +401,18 @@ public class ToolRetrieverService : IToolRetrieverService
             return null;
         }
 
+        // Check if this is a CLI subagent first
+        if (IsCliAgent(subAgent))
+        {
+            _logger.LogDebug("Resolving CLI sub-agent {SubAgentName} ({SubAgentId})", subAgent.Name, subAgent.Id);
+            return await BuildCliSubAgentAIFunctionAsync(subAgent, depth, cancellationToken);
+        }
+
+        // Otherwise, it's a model-based subagent
         if (string.IsNullOrEmpty(subAgent.Model))
         {
             _logger.LogWarning(
-                "Sub-agent {SubAgentId} has no model configured; skipping",
+                "Model-based sub-agent {SubAgentId} has no model configured; skipping",
                 subAgentId);
             return null;
         }
@@ -366,7 +440,7 @@ public class ToolRetrieverService : IToolRetrieverService
             var aiFunction = agentInstance.AsAIFunction();
 
             _logger.LogDebug(
-                "Created sub-agent AIFunction for agent {SubAgentName} ({SubAgentId})",
+                "Created model-based sub-agent AIFunction for agent {SubAgentName} ({SubAgentId})",
                 subAgent.Name, subAgentId);
 
             return aiFunction;

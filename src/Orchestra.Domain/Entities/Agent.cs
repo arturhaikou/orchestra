@@ -141,16 +141,12 @@ public class Agent
         {
             if (customInstructions.Trim().Length == 0)
                 throw new ArgumentException("CustomInstructions cannot be whitespace.", nameof(customInstructions));
-            if (customInstructions.Length > 5000)
-                throw new ArgumentException("CustomInstructions cannot exceed 5000 characters.", nameof(customInstructions));
         }
 
         if (projectPrinciples != null)
         {
             if (projectPrinciples.Trim().Length == 0)
                 throw new ArgumentException("ProjectPrinciples cannot be whitespace.", nameof(projectPrinciples));
-            if (projectPrinciples.Length > 5000)
-                throw new ArgumentException("ProjectPrinciples cannot exceed 5000 characters.", nameof(projectPrinciples));
         }
 
         if ((templateIdentifier is null) != (templateVersion is null))

@@ -53,10 +53,10 @@ public sealed class GithubCopilotCliClient : IAiCliClient
         return new GithubCopilotCliClient(copilotClient, modelId);
     }
 
-    public AIAgent AsAgent(string? instructions = null)
+    public AIAgent AsAgent(string? instructions = null, string? name = null)
     {
         if (_modelId is null)
-            return _copilotClient.AsAIAgent(instructions: instructions);
+            return _copilotClient.AsAIAgent(instructions: instructions, name: name);
 
         var config = new SessionConfig { Model = _modelId, OnPermissionRequest = PermissionHandler.ApproveAll, AvailableTools = ["read"] };
 
@@ -67,7 +67,7 @@ public sealed class GithubCopilotCliClient : IAiCliClient
                 Content = instructions
             };
 
-        return _copilotClient.AsAIAgent(sessionConfig: config);
+        return _copilotClient.AsAIAgent(sessionConfig: config, name: name);
     }
 
     /// <summary>
@@ -76,7 +76,7 @@ public sealed class GithubCopilotCliClient : IAiCliClient
     /// set during <see cref="CreateReadOnlyAsync"/>. Calling this on a client created
     /// with <see cref="CreateAsync"/> will not enforce any tool restrictions.
     /// </summary>
-    public AIAgent AsReadOnlyAgent(string? instructions = null) => AsAgent(instructions);
+    public AIAgent AsReadOnlyAgent(string? instructions = null, string? name = null) => AsAgent(instructions, name);
 
     public async ValueTask DisposeAsync()
         => await _copilotClient.DisposeAsync();

@@ -40,6 +40,8 @@ public class AgentServiceCreateFromTemplateTests
             _agentToolActionDataAccess,
             Substitute.For<IAgentMcpToolDataAccess>(),
             Substitute.For<IAgentSubAgentDataAccess>(),
+            Substitute.For<IAgentSkillDataAccess>(),
+            Substitute.For<ISkillDataAccess>(),
             _workspaceAuthorizationService,
             _toolValidationService,
             _templateRegistry,

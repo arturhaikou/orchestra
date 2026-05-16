@@ -42,6 +42,10 @@ namespace Orchestra.Infrastructure.Persistence
 
         public DbSet<AiCliIntegration> AiCliIntegrations { get; set; } = null!;
 
+        public DbSet<Skill> Skills { get; set; } = null!;
+
+        public DbSet<AgentSkill> AgentSkills { get; set; } = null!;
+
         public DbSet<DataProtectionKey> DataProtectionKeys { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -68,6 +72,8 @@ namespace Orchestra.Infrastructure.Persistence
             modelBuilder.ApplyConfiguration(new Configurations.ToolActionConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.AIProviderConfigurationConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.AiCliIntegrationConfiguration());
+            modelBuilder.ApplyConfiguration(new Configurations.SkillConfiguration());
+            modelBuilder.ApplyConfiguration(new Configurations.AgentSkillConfiguration());
         }
     }
 }

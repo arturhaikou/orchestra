@@ -37,12 +37,10 @@ public class AgentConfiguration : IEntityTypeConfiguration<Agent>
             .HasMaxLength(500);
 
         builder.Property(a => a.CustomInstructions)
-            .IsRequired(false)
-            .HasMaxLength(5000);
+            .IsRequired(false);
 
         builder.Property(a => a.ProjectPrinciples)
-            .IsRequired(false)
-            .HasMaxLength(5000);
+            .IsRequired(false);
 
         builder.Property(a => a.Capabilities)
             .HasColumnType("jsonb");

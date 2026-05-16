@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Loader2, AlertTriangle, Info, Plus, X } from 'lucide-react';
-import { Agent, Tool } from '../../types';
+import { Agent, Skill, Tool } from '../../types';
 import { getAgent, updateAgent, saveAgentToolAssignments, getAgents } from '../../services/agentService';
 import { getTools } from '../../services/toolService';
 import { fetchWorkspaceModels } from '../../services/workspaceService';
+import { getSkills } from '../../services/skillService';
 import Toast from '../Toast';
 import LockedField from '../agents/LockedField';
 import AgentFormCapabilities from '../agents/AgentFormCapabilities';
 import AgentToolSummarySection from '../agents/AgentToolSummarySection';
 import AddToolsModal from '../agents/AddToolsModal';
 import AddSubAgentsModal from '../agents/AddSubAgentsModal';
+import AddSkillsModal from '../skills/AddSkillsModal';
 import MarkdownPreviewToggle from '../agents/MarkdownPreviewToggle';
 import { getMcpServers } from '../../services/mcpServerService';
 import { useAgentMcpAssignments } from '../../hooks/useAgentMcpAssignments';
@@ -52,6 +54,9 @@ const AgentEditPage: React.FC = () => {
   const [allAgents, setAllAgents] = useState<Agent[]>([]);
   const [selectedSubAgentIds, setSelectedSubAgentIds] = useState<string[]>([]);
   const [isSubAgentsModalOpen, setIsSubAgentsModalOpen] = useState(false);
+  const [availableSkills, setAvailableSkills] = useState<Skill[]>([]);
+  const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
+  const [isSkillsModalOpen, setIsSkillsModalOpen] = useState(false);
 
   const { assignments: mcpAssignments } = useAgentMcpAssignments(agentId, !!agentId);
 
@@ -62,6 +67,7 @@ const AgentEditPage: React.FC = () => {
     fetchWorkspaceModels(workspaceId).then(setAvailableModels).catch(() => setAvailableModels([]));
     getMcpServers(workspaceId).then(setMcpServers).catch(() => setMcpServers([]));
     getAgents(workspaceId).then(setAllAgents).catch(() => setAllAgents([]));
+    getSkills(workspaceId).then(setAvailableSkills).catch(() => setAvailableSkills([]));
   }, [workspaceId, agentId]);
 
   useEffect(() => {
@@ -80,6 +86,7 @@ const AgentEditPage: React.FC = () => {
       const loaded = await getAgent(agentId!);
       setAgent(loaded);
       setSelectedSubAgentIds(loaded.subAgentIds ?? []);
+      setSelectedSkillIds((loaded.skills ?? []).map((s: Skill) => s.id));
       setFormState({
         name: loaded.name,
         role: loaded.role,
@@ -179,6 +186,12 @@ const AgentEditPage: React.FC = () => {
     // Sub-agents
     if (JSON.stringify(selectedSubAgentIds.sort()) !== JSON.stringify((agent?.subAgentIds || []).sort())) {
       payload.subAgentIds = selectedSubAgentIds;
+    }
+
+    // Skills
+    const originalSkillIds = (agent?.skills ?? []).map(s => s.id).sort();
+    if (JSON.stringify([...selectedSkillIds].sort()) !== JSON.stringify(originalSkillIds)) {
+      payload.skillIds = selectedSkillIds;
     }
 
     // Instructions
@@ -406,8 +419,45 @@ const AgentEditPage: React.FC = () => {
             </button>
           </section>
 
+          {/* Skills Section */}
+          <section className="space-y-3">
+            <h2 className="text-lg font-semibold text-text">Skills</h2>
+            {selectedSkillIds.length > 0 && (
+              <div className="space-y-2">
+                {selectedSkillIds.map(id => {
+                  const skill = availableSkills.find(s => s.id === id);
+                  if (!skill) return null;
+                  return (
+                    <div key={id} className="flex items-center gap-3 px-3 py-2 bg-surfaceHighlight border border-border rounded-lg">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-text truncate">{skill.name}</p>
+                        <p className="text-xs text-textMuted truncate">{skill.description}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedSkillIds(prev => prev.filter(i => i !== id))}
+                        className="text-textMuted hover:text-red-400 transition-colors p-1 rounded hover:bg-red-500/10 flex-shrink-0"
+                        aria-label={`Remove ${skill.name}`}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setIsSkillsModalOpen(true)}
+              className="flex items-center gap-2 px-3 py-2 border border-dashed border-border rounded-lg text-sm text-textMuted hover:text-primary hover:border-primary/50 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Add Skill
+            </button>
+          </section>
+
+          {/* Instructions Section */}
           <section className="space-y-4">
-            <h2 className="text-lg font-semibold text-text">Instructions</h2>
             {isReviewAgent ? (
               <div>
                 <label htmlFor="project-principles" className="block text-sm font-medium text-text mb-1">Project Principles</label>
@@ -416,6 +466,7 @@ const AgentEditPage: React.FC = () => {
                   onFocus={() => clearFieldError('projectPrinciples')} rows={6}
                   className="w-full px-3 py-2 bg-background border border-border rounded-md text-text text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-y"
                   placeholder="Define the coding standards and review principles..." />
+                <p className="text-textMuted text-xs mt-1">{formState.projectPrinciples.length} characters</p>
                 {validationErrors.projectPrinciples && <p className="text-red-400 text-xs mt-1">{validationErrors.projectPrinciples}</p>}
               </div>
             ) : (
@@ -425,6 +476,7 @@ const AgentEditPage: React.FC = () => {
                   onChange={value => setFormState(prev => ({ ...prev, customInstructions: value }))}
                   onFocus={() => clearFieldError('customInstructions')} rows={6}
                   placeholder="Describe the agent's behavior and guidelines..." />
+                <p className="text-textMuted text-xs mt-1">{formState.customInstructions.length} characters</p>
                 {validationErrors.customInstructions && <p className="text-red-400 text-xs mt-1">{validationErrors.customInstructions}</p>}
               </div>
             )}
@@ -449,6 +501,14 @@ const AgentEditPage: React.FC = () => {
             alreadySelectedIds={selectedSubAgentIds}
             onCommit={ids => { setSelectedSubAgentIds(ids); setIsSubAgentsModalOpen(false); }}
             onDiscard={() => setIsSubAgentsModalOpen(false)}
+          />
+
+          <AddSkillsModal
+            isOpen={isSkillsModalOpen}
+            allSkills={availableSkills}
+            alreadySelectedIds={selectedSkillIds}
+            onCommit={ids => { setSelectedSkillIds(ids); setIsSkillsModalOpen(false); }}
+            onDiscard={() => setIsSkillsModalOpen(false)}
           />
 
           <div className="flex justify-end gap-3 pt-4 border-t border-border">

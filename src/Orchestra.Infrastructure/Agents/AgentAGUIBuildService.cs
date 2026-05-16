@@ -1,5 +1,6 @@
 using Orchestra.Application.Agents.Templates;
 using Orchestra.Application.Common.Interfaces;
+using Orchestra.Application.Skills.DTOs;
 
 namespace Orchestra.Infrastructure.Agents;
 
@@ -14,19 +15,22 @@ public class AgentAGUIBuildService : IAgentAGUIBuildService
     private readonly IChatClientResolver _chatClientResolver;
     private readonly IToolRetrieverService _toolRetrieverService;
     private readonly IBuiltInAgentTemplateRegistry _templateRegistry;
+    private readonly IAgentSkillDataAccess _agentSkillDataAccess;
 
     public AgentAGUIBuildService(
         IWorkspaceAuthorizationService authorizationService,
         IAgentDataAccess agentDataAccess,
         IChatClientResolver chatClientResolver,
         IToolRetrieverService toolRetrieverService,
-        IBuiltInAgentTemplateRegistry templateRegistry)
+        IBuiltInAgentTemplateRegistry templateRegistry,
+        IAgentSkillDataAccess agentSkillDataAccess)
     {
         _authorizationService = authorizationService;
         _agentDataAccess = agentDataAccess;
         _chatClientResolver = chatClientResolver;
         _toolRetrieverService = toolRetrieverService;
         _templateRegistry = templateRegistry;
+        _agentSkillDataAccess = agentSkillDataAccess;
     }
 
     /// <inheritdoc/>
@@ -90,11 +94,17 @@ public class AgentAGUIBuildService : IAgentAGUIBuildService
             agent.ProjectPrinciples,
             cancellationToken);
 
+        var skillEntities = await _agentSkillDataAccess.GetSkillsByAgentIdAsync(agentId, cancellationToken);
+        var skills = skillEntities
+            .Select(s => new SkillDto(s.Id.ToString(), s.WorkspaceId.ToString(), s.Name, s.Description, s.Instructions, s.CreatedAt, s.UpdatedAt))
+            .ToList();
+
         return new AgentAGUIContext(
             AgentName: agent.Name,
             Instructions: agent.CustomInstructions ?? agent.ProjectPrinciples,
             IsCliAgent: false,
             ChatClient: chatClient,
-            Tools: tools);
+            Tools: tools,
+            Skills: skills);
     }
 }

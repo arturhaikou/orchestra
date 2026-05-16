@@ -18,6 +18,9 @@ import TicketCreatePage from './components/pages/TicketCreatePage';
 import TicketDetailPage from './components/pages/TicketDetailPage';
 import TicketEditPage from './components/pages/TicketEditPage';
 import ProfileEditPage from './components/pages/ProfileEditPage';
+import SkillsList from './components/pages/SkillsList';
+import SkillCreatePage from './components/pages/SkillCreatePage';
+import SkillEditPage from './components/pages/SkillEditPage';
 import Integrations from './components/Integrations';
 import TicketList from './components/TicketList';
 import AgentsList from './components/AgentsList';
@@ -139,6 +142,9 @@ const App: React.FC = () => {
           <Route path="agents/:agentId/edit" element={<AgentEditPage />} />
           <Route path="agents/deploy/:templateId" element={<DeployBuiltInAgentPage />} />
           <Route path="agents" element={<AgentsList />} />
+          <Route path="skills/new" element={<SkillCreatePage />} />
+          <Route path="skills/:skillId/edit" element={<SkillEditPage />} />
+          <Route path="skills" element={<SkillsList />} />
           <Route path="mcp-servers/new" element={<CreateMcpServerPage />} />
           <Route path="mcp-servers/:serverId/edit" element={<EditMcpServerPage />} />
           <Route path="mcp-servers" element={<McpServersPage />} />

@@ -48,6 +48,8 @@ public class AgentServiceProjectPrinciplesTests
             toolActionDataAccess,
             Substitute.For<IAgentMcpToolDataAccess>(),
             Substitute.For<IAgentSubAgentDataAccess>(),
+            Substitute.For<IAgentSkillDataAccess>(),
+            Substitute.For<ISkillDataAccess>(),
             authService,
             toolValidationService,
             Substitute.For<IBuiltInAgentTemplateRegistry>(),
@@ -209,40 +211,6 @@ public class AgentServiceProjectPrinciplesTests
         Assert.Null(capturedAgent.ProjectPrinciples);
         Assert.Equal("Help users with general tasks.", result.CustomInstructions);
         Assert.Null(result.ProjectPrinciples);
-    }
-
-    // -------------------------------------------------------------------------
-    // Scenario 7: Project Principles value exceeds 5,000 characters
-    // AC: projectPrinciples.length > 5000 → ArgumentException from domain entity
-    // -------------------------------------------------------------------------
-
-    [Fact]
-    public async Task CreateAgentAsync_WithReviewToolAndProjectPrinciplesExceeding5000Chars_ThrowsArgumentException()
-    {
-        // Arrange
-        var (sut, agentDataAccess, toolActionDataAccess, _, _) = BuildSut();
-        var userId = Guid.NewGuid();
-        var workspaceId = Guid.NewGuid();
-
-        toolActionDataAccess
-            .ContainsReviewToolActionAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>())
-            .Returns(true);
-
-        var request = new CreateAgentRequest(
-            WorkspaceId: workspaceId,
-            Name: "Review Bot",
-            Role: "Code Reviewer",
-            Capabilities: Array.Empty<string>(),
-            ToolActionIds: new[] { ReviewToolActionId.ToString() },
-            CustomInstructions: null,
-            ProjectPrinciples: new string('A', 5001), // 5001 characters — exceeds limit
-            Model: null);
-
-        // Act & Assert
-        await Assert.ThrowsAsync<ArgumentException>(
-            () => sut.CreateAgentAsync(userId, request));
-
-        await agentDataAccess.DidNotReceive().AddAsync(Arg.Any<Agent>(), Arg.Any<CancellationToken>());
     }
 
     // -------------------------------------------------------------------------

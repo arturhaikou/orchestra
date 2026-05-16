@@ -4,7 +4,7 @@ namespace Orchestra.Infrastructure.AiCliIntegrations;
 
 public interface IAiCliClient : IAsyncDisposable
 {
-    AIAgent AsAgent(string? instructions = null);
+    AIAgent AsAgent(string? instructions = null, string? name = null);
 
-    AIAgent AsReadOnlyAgent(string? instructions = null);
+    AIAgent AsReadOnlyAgent(string? instructions = null, string? name = null);
 }

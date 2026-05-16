@@ -1,11 +1,13 @@
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using NSubstitute.ExceptionExtensions;
+using Orchestra.Application.Agents.Templates;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.McpServers.Interfaces;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
 using Orchestra.Domain.Exceptions;
+using Orchestra.Infrastructure.AiCliIntegrations;
 using Orchestra.Infrastructure.Tools;
 using Orchestra.Tests.Shared.Builders;
 
@@ -25,6 +27,8 @@ public class ToolRetrieverServiceMcpTests
     private readonly IAgentMcpToolDataAccess _agentMcpToolDataAccess = Substitute.For<IAgentMcpToolDataAccess>();
     private readonly IAgentSubAgentDataAccess _agentSubAgentDataAccess = Substitute.For<IAgentSubAgentDataAccess>();
     private readonly IMcpClient _mcpClient = Substitute.For<IMcpClient>();
+    private readonly IBuiltInAgentTemplateRegistry _templateRegistry = Substitute.For<IBuiltInAgentTemplateRegistry>();
+    private readonly IAiCliClientFactory _cliClientFactory = Substitute.For<IAiCliClientFactory>();
     private readonly ILogger<ToolRetrieverService> _logger = Substitute.For<ILogger<ToolRetrieverService>>();
     private readonly ToolRetrieverService _sut;
 
@@ -51,6 +55,8 @@ public class ToolRetrieverServiceMcpTests
             _agentMcpToolDataAccess,
             _agentSubAgentDataAccess,
             Substitute.For<IChatClientResolver>(),
+            _templateRegistry,
+            _cliClientFactory,
             _logger);
     }
 

@@ -1,3 +1,5 @@
+using Orchestra.Application.Skills.DTOs;
+
 namespace Orchestra.Application.Common.Interfaces;
 
 /// <summary>
@@ -44,4 +46,5 @@ public sealed record AgentAGUIContext(
     bool IsCliAgent,
     Microsoft.Extensions.AI.IChatClient? ChatClient,
     IEnumerable<Microsoft.Extensions.AI.AIFunction> Tools,
-    Guid? AiCliIntegrationId = null);
+    Guid? AiCliIntegrationId = null,
+    IReadOnlyList<SkillDto>? Skills = null);

@@ -6,6 +6,7 @@ import BuiltInBadge from './BuiltInBadge';
 import IntegrationWarningBadge from './IntegrationWarningBadge';
 import GuideButton from './GuideButton';
 import GuidePanel from './GuidePanel';
+import SkillsSection from './SkillsSection';
 
 interface AgentCardProps {
   agent: Agent;
@@ -131,6 +132,7 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, allAgents, openGuideId, on
           <CapabilitiesSection capabilities={agent.capabilities} />
           <ToolingSection toolCategories={agent.toolCategories} mcpServerNames={agent.mcpServerNames} />
           <ModelSection model={agent.model} />
+          <SkillsSection skills={agent.skills} />
           <SubAgentsSection subAgentIds={agent.subAgentIds ?? []} allAgents={allAgents} />
         </div>
 

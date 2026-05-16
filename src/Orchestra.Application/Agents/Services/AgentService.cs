@@ -3,6 +3,7 @@ using Orchestra.Application.Agents.Templates;
 using Orchestra.Application.Common.Exceptions;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.McpServers.Interfaces;
+using Orchestra.Application.Skills.DTOs;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
 
@@ -14,6 +15,8 @@ public class AgentService : IAgentService
     private readonly IAgentToolActionDataAccess _agentToolActionDataAccess;
     private readonly IAgentMcpToolDataAccess _agentMcpToolDataAccess;
     private readonly IAgentSubAgentDataAccess _agentSubAgentDataAccess;
+    private readonly IAgentSkillDataAccess _agentSkillDataAccess;
+    private readonly ISkillDataAccess _skillDataAccess;
     private readonly IWorkspaceAuthorizationService _workspaceAuthorizationService;
     private readonly IToolValidationService _toolValidationService;
     private readonly IBuiltInAgentTemplateRegistry _templateRegistry;
@@ -27,6 +30,8 @@ public class AgentService : IAgentService
         IAgentToolActionDataAccess agentToolActionDataAccess,
         IAgentMcpToolDataAccess agentMcpToolDataAccess,
         IAgentSubAgentDataAccess agentSubAgentDataAccess,
+        IAgentSkillDataAccess agentSkillDataAccess,
+        ISkillDataAccess skillDataAccess,
         IWorkspaceAuthorizationService workspaceAuthorizationService,
         IToolValidationService toolValidationService,
         IBuiltInAgentTemplateRegistry templateRegistry,
@@ -39,6 +44,8 @@ public class AgentService : IAgentService
         _agentToolActionDataAccess = agentToolActionDataAccess ?? throw new ArgumentNullException(nameof(agentToolActionDataAccess));
         _agentMcpToolDataAccess = agentMcpToolDataAccess ?? throw new ArgumentNullException(nameof(agentMcpToolDataAccess));
         _agentSubAgentDataAccess = agentSubAgentDataAccess ?? throw new ArgumentNullException(nameof(agentSubAgentDataAccess));
+        _agentSkillDataAccess = agentSkillDataAccess ?? throw new ArgumentNullException(nameof(agentSkillDataAccess));
+        _skillDataAccess = skillDataAccess ?? throw new ArgumentNullException(nameof(skillDataAccess));
         _workspaceAuthorizationService = workspaceAuthorizationService ?? throw new ArgumentNullException(nameof(workspaceAuthorizationService));
         _toolValidationService = toolValidationService ?? throw new ArgumentNullException(nameof(toolValidationService));
         _templateRegistry = templateRegistry ?? throw new ArgumentNullException(nameof(templateRegistry));
@@ -151,6 +158,21 @@ public class AgentService : IAgentService
                     subAgentGuids,
                     request.WorkspaceId,
                     cancellationToken);
+        }
+
+        // 6.7. Assign skills if provided
+        if (request.SkillIds != null && request.SkillIds.Length > 0)
+        {
+            var skillGuids = request.SkillIds
+                .Select(id => Guid.TryParse(id, out var guid) ? guid : Guid.Empty)
+                .Where(guid => guid != Guid.Empty)
+                .ToList();
+
+            if (skillGuids.Count > 0)
+            {
+                await ValidateSkillsBelongToWorkspaceAsync(skillGuids, request.WorkspaceId, cancellationToken);
+                await _agentSkillDataAccess.AssignSkillsAsync(agent.Id, skillGuids, cancellationToken);
+            }
         }
 
         // 7. Map to DTO and return
@@ -359,6 +381,20 @@ public class AgentService : IAgentService
             }
         }
 
+        // 8c. Update skill assignments if provided (null = no-op, empty = remove all)
+        if (request.SkillIds != null)
+        {
+            var skillGuids = request.SkillIds
+                .Select(id => Guid.TryParse(id, out var guid) ? guid : Guid.Empty)
+                .Where(guid => guid != Guid.Empty)
+                .ToList();
+
+            if (skillGuids.Count > 0)
+                await ValidateSkillsBelongToWorkspaceAsync(skillGuids, agent.WorkspaceId, cancellationToken);
+
+            await _agentSkillDataAccess.ReplaceSkillsAsync(agentId, skillGuids, cancellationToken);
+        }
+
         // 9. Map to DTO and return
         return await MapToDtoAsync(agent, cancellationToken);
     }
@@ -515,6 +551,17 @@ public class AgentService : IAgentService
             ?? await _agentSubAgentDataAccess.GetSubAgentIdsByParentAgentIdAsync(agent.Id, cancellationToken)
             ?? [];
 
+        var skills = await _agentSkillDataAccess.GetSkillsByAgentIdAsync(agent.Id, cancellationToken) ?? [];
+        var skillDtos = skills.Select(s => new SkillDto(
+            Id: s.Id.ToString(),
+            WorkspaceId: s.WorkspaceId.ToString(),
+            Name: s.Name,
+            Description: s.Description,
+            Instructions: s.Instructions,
+            CreatedAt: s.CreatedAt,
+            UpdatedAt: s.UpdatedAt
+        )).ToList();
+
         var guide = await ResolveGuideAsync(agent, cancellationToken, preResolvedLabel);
 
         return new AgentDto(
@@ -542,7 +589,8 @@ public class AgentService : IAgentService
             TemplateVersion: agent.TemplateVersion,
             IsBuiltIn: agent.TemplateIdentifier != null,
             Guide: guide,
-            AiCliIntegrationId: agent.AiCliIntegrationId?.ToString()
+            AiCliIntegrationId: agent.AiCliIntegrationId?.ToString(),
+            Skills: skillDtos
         );
     }
 
@@ -636,5 +684,18 @@ public class AgentService : IAgentService
             Status: status,
             Reason: resolved.UnavailabilityReason,
             ExistingAgentId: resolved.ExistingAgentId);
+    }
+
+    private async Task ValidateSkillsBelongToWorkspaceAsync(
+        IReadOnlyList<Guid> skillIds,
+        Guid workspaceId,
+        CancellationToken cancellationToken)
+    {
+        foreach (var skillId in skillIds)
+        {
+            var exists = await _skillDataAccess.ExistsInWorkspaceAsync(skillId, workspaceId, cancellationToken);
+            if (!exists)
+                throw new ArgumentException($"Skill '{skillId}' does not exist in workspace '{workspaceId}'.");
+        }
     }
 }

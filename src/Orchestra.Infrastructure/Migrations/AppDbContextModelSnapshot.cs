@@ -102,8 +102,7 @@ namespace Orchestra.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("CustomInstructions")
-                        .HasMaxLength(5000)
-                        .HasColumnType("character varying(5000)");
+                        .HasColumnType("text");
 
                     b.Property<string>("Model")
                         .HasMaxLength(500)
@@ -115,8 +114,7 @@ namespace Orchestra.Infrastructure.Migrations
                         .HasColumnType("character varying(200)");
 
                     b.Property<string>("ProjectPrinciples")
-                        .HasMaxLength(5000)
-                        .HasColumnType("character varying(5000)");
+                        .HasColumnType("text");
 
                     b.Property<string>("Role")
                         .IsRequired()
@@ -175,6 +173,22 @@ namespace Orchestra.Infrastructure.Migrations
                         .HasDatabaseName("IX_AgentMcpTools_McpServerId");
 
                     b.ToTable("AgentMcpTools", (string)null);
+                });
+
+            modelBuilder.Entity("Orchestra.Domain.Entities.AgentSkill", b =>
+                {
+                    b.Property<Guid>("AgentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SkillId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("AgentId", "SkillId");
+
+                    b.HasIndex("SkillId")
+                        .HasDatabaseName("IX_AgentSkills_SkillId");
+
+                    b.ToTable("AgentSkills", (string)null);
                 });
 
             modelBuilder.Entity("Orchestra.Domain.Entities.AgentSubAgent", b =>
@@ -406,6 +420,43 @@ namespace Orchestra.Infrastructure.Migrations
                         .HasDatabaseName("IX_McpServers_WorkspaceId_Name");
 
                     b.ToTable("McpServers", (string)null);
+                });
+
+            modelBuilder.Entity("Orchestra.Domain.Entities.Skill", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<string>("Instructions")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkspaceId")
+                        .HasDatabaseName("IX_Skills_WorkspaceId");
+
+                    b.ToTable("Skills", (string)null);
                 });
 
             modelBuilder.Entity("Orchestra.Domain.Entities.Ticket", b =>
@@ -908,6 +959,21 @@ namespace Orchestra.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Orchestra.Domain.Entities.AgentSkill", b =>
+                {
+                    b.HasOne("Orchestra.Domain.Entities.Agent", null)
+                        .WithMany()
+                        .HasForeignKey("AgentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Orchestra.Domain.Entities.Skill", null)
+                        .WithMany()
+                        .HasForeignKey("SkillId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Orchestra.Domain.Entities.AgentSubAgent", b =>
                 {
                     b.HasOne("Orchestra.Domain.Entities.Agent", null)
@@ -957,6 +1023,15 @@ namespace Orchestra.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("Orchestra.Domain.Entities.McpServer", b =>
+                {
+                    b.HasOne("Orchestra.Domain.Entities.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Orchestra.Domain.Entities.Skill", b =>
                 {
                     b.HasOne("Orchestra.Domain.Entities.Workspace", null)
                         .WithMany()

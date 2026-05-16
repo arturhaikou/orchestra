@@ -99,6 +99,16 @@ export interface IntegrationStatus {
   warningMessage: string;
 }
 
+export interface Skill {
+  id: string;
+  workspaceId: string;
+  name: string;
+  description: string;
+  instructions: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Agent {
   id: string;
   workspaceId: string;
@@ -110,6 +120,8 @@ export interface Agent {
   toolCategories: string[]; // Unique category names for display
   mcpServerNames?: string[]; // MCP server names assigned to this agent
   subAgentIds: string[]; // IDs of agents assigned as sub-agents
+  skillIds?: string[]; // IDs of skills assigned to this agent
+  skills?: Skill[]; // Populated skill objects (read-only, from server)
   avatarUrl: string;
   customInstructions?: string;
   projectPrinciples?: string; // Non-null only for agents with a review tool assigned

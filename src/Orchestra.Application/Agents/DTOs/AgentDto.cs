@@ -1,3 +1,5 @@
+using Orchestra.Application.Skills.DTOs;
+
 namespace Orchestra.Application.Agents.DTOs;
 
 /// <summary>
@@ -24,5 +26,6 @@ public record AgentDto(
     int? TemplateVersion,
     bool IsBuiltIn,
     string? Guide = null,
-    string? AiCliIntegrationId = null
+    string? AiCliIntegrationId = null,
+    IReadOnlyList<SkillDto>? Skills = null
 );

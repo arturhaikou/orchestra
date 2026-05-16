@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Orchestra.Application.Common.Interfaces;
+using Orchestra.Application.Skills.DTOs;
 using Orchestra.Infrastructure.AiCliIntegrations;
 
 namespace Orchestra.Infrastructure.Agents;
@@ -72,15 +73,11 @@ public sealed class DynamicWorkspaceAgent : AIAgent
                 await using var cliClient = await factory.CreateReadOnlyClientAsync(
                     context.AiCliIntegrationId!.Value, cancellationToken);
 
-                var cliAgent = cliClient.AsReadOnlyAgent(context.Instructions);
+                var cliAgent = cliClient.AsReadOnlyAgent(context.Instructions, context.AgentName);
                 return await cliAgent.RunAsync(messages, options: options, cancellationToken: cancellationToken);
             }
 
-            var chatAgent = context.ChatClient!.AsAIAgent(
-                instructions: context.Instructions,
-                name: context.AgentName,
-                tools: context.Tools.ToArray());
-
+            var chatAgent = BuildChatAgent(context);
             return await chatAgent.RunAsync(messages, options: options, cancellationToken: cancellationToken);
         }
     }
@@ -105,17 +102,43 @@ public sealed class DynamicWorkspaceAgent : AIAgent
             }
             else
             {
-                var chatAgent = context.ChatClient!.AsAIAgent(
-                    instructions: context.Instructions,
-                    name: context.AgentName,
-                    tools: context.Tools.ToArray());
-
+                var chatAgent = BuildChatAgent(context);
                 stream = chatAgent.RunStreamingAsync(messages, options: options, cancellationToken: cancellationToken);
             }
 
             await foreach (var update in stream.ConfigureAwait(false))
                 yield return update;
         }
+    }
+
+    private static AIAgent BuildChatAgent(AgentAGUIContext context)
+    {
+        var chatOptions = new ChatOptions
+        {
+            Instructions = context.Instructions,
+            Tools = context.Tools.Cast<AITool>().ToList()
+        };
+
+        var agentOptions = new ChatClientAgentOptions
+        {
+            Name = context.AgentName,
+            ChatOptions = chatOptions
+        };
+
+        if (context.Skills?.Count > 0 )
+        {
+#pragma warning disable MAAI001
+            var inlineSkills = context.Skills
+                .Select(s => new AgentInlineSkill(new AgentSkillFrontmatter(s.Name, s.Description), s.Instructions))
+                .ToArray();
+
+            var skillsProvider = new AgentSkillsProvider(inlineSkills);
+#pragma warning restore MAAI001
+
+            agentOptions.AIContextProviders = [skillsProvider];
+        }
+
+        return context.ChatClient!.AsAIAgent(agentOptions);
     }
 
     public override object? GetService(Type serviceType, object? serviceKey = null) => null;
@@ -153,7 +176,7 @@ public sealed class DynamicWorkspaceAgent : AIAgent
         await using var cliClient = await factory.CreateReadOnlyClientAsync(
             context.AiCliIntegrationId!.Value, cancellationToken);
 
-        var cliAgent = cliClient.AsReadOnlyAgent(context.Instructions);
+        var cliAgent = cliClient.AsReadOnlyAgent(context.Instructions, context.AgentName);
 
         await foreach (var update in cliAgent
             .RunStreamingAsync(messages, options: options, cancellationToken: cancellationToken)

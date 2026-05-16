@@ -18,5 +18,6 @@ public record UpdateAgentRequest(
     string? CustomInstructions,
     string? ProjectPrinciples,
     Optional<string?> Model = default,
-    string[]? SubAgentIds = null
+    string[]? SubAgentIds = null,
+    string[]? SkillIds = null
 );
