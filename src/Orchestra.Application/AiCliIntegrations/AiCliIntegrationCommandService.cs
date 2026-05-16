@@ -42,7 +42,6 @@ public sealed class AiCliIntegrationCommandService : IAiCliIntegrationCommandSer
             encryptedCredential,
             request.UseLoggedInUser,
             request.WorkingDirectory,
-            request.ModelId,
             request.CliPath);
 
         await _dataAccess.AddAsync(integration, cancellationToken);
@@ -65,7 +64,7 @@ public sealed class AiCliIntegrationCommandService : IAiCliIntegrationCommandSer
                 ? _encryptionService.Encrypt(request.Credential)
                 : integration.EncryptedCredential;
 
-        integration.Update(request.Name, encryptedCredential, request.UseLoggedInUser, request.WorkingDirectory, request.ModelId, request.CliPath);
+        integration.Update(request.Name, encryptedCredential, request.UseLoggedInUser, request.WorkingDirectory, request.CliPath);
         await _dataAccess.UpdateAsync(integration, cancellationToken);
         return MapToDto(integration);
     }
@@ -113,7 +112,6 @@ public sealed class AiCliIntegrationCommandService : IAiCliIntegrationCommandSer
             Provider: integration.Provider,
             UseLoggedInUser: integration.UseLoggedInUser,
             WorkingDirectory: integration.WorkingDirectory,
-            ModelId: integration.ModelId,
             CliPath: integration.CliPath,
             CreatedAt: integration.CreatedAt,
             UpdatedAt: integration.UpdatedAt);

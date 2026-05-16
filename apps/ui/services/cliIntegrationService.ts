@@ -1,4 +1,4 @@
-import { AiCliIntegration, CreateCliIntegrationRequest, UpdateCliIntegrationRequest } from '../types';
+import { AiCliIntegration, CreateCliIntegrationRequest, UpdateCliIntegrationRequest, ModelMetadataDto } from '../types';
 import { getToken } from './authService';
 
 const API_BASE_URL = `${import.meta.env.VITE_API_URL}/v1/ai-cli-integrations`;
@@ -70,6 +70,30 @@ export const discoverCopilotModels = async (
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify({ credential, useLoggedInUser, workingDirectory, cliPath }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const message = (errorData as any)?.error || 'Failed to discover models';
+    throw new Error(message);
+  }
+  const models = await response.json();
+  return models.map((m: any) => m.id);
+};
+
+export const discoverModelsForIntegration = async (
+  workspaceId: string,
+  integrationId: string,
+): Promise<string[]> => {
+  const models = await discoverModelsMetadataForIntegration(workspaceId, integrationId);
+  return models.map(m => m.id);
+};
+
+export const discoverModelsMetadataForIntegration = async (
+  workspaceId: string,
+  integrationId: string,
+): Promise<ModelMetadataDto[]> => {
+  const response = await fetch(`${API_BASE_URL}/${integrationId}/models?workspaceId=${workspaceId}`, {
+    headers: getAuthHeaders(),
   });
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));

@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Loader2, AlertTriangle, Info, Plus, X } from 'lucide-react';
-import { Agent, Skill, Tool } from '../../types';
+import { Loader2, AlertTriangle, Info, Plus, X, RefreshCw } from 'lucide-react';
+import { Agent, Skill, Tool, ModelMetadataDto } from '../../types';
 import { getAgent, updateAgent, saveAgentToolAssignments, getAgents } from '../../services/agentService';
 import { getTools } from '../../services/toolService';
 import { fetchWorkspaceModels } from '../../services/workspaceService';
 import { getSkills } from '../../services/skillService';
+import { discoverModelsForIntegration, discoverModelsMetadataForIntegration } from '../../services/cliIntegrationService';
+import { REASONING_EFFORT_OPTIONS } from '../../utils/reasoningModels';
 import Toast from '../Toast';
 import LockedField from '../agents/LockedField';
 import AgentFormCapabilities from '../agents/AgentFormCapabilities';
@@ -46,6 +48,8 @@ const AgentEditPage: React.FC = () => {
   });
   const [availableTools, setAvailableTools] = useState<Tool[]>([]);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [availableModelMetadata, setAvailableModelMetadata] = useState<ModelMetadataDto[]>([]);
+  const [selectedReasoningEffort, setSelectedReasoningEffort] = useState<string>('');
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [isAddToolsModalOpen, setIsAddToolsModalOpen] = useState(false);
   const [openAtSourceId, setOpenAtSourceId] = useState<string | null>(null);
@@ -64,7 +68,6 @@ const AgentEditPage: React.FC = () => {
     if (!workspaceId || !agentId) return;
     loadAgentData();
     getTools(workspaceId).then(setAvailableTools).catch(() => setAvailableTools([]));
-    fetchWorkspaceModels(workspaceId).then(setAvailableModels).catch(() => setAvailableModels([]));
     getMcpServers(workspaceId).then(setMcpServers).catch(() => setMcpServers([]));
     getAgents(workspaceId).then(setAllAgents).catch(() => setAllAgents([]));
     getSkills(workspaceId).then(setAvailableSkills).catch(() => setAvailableSkills([]));
@@ -97,6 +100,22 @@ const AgentEditPage: React.FC = () => {
         projectPrinciples: loaded.projectPrinciples || '',
         selectedModel: loaded.model || 'Default',
       });
+      setSelectedReasoningEffort(loaded.reasoningEffort || '');
+
+      // Load available models depending on agent type
+      if (loaded.aiCliIntegrationId) {
+        discoverModelsMetadataForIntegration(workspaceId!, loaded.aiCliIntegrationId)
+          .then((metadata) => {
+            setAvailableModelMetadata(metadata);
+            setAvailableModels(metadata.map(m => m.id));
+          })
+          .catch(() => {
+            setAvailableModels([]);
+            setAvailableModelMetadata([]);
+          });
+      } else {
+        fetchWorkspaceModels(workspaceId!).then(setAvailableModels).catch(() => setAvailableModels([]));
+      }
     } catch {
       setLoadError('Agent not found');
     } finally {
@@ -132,6 +151,24 @@ const AgentEditPage: React.FC = () => {
     const hasExistingPrinciples = !!agent?.projectPrinciples;
     return hasReviewTools || hasExistingPrinciples;
   }, [formState.toolActionIds, availableTools, agent]);
+
+  const getModelMetadata = (modelId: string): ModelMetadataDto | undefined => {
+    return availableModelMetadata.find(m => m.id === modelId);
+  };
+
+  const supportsReasoningEffort = (modelId: string): boolean => {
+    const metadata = getModelMetadata(modelId);
+    return metadata?.supportedReasoningEfforts != null && metadata.supportedReasoningEfforts.length > 0;
+  };
+
+  const getReasoningEffortOptions = (modelId: string): string[] => {
+    const metadata = getModelMetadata(modelId);
+    return metadata?.supportedReasoningEfforts ?? [];
+  };
+
+  const getDefaultReasoningEffort = (modelId: string): string | undefined => {
+    return getModelMetadata(modelId)?.defaultReasoningEffort ?? undefined;
+  };
 
   const validateForm = (): Record<string, string> => {
     const errors: Record<string, string> = {};
@@ -210,6 +247,13 @@ const AgentEditPage: React.FC = () => {
     const originalModel = agent?.model || null;
     if (newModel !== originalModel) {
       payload.model = newModel;
+    }
+
+    // Reasoning effort - always include if changed
+    const newReasoningEffort = (newModel && supportsReasoningEffort(newModel) && selectedReasoningEffort) ? selectedReasoningEffort : null;
+    const originalReasoningEffort = agent?.reasoningEffort || null;
+    if (newReasoningEffort !== originalReasoningEffort) {
+      payload.reasoningEffort = newReasoningEffort;
     }
 
     return payload;
@@ -342,12 +386,27 @@ const AgentEditPage: React.FC = () => {
             <div>
               <label htmlFor="agent-model" className="block text-sm font-medium text-text mb-1">Model</label>
               <select id="agent-model" value={formState.selectedModel}
-                onChange={e => setFormState(prev => ({ ...prev, selectedModel: e.target.value }))}
+                onChange={e => { setFormState(prev => ({ ...prev, selectedModel: e.target.value })); setSelectedReasoningEffort(''); }}
                 className="w-full px-3 py-2 bg-background border border-border rounded-md text-text text-sm focus:outline-none focus:ring-2 focus:ring-primary">
                 <option value="Default">Default</option>
                 {availableModels.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>
+
+            {formState.selectedModel && formState.selectedModel !== 'Default' && supportsReasoningEffort(formState.selectedModel) && (
+              <div>
+                <label htmlFor="agent-reasoning-effort" className="block text-sm font-medium text-text mb-1">Reasoning Effort</label>
+                <select id="agent-reasoning-effort" value={selectedReasoningEffort}
+                  onChange={e => setSelectedReasoningEffort(e.target.value)}
+                  className="w-full px-3 py-2 bg-background border border-border rounded-md text-text text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                  <option value="">{getDefaultReasoningEffort(formState.selectedModel) ? `Default (${getDefaultReasoningEffort(formState.selectedModel)})` : 'Select reasoning effort'}</option>
+                  {getReasoningEffortOptions(formState.selectedModel).map(effort => (
+                    <option key={effort} value={effort}>{effort.charAt(0).toUpperCase() + effort.slice(1)}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-textMuted mt-1">Controls how much reasoning the model applies.</p>
+              </div>
+            )}
           </section>
 
           {isBuiltIn ? (

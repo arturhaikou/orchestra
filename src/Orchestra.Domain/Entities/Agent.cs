@@ -92,6 +92,13 @@ public class Agent
     public Guid? AiCliIntegrationId { get; private set; }
 
     /// <summary>
+    /// Gets the reasoning effort level for reasoning models.
+    /// Valid values: "low", "medium", "high", or null (not set / not applicable).
+    /// Only relevant when the selected model is a reasoning model.
+    /// </summary>
+    public string? ReasoningEffort { get; private set; }
+
+    /// <summary>
     /// Private constructor to enforce factory method usage.
     /// </summary>
     private Agent() { }
@@ -258,6 +265,20 @@ public class Agent
     public void SetAiCliIntegrationId(Guid? integrationId)
     {
         AiCliIntegrationId = integrationId;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Sets (or clears) the reasoning effort level for reasoning models.
+    /// </summary>
+    /// <param name="effort">One of "low", "medium", "high", or null to clear.</param>
+    /// <exception cref="ArgumentException">Thrown for unrecognised values.</exception>
+    public void SetReasoningEffort(string? effort)
+    {
+        if (effort is not null && effort != "low" && effort != "medium" && effort != "high")
+            throw new ArgumentException("ReasoningEffort must be \"low\", \"medium\", \"high\", or null.", nameof(effort));
+
+        ReasoningEffort = effort;
         UpdatedAt = DateTime.UtcNow;
     }
 }

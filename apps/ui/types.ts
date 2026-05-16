@@ -109,6 +109,12 @@ export interface Skill {
   updatedAt: string;
 }
 
+export interface ModelMetadataDto {
+  id: string;
+  supportedReasoningEfforts?: string[] | null;
+  defaultReasoningEffort?: string | null;
+}
+
 export interface Agent {
   id: string;
   workspaceId: string;
@@ -126,6 +132,7 @@ export interface Agent {
   customInstructions?: string;
   projectPrinciples?: string; // Non-null only for agents with a review tool assigned
   model?: string | null; // LLM model override; null means system default
+  reasoningEffort?: string | null; // Reasoning effort: "low", "medium", "high", or null
   templateId?: string | null;
   templateVersion?: number | null;
   isBuiltIn?: boolean;
@@ -166,6 +173,7 @@ export interface CreateAgentFromTemplateRequest {
   templateId: string;
   projectPrinciples: string;
   model?: string;
+  reasoningEffort?: string | null;
   aiCliIntegrationId?: string;
 }
 
@@ -233,7 +241,6 @@ export interface AiCliIntegration {
   provider: AiCliProviderType;
   useLoggedInUser: boolean;
   workingDirectory: string;
-  modelId?: string | null;
   cliPath?: string | null;
   createdAt: string;
   updatedAt?: string | null;
@@ -246,7 +253,6 @@ export interface CreateCliIntegrationRequest {
   credential?: string;
   useLoggedInUser: boolean;
   workingDirectory: string;
-  modelId?: string | null;
   cliPath?: string | null;
 }
 
@@ -256,7 +262,6 @@ export interface UpdateCliIntegrationRequest {
   credential?: string;
   useLoggedInUser: boolean;
   workingDirectory: string;
-  modelId?: string | null;
   cliPath?: string | null;
 }
 

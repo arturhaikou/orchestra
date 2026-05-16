@@ -38,10 +38,6 @@ public class AiCliIntegrationConfiguration : IEntityTypeConfiguration<AiCliInteg
             .IsRequired()
             .HasMaxLength(500);
 
-        builder.Property(a => a.ModelId)
-            .IsRequired(false)
-            .HasMaxLength(100);
-
         builder.Property(a => a.CliPath)
             .IsRequired(false)
             .HasMaxLength(500);

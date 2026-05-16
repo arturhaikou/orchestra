@@ -69,6 +69,10 @@ public class AgentConfiguration : IEntityTypeConfiguration<Agent>
             .OnDelete(DeleteBehavior.SetNull)
             .IsRequired(false);
 
+        builder.Property(a => a.ReasoningEffort)
+            .IsRequired(false)
+            .HasMaxLength(10);
+
         builder.HasIndex(a => new { a.WorkspaceId, a.TemplateIdentifier })
             .IsUnique()
             .HasFilter("\"TemplateIdentifier\" IS NOT NULL")

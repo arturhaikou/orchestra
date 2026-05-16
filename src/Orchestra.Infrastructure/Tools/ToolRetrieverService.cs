@@ -367,6 +367,8 @@ public class ToolRetrieverService : IToolRetrieverService
         {
             var cliClient = await _cliClientFactory.CreateReadOnlyClientAsync(
                 subAgent.AiCliIntegrationId.Value,
+                subAgent.Model,
+                subAgent.ReasoningEffort,
                 cancellationToken);
 
             var instructions = subAgent.CustomInstructions ?? subAgent.ProjectPrinciples;

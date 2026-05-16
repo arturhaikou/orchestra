@@ -6,4 +6,5 @@ public interface IAiCliIntegrationQueryService
 {
     Task<List<AiCliIntegrationDto>> GetListAsync(Guid userId, Guid workspaceId, CancellationToken cancellationToken = default);
     Task<AiCliIntegrationDto> GetByIdAsync(Guid userId, Guid workspaceId, Guid integrationId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ModelMetadataDto>> DiscoverModelsAsync(Guid userId, Guid workspaceId, Guid integrationId, CancellationToken cancellationToken = default);
 }

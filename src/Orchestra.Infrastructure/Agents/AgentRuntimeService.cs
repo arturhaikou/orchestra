@@ -73,7 +73,7 @@ public class AgentRuntimeService : IAgentRuntimeService
                 $"CLI agent '{agent.Id}' has no AiCliIntegrationId configured. Re-deploy the template to bind a CLI integration.");
 
         await using var client = await _cliClientFactory.CreateReadOnlyClientAsync(
-            agent.AiCliIntegrationId.Value, cancellationToken);
+            agent.AiCliIntegrationId.Value, agent.Model, agent.ReasoningEffort, cancellationToken);
 
         var aiAgent = client.AsReadOnlyAgent(agent.CustomInstructions, agent.Name);
         var response = await aiAgent.RunAsync(contextPrompt, cancellationToken: cancellationToken);

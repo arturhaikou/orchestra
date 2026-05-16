@@ -14,7 +14,6 @@ public class AiCliIntegration : IWorkspaceScopedEntity
     public string? EncryptedCredential { get; private set; }
     public bool UseLoggedInUser { get; private set; }
     public string WorkingDirectory { get; private set; } = string.Empty;
-    public string? ModelId { get; private set; }
     public string? CliPath { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime? UpdatedAt { get; private set; }
@@ -26,13 +25,11 @@ public class AiCliIntegration : IWorkspaceScopedEntity
         string? encryptedCredential,
         bool useLoggedInUser,
         string workingDirectory,
-        string? modelId = null,
         string? cliPath = null)
     {
         ValidateName(name);
         ValidateWorkingDirectory(workingDirectory);
         ValidateCredential(encryptedCredential, useLoggedInUser);
-        ValidateModelId(modelId);
         ValidateCliPath(cliPath);
 
         return new AiCliIntegration
@@ -44,25 +41,22 @@ public class AiCliIntegration : IWorkspaceScopedEntity
             EncryptedCredential = encryptedCredential,
             UseLoggedInUser = useLoggedInUser,
             WorkingDirectory = workingDirectory.Trim(),
-            ModelId = modelId?.Trim(),
             CliPath = cliPath?.Trim(),
             CreatedAt = DateTime.UtcNow
         };
     }
 
-    public void Update(string name, string? encryptedCredential, bool useLoggedInUser, string workingDirectory, string? modelId = null, string? cliPath = null)
+    public void Update(string name, string? encryptedCredential, bool useLoggedInUser, string workingDirectory, string? cliPath = null)
     {
         ValidateName(name);
         ValidateWorkingDirectory(workingDirectory);
         ValidateCredential(encryptedCredential, useLoggedInUser);
-        ValidateModelId(modelId);
         ValidateCliPath(cliPath);
 
         Name = name.Trim();
         EncryptedCredential = encryptedCredential;
         UseLoggedInUser = useLoggedInUser;
         WorkingDirectory = workingDirectory.Trim();
-        ModelId = modelId?.Trim();
         CliPath = cliPath?.Trim();
         UpdatedAt = DateTime.UtcNow;
     }
@@ -91,12 +85,6 @@ public class AiCliIntegration : IWorkspaceScopedEntity
             throw new ArgumentException(
                 "A credential must be provided when UseLoggedInUser is false.",
                 nameof(encryptedCredential));
-    }
-
-    private static void ValidateModelId(string? modelId)
-    {
-        if (modelId is not null && modelId.Trim().Length > 100)
-            throw new ArgumentException("Model ID must not exceed 100 characters.", nameof(modelId));
     }
 
     private static void ValidateCliPath(string? cliPath)

@@ -6,5 +6,4 @@ public record UpdateAiCliIntegrationRequest(
     string? Credential,
     bool UseLoggedInUser,
     string WorkingDirectory,
-    string? ModelId = null,
     string? CliPath = null);

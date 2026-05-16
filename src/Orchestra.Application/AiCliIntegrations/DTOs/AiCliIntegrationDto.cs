@@ -9,7 +9,6 @@ public record AiCliIntegrationDto(
     AiCliProviderType Provider,
     bool UseLoggedInUser,
     string WorkingDirectory,
-    string? ModelId,
     string? CliPath,
     DateTime CreatedAt,
     DateTime? UpdatedAt);

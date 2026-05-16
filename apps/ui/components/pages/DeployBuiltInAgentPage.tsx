@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Loader2, AlertTriangle, ArrowLeft, Terminal } from 'lucide-react';
+import { Loader2, AlertTriangle, ArrowLeft, Terminal, RefreshCw } from 'lucide-react';
 import { AgentTemplateDto, AiCliIntegration, AiCliProviderType } from '../../types';
 import { getAgentTemplates, createAgentFromTemplate } from '../../services/agentService';
-import { getCliIntegrations } from '../../services/cliIntegrationService';
+import { getCliIntegrations, discoverModelsForIntegration } from '../../services/cliIntegrationService';
 import { fetchWorkspaceModels } from '../../services/workspaceService';
+import { isReasoningModel, REASONING_EFFORT_OPTIONS } from '../../utils/reasoningModels';
 import Toast from '../Toast';
 import TemplateDetailsCard from '../agents/TemplateDetailsCard';
 
@@ -32,7 +33,9 @@ const DeployBuiltInAgentPage: React.FC = () => {
   const [selectedCliIntegrationId, setSelectedCliIntegrationId] = useState<string>('');
   const [loadingIntegrations, setLoadingIntegrations] = useState(false);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
-  const [selectedModel, setSelectedModel] = useState<string>('Default');
+  const [selectedModel, setSelectedModel] = useState<string>('');
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
+  const [selectedReasoningEffort, setSelectedReasoningEffort] = useState<string>('');
 
   const agentsPath = `/workspaces/${workspaceId}/agents`;
 
@@ -84,6 +87,29 @@ const DeployBuiltInAgentPage: React.FC = () => {
     return stateMap[t.availability.status] ?? 'ERROR';
   };
 
+  const loadCliModels = async (integrationId: string) => {
+    if (!integrationId || !workspaceId) return;
+    setIsLoadingModels(true);
+    setAvailableModels([]);
+    setSelectedModel('');
+    setSelectedReasoningEffort('');
+    try {
+      const models = await discoverModelsForIntegration(workspaceId, integrationId);
+      setAvailableModels(models);
+    } catch {
+      // silently ignore — user can still proceed without model selection
+    } finally {
+      setIsLoadingModels(false);
+    }
+  };
+
+  const handleIntegrationChange = (integrationId: string) => {
+    setSelectedCliIntegrationId(integrationId);
+    if (template?.isCliAgent && integrationId) {
+      loadCliModels(integrationId);
+    }
+  };
+
   const handleDeploy = async () => {
     if (!template) return;
     setIsDeploying(true);
@@ -92,7 +118,8 @@ const DeployBuiltInAgentPage: React.FC = () => {
         workspaceId: workspaceId!,
         templateId: templateId!,
         projectPrinciples: template.editableFields.includes('projectPrinciples') ? projectPrinciples.trim() : '',
-        model: !template.isCliAgent && selectedModel !== 'Default' ? selectedModel : undefined,
+        model: selectedModel || undefined,
+        reasoningEffort: (selectedModel && isReasoningModel(selectedModel) && selectedReasoningEffort) ? selectedReasoningEffort : undefined,
         aiCliIntegrationId: template.isCliAgent ? selectedCliIntegrationId : undefined,
       });
       setToast({ message: 'Agent deployed successfully', type: 'success' });
@@ -193,7 +220,7 @@ const DeployBuiltInAgentPage: React.FC = () => {
               ) : (
                 <select
                   value={selectedCliIntegrationId}
-                  onChange={(e) => setSelectedCliIntegrationId(e.target.value)}
+                  onChange={(e) => handleIntegrationChange(e.target.value)}
                   disabled={isDeploying}
                   className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:border-primary"
                   aria-label="Select CLI integration"
@@ -219,13 +246,61 @@ const DeployBuiltInAgentPage: React.FC = () => {
                 className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:border-primary"
                 aria-label="Select model"
               >
-                <option value="Default">Default</option>
+                <option value="">Default</option>
                 {availableModels.map((model) => (
                   <option key={model} value={model}>
                     {model}
                   </option>
                 ))}
               </select>
+            </div>
+          )}
+
+          {template.isCliAgent && selectedCliIntegrationId && (
+            <div>
+              <label className="block text-sm font-semibold mb-1 flex items-center gap-1.5">
+                Model
+                <button
+                  type="button"
+                  onClick={() => loadCliModels(selectedCliIntegrationId)}
+                  disabled={isLoadingModels}
+                  className="ml-1 inline-flex items-center gap-1 text-xs text-textMuted hover:text-text"
+                  title="Reload models"
+                >
+                  <RefreshCw size={12} className={isLoadingModels ? 'animate-spin' : ''} />
+                  {isLoadingModels ? 'Loading…' : 'Load models'}
+                </button>
+              </label>
+              <select
+                value={selectedModel}
+                onChange={(e) => { setSelectedModel(e.target.value); setSelectedReasoningEffort(''); }}
+                disabled={isDeploying || isLoadingModels}
+                className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:border-primary"
+                aria-label="Select model"
+              >
+                <option value="">Default (Copilot decides)</option>
+                {availableModels.map((model) => (
+                  <option key={model} value={model}>{model}</option>
+                ))}
+              </select>
+
+              {selectedModel && isReasoningModel(selectedModel) && (
+                <div className="mt-3">
+                  <label className="block text-sm font-semibold mb-1">Reasoning Effort</label>
+                  <select
+                    value={selectedReasoningEffort}
+                    onChange={(e) => setSelectedReasoningEffort(e.target.value)}
+                    disabled={isDeploying}
+                    className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:border-primary"
+                  >
+                    <option value="">Default</option>
+                    {REASONING_EFFORT_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-textMuted mt-1">Controls how much reasoning the model applies. Higher effort is slower but more thorough.</p>
+                </div>
+              )}
             </div>
           )}
 

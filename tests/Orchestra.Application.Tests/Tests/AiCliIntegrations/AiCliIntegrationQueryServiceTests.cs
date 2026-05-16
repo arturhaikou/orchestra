@@ -5,6 +5,7 @@ using Orchestra.Application.Common.Exceptions;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
+using Orchestra.Domain.Interfaces;
 
 namespace Orchestra.Application.Tests.Tests.AiCliIntegrations;
 
@@ -12,6 +13,8 @@ public sealed class AiCliIntegrationQueryServiceTests
 {
     private readonly Mock<IWorkspaceAuthorizationService> _authMock;
     private readonly Mock<IAiCliIntegrationDataAccess> _dataAccessMock;
+    private readonly Mock<ICredentialEncryptionService> _encryptionMock;
+    private readonly Mock<ICopilotModelDiscoveryService> _modelDiscoveryMock;
     private readonly AiCliIntegrationQueryService _sut;
 
     private readonly Guid _userId = Guid.NewGuid();
@@ -21,6 +24,8 @@ public sealed class AiCliIntegrationQueryServiceTests
     {
         _authMock = new Mock<IWorkspaceAuthorizationService>();
         _dataAccessMock = new Mock<IAiCliIntegrationDataAccess>();
+        _encryptionMock = new Mock<ICredentialEncryptionService>();
+        _modelDiscoveryMock = new Mock<ICopilotModelDiscoveryService>();
 
         _authMock
             .Setup(s => s.ValidateMembershipAsync(
@@ -29,7 +34,9 @@ public sealed class AiCliIntegrationQueryServiceTests
 
         _sut = new AiCliIntegrationQueryService(
             _authMock.Object,
-            _dataAccessMock.Object);
+            _dataAccessMock.Object,
+            _encryptionMock.Object,
+            _modelDiscoveryMock.Object);
     }
 
     // ── GetListAsync ─────────────────────────────────────────────────────────

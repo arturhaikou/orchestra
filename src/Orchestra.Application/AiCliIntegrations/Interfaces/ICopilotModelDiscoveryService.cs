@@ -1,8 +1,10 @@
+using Orchestra.Application.AiCliIntegrations.DTOs;
+
 namespace Orchestra.Application.AiCliIntegrations.Interfaces;
 
 public interface ICopilotModelDiscoveryService
 {
-    Task<IReadOnlyList<string>> DiscoverModelsAsync(
+    Task<IReadOnlyList<ModelMetadataDto>> DiscoverModelsAsync(
         string? credential,
         bool useLoggedInUser,
         string workingDirectory,

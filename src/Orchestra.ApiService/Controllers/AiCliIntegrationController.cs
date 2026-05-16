@@ -175,8 +175,44 @@ public class AiCliIntegrationController : ControllerBase
         }
     }
 
+    [HttpGet("{id:guid}/models")]
+    [ProducesResponseType(typeof(List<ModelMetadataDto>), 200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(403)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> GetModelsForIntegration(
+        Guid id,
+        [FromQuery] Guid workspaceId,
+        CancellationToken cancellationToken)
+    {
+        if (workspaceId == Guid.Empty)
+            return BadRequest(new AiCliIntegrationErrorResponse("workspaceId is required."));
+
+        try
+        {
+            var userId = GetUserIdFromClaims();
+            var models = await _queryService.DiscoverModelsAsync(userId, workspaceId, id, cancellationToken);
+            return Ok(models);
+        }
+        catch (ArgumentException)
+        {
+            return NotFound(new AiCliIntegrationErrorResponse($"AI CLI integration '{id}' was not found."));
+        }
+        catch (WorkspaceAccessDeniedException ex)
+        {
+            _logger.LogWarning(ex, "Unauthorized model discovery attempt for integration {IntegrationId}", id);
+            return StatusCode(403, new AiCliIntegrationErrorResponse("Access denied."));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to discover models for integration {IntegrationId}", id);
+            return BadRequest(new AiCliIntegrationErrorResponse("Failed to discover models. Check your credentials and working directory."));
+        }
+    }
+
     [HttpPost("models")]
-    [ProducesResponseType(typeof(List<string>), 200)]
+    [ProducesResponseType(typeof(List<ModelMetadataDto>), 200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(401)]
     public async Task<IActionResult> DiscoverModels(

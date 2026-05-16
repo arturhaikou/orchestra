@@ -19,6 +19,8 @@ public sealed class AiCliClientFactory : IAiCliClientFactory
 
     public async Task<IAiCliClient> CreateClientAsync(
         Guid integrationId,
+        string? modelId = null,
+        string? reasoningEffort = null,
         CancellationToken cancellationToken = default)
     {
         var (integration, credential) = await LoadIntegrationAsync(integrationId, cancellationToken);
@@ -30,7 +32,8 @@ public sealed class AiCliClientFactory : IAiCliClientFactory
                     credential,
                     integration.UseLoggedInUser,
                     integration.WorkingDirectory,
-                    integration.ModelId,
+                    modelId,
+                    reasoningEffort,
                     cancellationToken),
 
             _ => throw new NotSupportedException(
@@ -40,6 +43,8 @@ public sealed class AiCliClientFactory : IAiCliClientFactory
 
     public async Task<IAiCliClient> CreateReadOnlyClientAsync(
         Guid integrationId,
+        string? modelId = null,
+        string? reasoningEffort = null,
         CancellationToken cancellationToken = default)
     {
         var (integration, credential) = await LoadIntegrationAsync(integrationId, cancellationToken);
@@ -51,8 +56,9 @@ public sealed class AiCliClientFactory : IAiCliClientFactory
                     credential,
                     integration.UseLoggedInUser,
                     integration.WorkingDirectory,
-                    integration.ModelId,
+                    modelId,
                     integration.CliPath,
+                    reasoningEffort,
                     cancellationToken),
 
             _ => throw new NotSupportedException(

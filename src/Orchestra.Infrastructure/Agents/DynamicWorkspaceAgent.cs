@@ -71,7 +71,7 @@ public sealed class DynamicWorkspaceAgent : AIAgent
             {
                 var factory = scope.ServiceProvider.GetRequiredService<IAiCliClientFactory>();
                 await using var cliClient = await factory.CreateReadOnlyClientAsync(
-                    context.AiCliIntegrationId!.Value, cancellationToken);
+                    context.AiCliIntegrationId!.Value, context.CliModel, context.CliReasoningEffort, cancellationToken);
 
                 var cliAgent = cliClient.AsReadOnlyAgent(context.Instructions, context.AgentName);
                 return await cliAgent.RunAsync(messages, options: options, cancellationToken: cancellationToken);
@@ -174,7 +174,7 @@ public sealed class DynamicWorkspaceAgent : AIAgent
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         await using var cliClient = await factory.CreateReadOnlyClientAsync(
-            context.AiCliIntegrationId!.Value, cancellationToken);
+            context.AiCliIntegrationId!.Value, context.CliModel, context.CliReasoningEffort, cancellationToken);
 
         var cliAgent = cliClient.AsReadOnlyAgent(context.Instructions, context.AgentName);
 

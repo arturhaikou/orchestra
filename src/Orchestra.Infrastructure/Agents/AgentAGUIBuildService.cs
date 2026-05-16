@@ -73,7 +73,9 @@ public class AgentAGUIBuildService : IAgentAGUIBuildService
             IsCliAgent: true,
             ChatClient: null,
             Tools: [],
-            AiCliIntegrationId: agent.AiCliIntegrationId);
+            AiCliIntegrationId: agent.AiCliIntegrationId,
+            CliModel: agent.Model,
+            CliReasoningEffort: agent.ReasoningEffort);
     }
 
     private async Task<AgentAGUIContext> BuildChatContextAsync(

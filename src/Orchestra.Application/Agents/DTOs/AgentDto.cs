@@ -27,5 +27,6 @@ public record AgentDto(
     bool IsBuiltIn,
     string? Guide = null,
     string? AiCliIntegrationId = null,
+    string? ReasoningEffort = null,
     IReadOnlyList<SkillDto>? Skills = null
 );

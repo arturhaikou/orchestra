@@ -47,4 +47,6 @@ public sealed record AgentAGUIContext(
     Microsoft.Extensions.AI.IChatClient? ChatClient,
     IEnumerable<Microsoft.Extensions.AI.AIFunction> Tools,
     Guid? AiCliIntegrationId = null,
+    string? CliModel = null,
+    string? CliReasoningEffort = null,
     IReadOnlyList<SkillDto>? Skills = null);

@@ -110,6 +110,10 @@ public class AgentService : IAgentService
             projectPrinciples: projectPrinciplesForEntity,
             model: request.Model);
 
+        // 4.5. Set reasoning effort if provided
+        if (request.ReasoningEffort is not null)
+            agent.SetReasoningEffort(request.ReasoningEffort);
+
         // 5. Persist using data access layer
         await _agentDataAccess.AddAsync(agent, cancellationToken);
 
@@ -328,6 +332,12 @@ public class AgentService : IAgentService
             agent.SetModel(request.Model.Value);
         }
 
+        // 6c. Apply reasoning effort update if the field was explicitly included in the request
+        if (request.ReasoningEffort.HasValue)
+        {
+            agent.SetReasoningEffort(request.ReasoningEffort.Value);
+        }
+
         // 7. Persist changes using data access layer
         await _agentDataAccess.UpdateAsync(agent, cancellationToken);
 
@@ -439,6 +449,9 @@ public class AgentService : IAgentService
 
         if (template.IsCliAgent && request.AiCliIntegrationId.HasValue)
             agent.SetAiCliIntegrationId(request.AiCliIntegrationId.Value);
+
+        if (request.ReasoningEffort is not null)
+            agent.SetReasoningEffort(request.ReasoningEffort);
 
         await _agentDataAccess.AddAsync(agent, cancellationToken);
 
@@ -590,6 +603,7 @@ public class AgentService : IAgentService
             IsBuiltIn: agent.TemplateIdentifier != null,
             Guide: guide,
             AiCliIntegrationId: agent.AiCliIntegrationId?.ToString(),
+            ReasoningEffort: agent.ReasoningEffort,
             Skills: skillDtos
         );
     }

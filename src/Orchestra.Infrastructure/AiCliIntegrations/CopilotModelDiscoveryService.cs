@@ -1,11 +1,12 @@
 using GitHub.Copilot.SDK;
+using Orchestra.Application.AiCliIntegrations.DTOs;
 using Orchestra.Application.AiCliIntegrations.Interfaces;
 
 namespace Orchestra.Infrastructure.AiCliIntegrations;
 
 public sealed class CopilotModelDiscoveryService : ICopilotModelDiscoveryService
 {
-    public async Task<IReadOnlyList<string>> DiscoverModelsAsync(
+    public async Task<IReadOnlyList<ModelMetadataDto>> DiscoverModelsAsync(
         string? credential,
         bool useLoggedInUser,
         string workingDirectory,
@@ -24,6 +25,14 @@ public sealed class CopilotModelDiscoveryService : ICopilotModelDiscoveryService
 
         var models = await client.ListModelsAsync(cancellationToken);
 
-        return models.Select(m => m.Id).Where(id => id is not null).ToList()!;
+        return models
+            .Where(m => m.Id is not null)
+            .Select(m => new ModelMetadataDto
+            {
+                Id = m.Id!,
+                SupportedReasoningEfforts = m.SupportedReasoningEfforts,
+                DefaultReasoningEffort = m.DefaultReasoningEffort
+            })
+            .ToList();
     }
 }

@@ -16,6 +16,7 @@ public record CreateAgentRequest(
     string? CustomInstructions,
     string? ProjectPrinciples,
     string? Model,
+    string? ReasoningEffort = null,
     IReadOnlyList<McpToolSelectionDto>? McpSelections = null,
     string[]? SubAgentIds = null,
     string[]? SkillIds = null

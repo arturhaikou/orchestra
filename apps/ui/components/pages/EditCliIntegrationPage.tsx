@@ -1,6 +1,6 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
-import { AlertTriangle, Loader2, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Loader2 } from 'lucide-react';
 import { AiCliProviderType } from '../../types';
 import { useCliIntegrationForm } from '../../hooks/useCliIntegrationForm';
 
@@ -22,10 +22,6 @@ const EditCliIntegrationPage: React.FC = () => {
     validationErrors,
     handleSave,
     handleCancel,
-    availableModels,
-    isLoadingModels,
-    modelDiscoveryError,
-    loadModels,
   } = useCliIntegrationForm(workspaceId ?? '', integrationId);
 
   if (isLoading) {
@@ -146,44 +142,6 @@ const EditCliIntegrationPage: React.FC = () => {
             {validationErrors.cliPath && (
               <FieldError message={validationErrors.cliPath} />
             )}
-          </div>
-
-          {/* Model Selection */}
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold text-textMuted uppercase tracking-widest">Model</label>
-            <div className="flex gap-2">
-              <select
-                value={formState.modelId}
-                onChange={e => setField('modelId', e.target.value)}
-                className="flex-1 bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary"
-              >
-                <option value="">Default (Copilot decides)</option>
-                {availableModels.map(model => (
-                  <option key={model} value={model}>{model}</option>
-                ))}
-                {formState.modelId && !availableModels.includes(formState.modelId) && (
-                  <option value={formState.modelId}>{formState.modelId}</option>
-                )}
-              </select>
-              <button
-                type="button"
-                onClick={loadModels}
-                disabled={isLoadingModels}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm text-textMuted hover:text-text border border-border rounded-lg hover:bg-surfaceHighlight transition-colors disabled:opacity-50"
-                title="Load available models — enter your token above first"
-              >
-                {isLoadingModels
-                  ? <Loader2 size={14} className="animate-spin" />
-                  : <RefreshCw size={14} />}
-                Load
-              </button>
-            </div>
-            {modelDiscoveryError && <FieldError message={modelDiscoveryError} />}
-            <p className="text-xs text-textMuted">
-              {formState.useLoggedInUser
-                ? 'Click Load to fetch available models using your logged-in GitHub account.'
-                : 'Enter your GitHub token above, then click Load to fetch available models.'}
-            </p>
           </div>
 
           {saveError && (

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pencil, Terminal, Trash2 } from 'lucide-react';
+import { Pencil, Terminal, Trash2, FolderOpen } from 'lucide-react';
 import { AiCliIntegration, AiCliProviderType } from '../../types';
 
 interface CliIntegrationCardProps {
@@ -21,7 +21,7 @@ const CliIntegrationCard: React.FC<CliIntegrationCardProps> = ({
   onDelete,
   deleteButtonRef,
 }) => (
-  <div className="bg-surface border border-border rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,0.4),0_0_0_1px_rgba(255,255,255,0.04)] flex flex-col h-[136px] transition-[border-color,box-shadow] duration-150 hover:border-indigo-500/30 hover:shadow-[0_2px_8px_rgba(0,0,0,0.5),0_0_0_1px_rgba(99,102,241,0.15)]">
+  <div className="bg-surface border border-border rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,0.4),0_0_0_1px_rgba(255,255,255,0.04)] flex flex-col transition-[border-color,box-shadow] duration-150 hover:border-indigo-500/30 hover:shadow-[0_2px_8px_rgba(0,0,0,0.5),0_0_0_1px_rgba(99,102,241,0.15)]">
 
     <div className="flex items-start gap-3 px-3.5 pt-3.5 pb-2.5">
       <div className="w-9 h-9 rounded-lg bg-surfaceHighlight border border-border/50 flex items-center justify-center shrink-0">
@@ -38,16 +38,19 @@ const CliIntegrationCard: React.FC<CliIntegrationCardProps> = ({
       </div>
     </div>
 
-    <div className="flex-1 px-3.5 pb-2.5 flex items-center gap-3">
-      <span className="inline-flex items-center gap-1.5 text-xs text-textMuted">
+    <div className="flex items-center gap-3 px-3.5 pb-2.5">
+      <span className="inline-flex items-center gap-1.5 text-xs text-textMuted shrink-0">
         <span
           className={`w-1.5 h-1.5 rounded-full ${integration.useLoggedInUser ? 'bg-emerald-500' : 'bg-sky-400'}`}
         />
         {integration.useLoggedInUser ? 'Logged-in user' : 'Token auth'}
       </span>
-      {integration.modelId && (
-        <span className="inline-flex items-center gap-1 text-xs text-textMuted bg-surfaceHighlight border border-border/50 rounded px-1.5 py-0.5 font-mono">
-          {integration.modelId}
+      {integration.workingDirectory && (
+        <span className="inline-flex items-center gap-1 text-xs text-textMuted min-w-0">
+          <FolderOpen className="w-3 h-3 shrink-0" />
+          <span className="truncate font-mono" title={integration.workingDirectory}>
+            {integration.workingDirectory}
+          </span>
         </span>
       )}
     </div>
