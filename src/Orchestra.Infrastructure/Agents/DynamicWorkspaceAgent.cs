@@ -70,11 +70,23 @@ public sealed class DynamicWorkspaceAgent : AIAgent
             if (context.IsCliAgent)
             {
                 var factory = scope.ServiceProvider.GetRequiredService<IAiCliClientFactory>();
-                await using var cliClient = await factory.CreateReadOnlyClientAsync(
-                    context.AiCliIntegrationId!.Value, context.CliModel, context.CliReasoningEffort, cancellationToken);
 
-                var cliAgent = cliClient.AsReadOnlyAgent(context.Instructions, context.AgentName);
-                return await cliAgent.RunAsync(messages, options: options, cancellationToken: cancellationToken);
+                if (context.IsReadOnlyCli)
+                {
+                    await using var cliClient = await factory.CreateReadOnlyClientAsync(
+                        context.AiCliIntegrationId!.Value, context.CliModel, context.CliReasoningEffort, cancellationToken);
+
+                    var cliAgent = cliClient.AsReadOnlyAgent(context.Instructions, context.AgentName);
+                    return await cliAgent.RunAsync(messages, options: options, cancellationToken: cancellationToken);
+                }
+                else
+                {
+                    await using var cliClient = await factory.CreateClientAsync(
+                        context.AiCliIntegrationId!.Value, context.CliModel, context.CliReasoningEffort, cancellationToken);
+
+                    var cliAgent = cliClient.AsAgent(context.Instructions, context.AgentName);
+                    return await cliAgent.RunAsync(messages, options: options, cancellationToken: cancellationToken);
+                }
             }
 
             var chatAgent = BuildChatAgent(context);
@@ -173,16 +185,33 @@ public sealed class DynamicWorkspaceAgent : AIAgent
         AgentRunOptions? options,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        await using var cliClient = await factory.CreateReadOnlyClientAsync(
-            context.AiCliIntegrationId!.Value, context.CliModel, context.CliReasoningEffort, cancellationToken);
-
-        var cliAgent = cliClient.AsReadOnlyAgent(context.Instructions, context.AgentName);
-
-        await foreach (var update in cliAgent
-            .RunStreamingAsync(messages, options: options, cancellationToken: cancellationToken)
-            .ConfigureAwait(false))
+        if (context.IsReadOnlyCli)
         {
-            yield return update;
+            await using var cliClient = await factory.CreateReadOnlyClientAsync(
+                context.AiCliIntegrationId!.Value, context.CliModel, context.CliReasoningEffort, cancellationToken);
+
+            var cliAgent = cliClient.AsReadOnlyAgent(context.Instructions, context.AgentName);
+
+            await foreach (var update in cliAgent
+                .RunStreamingAsync(messages, options: options, cancellationToken: cancellationToken)
+                .ConfigureAwait(false))
+            {
+                yield return update;
+            }
+        }
+        else
+        {
+            await using var cliClient = await factory.CreateClientAsync(
+                context.AiCliIntegrationId!.Value, context.CliModel, context.CliReasoningEffort, cancellationToken);
+
+            var cliAgent = cliClient.AsAgent(context.Instructions, context.AgentName);
+
+            await foreach (var update in cliAgent
+                .RunStreamingAsync(messages, options: options, cancellationToken: cancellationToken)
+                .ConfigureAwait(false))
+            {
+                yield return update;
+            }
         }
     }
 

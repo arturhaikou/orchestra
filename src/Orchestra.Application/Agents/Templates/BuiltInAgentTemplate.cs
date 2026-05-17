@@ -16,4 +16,5 @@ public record BuiltInAgentTemplate(
     IReadOnlyDictionary<ProviderType, string>? ProviderLabelMap,
     IReadOnlyDictionary<ProviderType, string>? ProviderToolMethodMap,
     bool IsCliAgent = false,
-    string? DefaultCustomInstructions = null);
+    string? DefaultCustomInstructions = null,
+    bool IsReadOnlyCli = true);

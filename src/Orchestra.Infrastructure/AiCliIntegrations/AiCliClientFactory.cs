@@ -33,6 +33,7 @@ public sealed class AiCliClientFactory : IAiCliClientFactory
                     integration.UseLoggedInUser,
                     integration.WorkingDirectory,
                     modelId,
+                    integration.CliPath,
                     reasoningEffort,
                     cancellationToken),
 

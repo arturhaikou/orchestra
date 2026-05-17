@@ -61,11 +61,14 @@ public class AgentAGUIBuildService : IAgentAGUIBuildService
         return template?.IsCliAgent == true;
     }
 
-    private static AgentAGUIContext BuildCliContext(Orchestra.Domain.Entities.Agent agent)
+    private AgentAGUIContext BuildCliContext(Orchestra.Domain.Entities.Agent agent)
     {
         if (agent.AiCliIntegrationId is null)
             throw new InvalidOperationException(
                 $"CLI agent '{agent.Id}' has no AiCliIntegrationId configured. Re-deploy the template to bind a CLI integration.");
+
+        var template = _templateRegistry.GetByIdentifier(agent.TemplateIdentifier!);
+        var isReadOnly = template?.IsReadOnlyCli ?? true;
 
         return new AgentAGUIContext(
             AgentName: agent.Name,
@@ -75,7 +78,8 @@ public class AgentAGUIBuildService : IAgentAGUIBuildService
             Tools: [],
             AiCliIntegrationId: agent.AiCliIntegrationId,
             CliModel: agent.Model,
-            CliReasoningEffort: agent.ReasoningEffort);
+            CliReasoningEffort: agent.ReasoningEffort,
+            IsReadOnlyCli: isReadOnly);
     }
 
     private async Task<AgentAGUIContext> BuildChatContextAsync(

@@ -365,16 +365,32 @@ public class ToolRetrieverService : IToolRetrieverService
 
         try
         {
-            var cliClient = await _cliClientFactory.CreateReadOnlyClientAsync(
-                subAgent.AiCliIntegrationId.Value,
-                subAgent.Model,
-                subAgent.ReasoningEffort,
-                cancellationToken);
+            var template = _templateRegistry.GetByIdentifier(subAgent.TemplateIdentifier!);
+            var isReadOnly = template?.IsReadOnlyCli ?? true;
 
             var instructions = subAgent.CustomInstructions ?? subAgent.ProjectPrinciples;
-            var readOnlyAgent = cliClient.AsReadOnlyAgent(instructions, subAgent.Name);
+            AIFunction aiFunction;
 
-            var aiFunction = readOnlyAgent.AsAIFunction();
+            if (isReadOnly)
+            {
+                var cliClient = await _cliClientFactory.CreateReadOnlyClientAsync(
+                    subAgent.AiCliIntegrationId.Value,
+                    subAgent.Model,
+                    subAgent.ReasoningEffort,
+                    cancellationToken);
+
+                aiFunction = cliClient.AsReadOnlyAgent(instructions, subAgent.Name).AsAIFunction();
+            }
+            else
+            {
+                var cliClient = await _cliClientFactory.CreateClientAsync(
+                    subAgent.AiCliIntegrationId.Value,
+                    subAgent.Model,
+                    subAgent.ReasoningEffort,
+                    cancellationToken);
+
+                aiFunction = cliClient.AsAgent(instructions, subAgent.Name).AsAIFunction();
+            }
 
             _logger.LogDebug(
                 "Created CLI sub-agent AIFunction for agent {SubAgentName} ({SubAgentId})",

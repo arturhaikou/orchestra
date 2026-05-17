@@ -11,6 +11,7 @@ public class BuiltInAgentTemplateRegistry : IBuiltInAgentTemplateRegistry
     {
         Register(CreateCodeReviewTemplate());
         Register(CreateAgenticSearchTemplate());
+        Register(CreateCodingAgentTemplate());
     }
 
     public IReadOnlyList<BuiltInAgentTemplate> GetAll()
@@ -84,6 +85,52 @@ public class BuiltInAgentTemplateRegistry : IBuiltInAgentTemplateRegistry
                 - Cite exact file paths and line numbers when referencing code.
                 - Synthesize findings into a clear, concise, and actionable summary.
                 - If the topic spans multiple modules, describe relationships and data flow.
+                """);
+    }
+
+    private static BuiltInAgentTemplate CreateCodingAgentTemplate()
+    {
+        return new BuiltInAgentTemplate(
+            Identifier: "coding",
+            Version: 1,
+            DisplayName: "Coding Agent",
+            Role: "Expert software engineer and implementation specialist",
+            Capabilities: new[] { "Code Generation", "Code Editing", "Refactoring", "Bug Fixing", "Test Writing" },
+            RequiredIntegrationType: null,
+            ToolActionMethodNames: Array.Empty<string>(),
+            LockedFields: new HashSet<string> { "name", "role", "capabilities", "tools" },
+            EditableFields: Array.Empty<string>(),
+            GuideTemplate: "Assign a ticket describing the coding task. The agent will implement, edit, test, and verify changes directly in the codebase.",
+            ProviderLabelMap: null,
+            ProviderToolMethodMap: null,
+            IsCliAgent: true,
+            IsReadOnlyCli: false,
+            DefaultCustomInstructions:
+                """
+                You are an elite software engineer with full read/write access to the codebase.
+                Your mission is to implement, modify, and maintain code to the highest professional standards.
+
+                Capabilities available to you:
+                - Read, create, edit, and delete files
+                - Execute shell commands (build, test, lint, format, git operations)
+                - Navigate and understand the entire repository structure
+                - Run and verify tests before completing any task
+
+                Working principles:
+                - Always explore the codebase first to understand existing patterns, conventions, and architecture before making changes.
+                - Follow the project's existing naming conventions, folder structure, and coding style.
+                - Write clean, self-documenting code — prefer meaningful names over inline comments.
+                - Keep functions small and focused (single responsibility).
+                - Make atomic, minimal-scope changes; do not introduce unrelated modifications.
+                - Always verify your changes compile and tests pass before reporting completion.
+                - If requirements are ambiguous, state your assumptions clearly before proceeding.
+
+                Process for every task:
+                1. Explore relevant files and understand the existing implementation.
+                2. Plan the required changes at a high level.
+                3. Implement step-by-step, verifying each change.
+                4. Run build and tests to confirm correctness.
+                5. Provide a concise summary of what was changed and why.
                 """);
     }
 }

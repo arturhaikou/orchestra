@@ -72,12 +72,27 @@ public class AgentRuntimeService : IAgentRuntimeService
             throw new InvalidOperationException(
                 $"CLI agent '{agent.Id}' has no AiCliIntegrationId configured. Re-deploy the template to bind a CLI integration.");
 
-        await using var client = await _cliClientFactory.CreateReadOnlyClientAsync(
-            agent.AiCliIntegrationId.Value, agent.Model, agent.ReasoningEffort, cancellationToken);
+        var template = _templateRegistry.GetByIdentifier(agent.TemplateIdentifier!);
+        var isReadOnly = template?.IsReadOnlyCli ?? true;
 
-        var aiAgent = client.AsReadOnlyAgent(agent.CustomInstructions, agent.Name);
-        var response = await aiAgent.RunAsync(contextPrompt, cancellationToken: cancellationToken);
-        return response.Text ?? "Agent completed execution (no response text)";
+        if (isReadOnly)
+        {
+            await using var client = await _cliClientFactory.CreateReadOnlyClientAsync(
+                agent.AiCliIntegrationId.Value, agent.Model, agent.ReasoningEffort, cancellationToken);
+
+            var aiAgent = client.AsReadOnlyAgent(agent.CustomInstructions, agent.Name);
+            var response = await aiAgent.RunAsync(contextPrompt, cancellationToken: cancellationToken);
+            return response.Text ?? "Agent completed execution (no response text)";
+        }
+        else
+        {
+            await using var client = await _cliClientFactory.CreateClientAsync(
+                agent.AiCliIntegrationId.Value, agent.Model, agent.ReasoningEffort, cancellationToken);
+
+            var aiAgent = client.AsAgent(agent.CustomInstructions, agent.Name);
+            var response = await aiAgent.RunAsync(contextPrompt, cancellationToken: cancellationToken);
+            return response.Text ?? "Agent completed execution (no response text)";
+        }
     }
 
     private async Task<string> ExecuteChatAgentAsync(

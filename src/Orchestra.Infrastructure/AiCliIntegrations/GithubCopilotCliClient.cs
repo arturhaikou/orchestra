@@ -21,6 +21,7 @@ public sealed class GithubCopilotCliClient : IAiCliClient
         bool useLoggedInUser,
         string workingDirectory,
         string? modelId = null,
+        string? cliPath = null,
         string? reasoningEffort = null,
         CancellationToken cancellationToken = default)
     {
@@ -28,7 +29,8 @@ public sealed class GithubCopilotCliClient : IAiCliClient
         {
             GitHubToken = useLoggedInUser ? null : githubToken,
             UseLoggedInUser = useLoggedInUser,
-            Cwd = workingDirectory
+            Cwd = workingDirectory,
+            CliPath = cliPath
         });
 
         await copilotClient.StartAsync(cancellationToken);
@@ -62,7 +64,7 @@ public sealed class GithubCopilotCliClient : IAiCliClient
         if (_modelId is null)
             return _copilotClient.AsAIAgent(instructions: instructions, name: name);
 
-        var config = new SessionConfig { Model = _modelId, OnPermissionRequest = PermissionHandler.ApproveAll, AvailableTools = ["read"] };
+        var config = new SessionConfig { Model = _modelId, OnPermissionRequest = PermissionHandler.ApproveAll };
 
         if (_reasoningEffort is not null)
             config.ReasoningEffort = _reasoningEffort;

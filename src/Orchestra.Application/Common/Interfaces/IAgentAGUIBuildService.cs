@@ -49,4 +49,5 @@ public sealed record AgentAGUIContext(
     Guid? AiCliIntegrationId = null,
     string? CliModel = null,
     string? CliReasoningEffort = null,
+    bool IsReadOnlyCli = true,
     IReadOnlyList<SkillDto>? Skills = null);
