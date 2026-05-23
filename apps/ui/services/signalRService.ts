@@ -3,24 +3,28 @@ import { HubConnection, HubConnectionBuilder, HubConnectionState } from '@micros
 import { getToken } from './authService';
 import { ModelPullProgressEvent, ModelPullCompletedEvent, ModelPullFailedEvent, AgentExecutionCompletedEvent, TicketStatusChangedEvent, ConnectionStatus } from '../types';
 
+export type { ConnectionStatus };
+
 const HUB_URL = `${import.meta.env.VITE_API_URL}/hubs/notifications`;
 
 let activeConnection: HubConnection | null = null;
 let activeWorkspaceId: string | null = null;
 let connectionStatus: ConnectionStatus = 'disconnected';
-let connectionStatusHandler: ((status: ConnectionStatus) => void) | null = null;
+let connectionStatusHandlers: Set<(status: ConnectionStatus) => void> = new Set();
 let executionCompletedHandler: ((event: AgentExecutionCompletedEvent) => void) | null = null;
-let ticketStatusChangedHandler: ((event: TicketStatusChangedEvent) => void) | null = null;
-let reconnectedHandler: (() => void) | null = null;
+let ticketStatusChangedHandlers: Set<(event: TicketStatusChangedEvent) => void> = new Set();
+let reconnectedHandlers: Set<() => void> = new Set();
 
 const RETRY_DELAYS = [0, 2000, 5000, 10000, 30000];
 
 const emitConnectionStatus = (status: ConnectionStatus): void => {
   connectionStatus = status;
-  connectionStatusHandler?.(status);
+  connectionStatusHandlers.forEach(handler => handler(status));
 };
 
 export const connect = async (workspaceId: string): Promise<void> => {
+  if (activeConnection?.state === HubConnectionState.Connected && activeWorkspaceId === workspaceId) return;
+
   const connection = new HubConnectionBuilder()
     .withUrl(HUB_URL, {
       accessTokenFactory: () => getToken() ?? '',
@@ -30,10 +34,12 @@ export const connect = async (workspaceId: string): Promise<void> => {
     .build();
 
   connection.onreconnecting(() => {
+    if (activeConnection !== connection) return;
     emitConnectionStatus('reconnecting');
   });
 
   connection.onreconnected(async () => {
+    if (activeConnection !== connection) return;
     emitConnectionStatus('connected');
     try {
       if (activeWorkspaceId) {
@@ -42,10 +48,11 @@ export const connect = async (workspaceId: string): Promise<void> => {
     } catch (err) {
       console.error('SignalR: Failed to re-join workspace group after reconnect:', err);
     }
-    reconnectedHandler?.();
+    reconnectedHandlers.forEach(h => h());
   });
 
   connection.onclose(() => {
+    if (activeConnection !== connection) return;
     emitConnectionStatus('disconnected');
   });
 
@@ -56,7 +63,7 @@ export const connect = async (workspaceId: string): Promise<void> => {
 
   connection.on('TicketStatusChanged', (event: TicketStatusChangedEvent) => {
     if (event.workspaceId !== activeWorkspaceId) return;
-    ticketStatusChangedHandler?.(event);
+    ticketStatusChangedHandlers.forEach(h => h(event));
   });
 
   activeConnection = connection;
@@ -66,9 +73,11 @@ export const connect = async (workspaceId: string): Promise<void> => {
     await connection.start();
   } catch (err) {
     console.error('SignalR: Failed to start connection:', err);
-    activeConnection = null;
-    activeWorkspaceId = null;
-    emitConnectionStatus('disconnected');
+    if (activeConnection === connection) {
+      activeConnection = null;
+      activeWorkspaceId = null;
+      emitConnectionStatus('disconnected');
+    }
     throw err;
   }
 
@@ -84,17 +93,22 @@ export const connect = async (workspaceId: string): Promise<void> => {
 export const disconnect = async (workspaceId: string): Promise<void> => {
   if (!activeConnection) return;
 
-  if (activeConnection.state === HubConnectionState.Connected) {
+  const connection = activeConnection;
+
+  if (connection.state === HubConnectionState.Connected) {
     try {
-      await activeConnection.invoke('LeaveWorkspaceGroup', workspaceId);
+      await connection.invoke('LeaveWorkspaceGroup', workspaceId);
     } catch (err) {
       console.error('SignalR: Failed to leave workspace group:', err);
     }
   }
 
-  await activeConnection.stop();
-  activeConnection = null;
-  activeWorkspaceId = null;
+  await connection.stop();
+
+  if (activeConnection === connection) {
+    activeConnection = null;
+    activeWorkspaceId = null;
+  }
 };
 
 export const switchWorkspace = async (fromId: string, toId: string): Promise<void> => {
@@ -148,26 +162,47 @@ export const offAgentExecutionCompleted = (): void => {
   executionCompletedHandler = null;
 };
 
-export const onTicketStatusChanged = (handler: (event: TicketStatusChangedEvent) => void): void => {
-  ticketStatusChangedHandler = handler;
+export const onTicketStatusChanged = (handler: (event: TicketStatusChangedEvent) => void): (() => void) => {
+  ticketStatusChangedHandlers.add(handler);
+  return () => ticketStatusChangedHandlers.delete(handler);
 };
 
 export const offTicketStatusChanged = (): void => {
-  ticketStatusChangedHandler = null;
+  ticketStatusChangedHandlers.clear();
 };
 
-export const onReconnected = (handler: () => void): void => {
-  reconnectedHandler = handler;
+export const onReconnected = (handler: () => void): (() => void) => {
+  reconnectedHandlers.add(handler);
+  return () => reconnectedHandlers.delete(handler);
 };
 
 export const offReconnected = (): void => {
-  reconnectedHandler = null;
+  reconnectedHandlers.clear();
 };
 
-export const onConnectionStatusChange = (handler: (status: ConnectionStatus) => void): void => {
-  connectionStatusHandler = handler;
+export const onConnectionStatusChange = (handler: (status: ConnectionStatus) => void): (() => void) => {
+  connectionStatusHandlers.add(handler);
+  return () => connectionStatusHandlers.delete(handler);
 };
 
 export const getConnectionStatus = (): ConnectionStatus => {
   return connectionStatus;
+};
+
+export const onJobCreated = (handler: (data: any) => void): (() => void) => {
+  if (!activeConnection) return () => {};
+  activeConnection.on('JobCreated', handler);
+  return () => activeConnection?.off('JobCreated', handler);
+};
+
+export const onJobStatusChanged = (handler: (data: any) => void): (() => void) => {
+  if (!activeConnection) return () => {};
+  activeConnection.on('JobStatusChanged', handler);
+  return () => activeConnection?.off('JobStatusChanged', handler);
+};
+
+export const onJobStepAdded = (handler: (data: any) => void): (() => void) => {
+  if (!activeConnection) return () => {};
+  activeConnection.on('JobStepAdded', handler);
+  return () => activeConnection?.off('JobStepAdded', handler);
 };

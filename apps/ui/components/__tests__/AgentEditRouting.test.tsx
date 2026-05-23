@@ -50,6 +50,7 @@ const mockAgent = {
   templateId: null,
   templateVersion: null,
   isBuiltIn: false,
+  subAgentIds: [],
 };
 
 const LocationDisplay: React.FC = () => {

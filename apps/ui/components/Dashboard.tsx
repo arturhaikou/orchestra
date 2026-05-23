@@ -13,7 +13,7 @@ import {
 import { getTickets } from '../services/ticketService';
 import { getAgents } from '../services/agentService';
 import { getJobs } from '../services/jobService';
-import { Ticket, Agent, Job } from '../types';
+import { Ticket, Agent, JobSummary } from '../types';
 
 interface DashboardProps {
   workspaceId: string;
@@ -23,7 +23,7 @@ interface DashboardProps {
 const Dashboard: React.FC<DashboardProps> = ({ workspaceId, isDarkMode = true }) => {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [jobs, setJobs] = useState<Job[]>([]);
+  const [jobs, setJobs] = useState<JobSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchData = async () => {
@@ -36,7 +36,7 @@ const Dashboard: React.FC<DashboardProps> = ({ workspaceId, isDarkMode = true })
       ]);
       setTickets(ticketRes.items);
       setAgents(agentRes);
-      setJobs(jobRes);
+      setJobs(jobRes.items);
     } catch (error) {
       console.error("Dashboard failed to fetch live data", error);
     } finally {
@@ -54,7 +54,7 @@ const Dashboard: React.FC<DashboardProps> = ({ workspaceId, isDarkMode = true })
   const stats = [
     { label: 'Active Tickets', value: tickets.filter(t => t.status.name !== 'Done').length, color: 'text-blue-400' },
     { label: 'Active Agents', value: agents.filter(a => a.status === 'BUSY').length, color: 'text-purple-400' },
-    { label: 'Jobs Running', value: jobs.filter(j => j.status === 'IN_PROGRESS').length, color: 'text-emerald-400' },
+    { label: 'Jobs Running', value: jobs.filter(j => j.status === 'Running').length, color: 'text-emerald-400' },
     { label: 'Avg Satisfaction', value: tickets.length > 0 ? `${Math.round(tickets.reduce((acc, t) => acc + t.satisfaction, 0) / tickets.length)}%` : '0%', color: 'text-yellow-400' },
   ];
 
@@ -143,13 +143,15 @@ const Dashboard: React.FC<DashboardProps> = ({ workspaceId, isDarkMode = true })
                    No recent system activity.
                </div>
             ) : (
-                jobs.flatMap(j => j.logs.map((l, i) => ({ log: l, jobId: j.id, type: j.type, i }))).slice(-20).reverse().map((item, idx) => (
+                jobs.slice(0, 20).map((job, idx) => (
                   <div key={idx} className="text-[11px] font-mono border-l-2 border-primary/30 pl-3 py-1.5 animate-in fade-in slide-in-from-left-2">
                     <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-primaryHover font-bold">{item.jobId}</span>
-                        {item.type && <span className="bg-surfaceHighlight px-1 rounded text-[9px] text-textMuted">{item.type}</span>}
+                        <span className="text-primaryHover font-bold">{job.agentName}</span>
+                        <span className="bg-surfaceHighlight px-1 rounded text-[9px] text-textMuted">{job.triggerType}</span>
                     </div>
-                    <span className="text-textMuted leading-tight">{item.log}</span>
+                    <span className="text-textMuted leading-tight">
+                      {job.ticketTitle ?? 'Manual execution'} — {job.status} · {new Date(job.createdAt).toLocaleTimeString()}
+                    </span>
                   </div>
                 ))
             )}

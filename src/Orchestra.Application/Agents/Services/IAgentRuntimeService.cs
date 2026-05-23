@@ -1,3 +1,5 @@
+using Orchestra.Application.Jobs.DTOs;
+
 namespace Orchestra.Application.Agents.Services;
 
 /// <summary>
@@ -25,6 +27,7 @@ public interface IAgentRuntimeService
     /// <c>IToolRetrieverService</c> for capture in the review-action closure.
     /// Must NOT be logged at any verbosity level.
     /// </param>
+    /// <param name="jobContext">The job context for tracking job execution (nullable).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The text response from the agent execution.</returns>
     Task<string> ExecuteAgentAsync(
@@ -32,5 +35,6 @@ public interface IAgentRuntimeService
         string contextPrompt,
         string? agentModel = null,
         string? projectPrinciples = null,
+        JobContext? jobContext = null,
         CancellationToken cancellationToken = default);
 }

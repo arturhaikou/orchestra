@@ -8,6 +8,7 @@ using Orchestra.Application.Auth.Services;
 using Orchestra.Application.Integrations.Services;
 using Orchestra.Application.Workspaces.Services;
 using Orchestra.Application.Tickets.Services;
+using Orchestra.Application.Jobs.Services;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Agents.Templates;
 using Orchestra.Application.Tools.Services;
@@ -15,6 +16,7 @@ using Orchestra.Domain.Interfaces;
 using Orchestra.Infrastructure.CodeReview;
 using Orchestra.Infrastructure.Integrations;
 using Orchestra.Infrastructure.Agents;
+using Orchestra.Infrastructure.Jobs;
 using Orchestra.Infrastructure.Persistence;
 using Orchestra.Infrastructure.Security;
 using Orchestra.Infrastructure.Integrations.Providers;
@@ -110,6 +112,9 @@ public static class Extensions
         builder.Services.AddScoped<IExternalTicketFetchingService, TicketExternalFetchingService>();
         builder.Services.AddScoped<ITicketMaterializationService, TicketMaterializationService>();
         builder.Services.AddScoped<ITicketService, TicketService>();
+        builder.Services.AddScoped<IJobDataAccess, JobDataAccess>();
+        builder.Services.AddScoped<IJobStepWriter, JobStepWriter>();
+        builder.Services.AddScoped<IJobService, JobService>();
         builder.Services.AddScoped<IToolService, ToolService>();
         builder.Services.AddScoped<IToolCategoryDataAccess, ToolCategoryDataAccess>();
         builder.Services.AddScoped<IAgentToolActionDataAccess, AgentToolActionDataAccess>();
@@ -213,6 +218,7 @@ public static class Extensions
         builder.Services.Configure<AgentExecutionSettings>(
             builder.Configuration.GetSection(AgentExecutionSettings.SectionName));
         builder.Services.AddScoped<IAgentRuntimeService, AgentRuntimeService>();
+        builder.Services.AddScoped<IChatAgentRunner, ChatAgentRunner>();
         builder.Services.AddScoped<IAgentOrchestrationService, AgentOrchestrationService>();
         builder.Services.AddScoped<IAgentContextBuilder, AgentContextBuilder>();
         builder.Services.AddScoped<ITicketAgentExecutionDataAccess, TicketAgentExecutionDataAccess>();

@@ -3,7 +3,9 @@ using Microsoft.Extensions.AI;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Agents.Templates;
 using Orchestra.Application.Common.Interfaces;
-using Orchestra.Application.Skills.DTOs;
+using Orchestra.Application.Jobs.DTOs;
+using Orchestra.Application.Jobs.Services;
+using Orchestra.Domain.Enums;
 using Orchestra.Infrastructure.AiCliIntegrations;
 
 namespace Orchestra.Infrastructure.Agents;
@@ -15,25 +17,31 @@ public class AgentRuntimeService : IAgentRuntimeService
 {
     private readonly IChatClientResolver _chatClientResolver;
     private readonly IAgentDataAccess _agentDataAccess;
-    private readonly IAgentSkillDataAccess _agentSkillDataAccess;
+    private readonly IChatAgentRunner _chatAgentRunner;
     private readonly IToolRetrieverService _toolRetrieverService;
     private readonly IBuiltInAgentTemplateRegistry _templateRegistry;
     private readonly IAiCliClientFactory _cliClientFactory;
+    private readonly IJobService _jobService;
+    private readonly IJobStepWriter _jobStepWriter;
 
     public AgentRuntimeService(
         IChatClientResolver chatClientResolver,
         IAgentDataAccess agentDataAccess,
-        IAgentSkillDataAccess agentSkillDataAccess,
+        IChatAgentRunner chatAgentRunner,
         IToolRetrieverService toolRetrieverService,
         IBuiltInAgentTemplateRegistry templateRegistry,
-        IAiCliClientFactory cliClientFactory)
+        IAiCliClientFactory cliClientFactory,
+        IJobService jobService,
+        IJobStepWriter jobStepWriter)
     {
         _chatClientResolver = chatClientResolver;
         _agentDataAccess = agentDataAccess;
-        _agentSkillDataAccess = agentSkillDataAccess;
+        _chatAgentRunner = chatAgentRunner;
         _toolRetrieverService = toolRetrieverService;
         _templateRegistry = templateRegistry;
         _cliClientFactory = cliClientFactory;
+        _jobService = jobService;
+        _jobStepWriter = jobStepWriter;
     }
 
     /// <inheritdoc/>
@@ -42,16 +50,75 @@ public class AgentRuntimeService : IAgentRuntimeService
         string contextPrompt,
         string? agentModel = null,
         string? projectPrinciples = null,
+        JobContext? jobContext = null,
         CancellationToken cancellationToken = default)
     {
         var agentEntity = await _agentDataAccess.GetByIdAsync(agentId, cancellationToken);
         if (agentEntity == null)
             throw new InvalidOperationException($"Agent {agentId} not found");
 
-        if (IsCliAgent(agentEntity))
-            return await ExecuteCliAgentAsync(agentEntity, contextPrompt, cancellationToken);
+        Guid? jobId = null;
+        if (jobContext is not null)
+            jobId = await CreateAndStartJobAsync(jobContext, cancellationToken);
 
-        return await ExecuteChatAgentAsync(agentEntity, agentId, agentModel, projectPrinciples, contextPrompt, cancellationToken);
+        try
+        {
+            string result;
+            if (IsCliAgent(agentEntity))
+                result = await ExecuteCliAgentAsync(agentEntity, contextPrompt, jobId, jobContext?.WorkspaceId, cancellationToken);
+            else
+                result = await ExecuteChatAgentAsync(
+                    agentEntity,
+                    agentId,
+                    agentModel,
+                    projectPrinciples,
+                    contextPrompt,
+                    jobId,
+                    jobContext?.WorkspaceId,
+                    cancellationToken);
+
+            if (jobId.HasValue && jobContext is not null)
+                await _jobService.UpdateJobStatusAsync(
+                    jobId.Value,
+                    JobStatus.Completed,
+                    finalResponse: result,
+                    cancellationToken: cancellationToken);
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            if (jobId.HasValue)
+                await _jobService.UpdateJobStatusAsync(
+                    jobId.Value,
+                    JobStatus.Failed,
+                    errorMessage: ex.Message,
+                    cancellationToken: cancellationToken);
+            throw;
+        }
+    }
+
+    private async Task<Guid> CreateAndStartJobAsync(
+        JobContext jobContext,
+        CancellationToken cancellationToken)
+    {
+        var jobId = await _jobService.CreateJobAsync(
+            new CreateJobRequest(
+                jobContext.WorkspaceId,
+                jobContext.AgentId,
+                jobContext.AgentName,
+                jobContext.TriggerType,
+                jobContext.InitialPrompt,
+                jobContext.TicketId,
+                jobContext.TicketTitle),
+            cancellationToken);
+
+        await _jobService.UpdateJobStatusAsync(
+            jobId,
+            JobStatus.Running,
+            cancellationToken: cancellationToken);
+
+        return jobId;
     }
 
     private bool IsCliAgent(Orchestra.Domain.Entities.Agent agent)
@@ -66,6 +133,8 @@ public class AgentRuntimeService : IAgentRuntimeService
     private async Task<string> ExecuteCliAgentAsync(
         Orchestra.Domain.Entities.Agent agent,
         string contextPrompt,
+        Guid? jobId,
+        Guid? workspaceId,
         CancellationToken cancellationToken)
     {
         if (agent.AiCliIntegrationId is null)
@@ -75,10 +144,53 @@ public class AgentRuntimeService : IAgentRuntimeService
         var template = _templateRegistry.GetByIdentifier(agent.TemplateIdentifier!);
         var isReadOnly = template?.IsReadOnlyCli ?? true;
 
+        if (jobId.HasValue && workspaceId.HasValue)
+            return await ExecuteCliAgentWithTrackingAsync(agent, contextPrompt, isReadOnly, jobId.Value, workspaceId.Value, cancellationToken);
+
+        return await ExecuteCliAgentWithoutTrackingAsync(agent, contextPrompt, isReadOnly, cancellationToken);
+    }
+
+    private async Task<string> ExecuteCliAgentWithTrackingAsync(
+        Orchestra.Domain.Entities.Agent agent,
+        string contextPrompt,
+        bool isReadOnly,
+        Guid jobId,
+        Guid workspaceId,
+        CancellationToken cancellationToken)
+    {
+        var client = isReadOnly
+            ? await _cliClientFactory.CreateReadOnlyClientAsync(agent.AiCliIntegrationId!.Value, agent.Model, agent.ReasoningEffort, cancellationToken)
+            : await _cliClientFactory.CreateClientAsync(agent.AiCliIntegrationId!.Value, agent.Model, agent.ReasoningEffort, cancellationToken);
+
+        await using var _ = client;
+
+        await _jobStepWriter.WriteAsync(jobId, workspaceId, JobStepType.AgentStarted, cancellationToken: cancellationToken);
+        try
+        {
+            var result = await client.RunWithTrackingAsync(
+                contextPrompt, agent.CustomInstructions, agent.Name,
+                _jobStepWriter, jobId, workspaceId, cancellationToken);
+
+            await _jobStepWriter.WriteAsync(jobId, workspaceId, JobStepType.AgentCompleted, content: result, cancellationToken: cancellationToken);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            await _jobStepWriter.WriteAsync(jobId, workspaceId, JobStepType.AgentFailed, content: ex.Message, isError: true, cancellationToken: cancellationToken);
+            throw;
+        }
+    }
+
+    private async Task<string> ExecuteCliAgentWithoutTrackingAsync(
+        Orchestra.Domain.Entities.Agent agent,
+        string contextPrompt,
+        bool isReadOnly,
+        CancellationToken cancellationToken)
+    {
         if (isReadOnly)
         {
             await using var client = await _cliClientFactory.CreateReadOnlyClientAsync(
-                agent.AiCliIntegrationId.Value, agent.Model, agent.ReasoningEffort, cancellationToken);
+                agent.AiCliIntegrationId!.Value, agent.Model, agent.ReasoningEffort, cancellationToken);
 
             var aiAgent = client.AsReadOnlyAgent(agent.CustomInstructions, agent.Name);
             var response = await aiAgent.RunAsync(contextPrompt, cancellationToken: cancellationToken);
@@ -87,7 +199,7 @@ public class AgentRuntimeService : IAgentRuntimeService
         else
         {
             await using var client = await _cliClientFactory.CreateClientAsync(
-                agent.AiCliIntegrationId.Value, agent.Model, agent.ReasoningEffort, cancellationToken);
+                agent.AiCliIntegrationId!.Value, agent.Model, agent.ReasoningEffort, cancellationToken);
 
             var aiAgent = client.AsAgent(agent.CustomInstructions, agent.Name);
             var response = await aiAgent.RunAsync(contextPrompt, cancellationToken: cancellationToken);
@@ -101,6 +213,8 @@ public class AgentRuntimeService : IAgentRuntimeService
         string? agentModel,
         string? projectPrinciples,
         string contextPrompt,
+        Guid? jobId,
+        Guid? workspaceId,
         CancellationToken cancellationToken)
     {
         var chatClient = await _chatClientResolver.ResolveAsync(
@@ -113,40 +227,23 @@ public class AgentRuntimeService : IAgentRuntimeService
             agentId,
             agentModel,
             projectPrinciples,
+            jobTracking: jobId.HasValue && workspaceId.HasValue
+                ? new JobTrackingContext(_jobStepWriter, jobId.Value, workspaceId.Value)
+                : null,
             cancellationToken);
 
-        var skillEntities = await _agentSkillDataAccess.GetSkillsByAgentIdAsync(agentId, cancellationToken);
-        var skills = skillEntities
-            .Select(s => new SkillDto(s.Id.ToString(), s.WorkspaceId.ToString(), s.Name, s.Description, s.Instructions, s.CreatedAt, s.UpdatedAt))
-            .ToList();
+        var jobTracking = jobId.HasValue && workspaceId.HasValue
+            ? new JobTrackingContext(_jobStepWriter, jobId.Value, workspaceId.Value)
+            : null;
 
-        var chatOptions = new ChatOptions
-        {
-            Instructions = agentEntity.CustomInstructions,
-            Tools = aiFunctions.Cast<AITool>().ToList()
-        };
+        var result = await _chatAgentRunner.RunAsync(
+            chatClient,
+            agentEntity,
+            aiFunctions.ToList(),
+            contextPrompt,
+            jobTracking,
+            cancellationToken);
 
-        var agentOptions = new ChatClientAgentOptions
-        {
-            Name = agentEntity.Name,
-            ChatOptions = chatOptions
-        };
-
-        if (skills.Count > 0)
-        {
-#pragma warning disable MAAI001
-            var inlineSkills = skills
-                .Select(s => new AgentInlineSkill(new AgentSkillFrontmatter(s.Name, s.Description), s.Instructions))
-                .ToArray();
-
-            var skillsProvider = new AgentSkillsProvider(inlineSkills);
-#pragma warning restore MAAI001
-
-            agentOptions.AIContextProviders = [skillsProvider];
-        }
-
-        var agent = chatClient.AsAIAgent(agentOptions);
-        var response = await agent.RunAsync(contextPrompt, cancellationToken: cancellationToken);
-        return response.Text ?? "Agent completed execution (no response text)";
+        return result ?? "Agent completed execution (no response text)";
     }
 }

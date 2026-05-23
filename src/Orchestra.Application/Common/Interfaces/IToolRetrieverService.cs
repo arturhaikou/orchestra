@@ -1,4 +1,5 @@
 using Microsoft.Extensions.AI;
+using Orchestra.Application.Jobs.DTOs;
 
 namespace Orchestra.Application.Common.Interfaces;
 
@@ -29,5 +30,6 @@ public interface IToolRetrieverService
         Guid agentId,
         string? modelIdentifier = null,
         string? projectPrinciples = null,
+        JobTrackingContext? jobTracking = null,
         CancellationToken cancellationToken = default);
 }

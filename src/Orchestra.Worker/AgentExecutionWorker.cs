@@ -59,47 +59,51 @@ public class AgentExecutionWorker : BackgroundService
 
     private async Task ProcessEligibleTicketsAsync(CancellationToken cancellationToken)
     {
-        await using var scope = _serviceProvider.CreateAsyncScope();
-
-        var orchestrationService = scope.ServiceProvider
-            .GetRequiredService<IAgentOrchestrationService>();
-        var ticketDataAccess = scope.ServiceProvider
-            .GetRequiredService<ITicketAgentExecutionDataAccess>();
-
-        // Get eligible tickets
-        var internalTickets = await ticketDataAccess
-            .GetInternalTicketsReadyForAgentAsync(cancellationToken);
-        var externalTickets = await ticketDataAccess
-            .GetExternalMaterializedTicketsReadyForAgentAsync(cancellationToken);
-
-        var allTickets = internalTickets.Concat(externalTickets).ToList();
-
-        if (!allTickets.Any())
+        // Get eligible tickets in a dedicated scope
+        await using (var scope = _serviceProvider.CreateAsyncScope())
         {
-            _logger.LogDebug("No tickets ready for agent execution");
-            return;
+            var ticketDataAccess = scope.ServiceProvider
+                .GetRequiredService<ITicketAgentExecutionDataAccess>();
+
+            // Get eligible tickets
+            var internalTickets = await ticketDataAccess
+                .GetInternalTicketsReadyForAgentAsync(cancellationToken);
+            var externalTickets = await ticketDataAccess
+                .GetExternalMaterializedTicketsReadyForAgentAsync(cancellationToken);
+
+            var allTickets = internalTickets.Concat(externalTickets).ToList();
+
+            if (!allTickets.Any())
+            {
+                _logger.LogDebug("No tickets ready for agent execution");
+                return;
+            }
+
+            _logger.LogInformation(
+                "Found {Count} ticket(s) ready for agent execution ({InternalCount} internal, {ExternalCount} external)",
+                allTickets.Count,
+                internalTickets.Count,
+                externalTickets.Count);
+
+            // Execute agents for each ticket with separate scopes (concurrent execution allowed)
+            var tasks = allTickets.Select(ticket =>
+                ExecuteTicketAsync(ticket.Id, cancellationToken));
+
+            await Task.WhenAll(tasks);
         }
-
-        _logger.LogInformation(
-            "Found {Count} ticket(s) ready for agent execution ({InternalCount} internal, {ExternalCount} external)",
-            allTickets.Count,
-            internalTickets.Count,
-            externalTickets.Count);
-
-        // Execute agents for each ticket (concurrent execution allowed)
-        var tasks = allTickets.Select(ticket =>
-            ExecuteTicketAsync(orchestrationService, ticket.Id, cancellationToken));
-
-        await Task.WhenAll(tasks);
     }
 
     private async Task ExecuteTicketAsync(
-        IAgentOrchestrationService orchestrationService,
         Guid ticketId,
         CancellationToken cancellationToken)
     {
         try
         {
+            // Create a separate scope for each ticket execution to avoid DbContext concurrency issues
+            await using var scope = _serviceProvider.CreateAsyncScope();
+            var orchestrationService = scope.ServiceProvider
+                .GetRequiredService<IAgentOrchestrationService>();
+
             var result = await orchestrationService.ExecuteAgentForTicketAsync(
                 ticketId,
                 cancellationToken);

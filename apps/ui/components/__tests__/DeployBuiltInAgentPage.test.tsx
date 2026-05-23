@@ -30,6 +30,8 @@ const createMockTemplate = (overrides: Partial<AgentTemplateDto> = {}): AgentTem
   toolLabel: 'Code Review Tools',
   usageGuide: 'Assign this agent to tickets requiring code review.',
   templateVersion: 1,
+  isCliAgent: false,
+  editableFields: [],
   ...overrides,
 });
 
@@ -70,6 +72,7 @@ const mockDeployedAgent = {
   templateId: 'code-review',
   templateVersion: 1,
   isBuiltIn: true,
+  subAgentIds: [],
 };
 
 const LocationDisplay: React.FC = () => {

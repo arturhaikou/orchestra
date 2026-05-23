@@ -21,6 +21,8 @@ import ProfileEditPage from './components/pages/ProfileEditPage';
 import SkillsList from './components/pages/SkillsList';
 import SkillCreatePage from './components/pages/SkillCreatePage';
 import SkillEditPage from './components/pages/SkillEditPage';
+import JobsPage from './components/pages/JobsPage';
+import JobDetailPage from './components/pages/JobDetailPage';
 import Integrations from './components/Integrations';
 import TicketList from './components/TicketList';
 import AgentsList from './components/AgentsList';
@@ -145,6 +147,8 @@ const App: React.FC = () => {
           <Route path="skills/new" element={<SkillCreatePage />} />
           <Route path="skills/:skillId/edit" element={<SkillEditPage />} />
           <Route path="skills" element={<SkillsList />} />
+          <Route path="jobs" element={<JobsPage />} />
+          <Route path="jobs/:jobId" element={<JobDetailPage />} />
           <Route path="mcp-servers/new" element={<CreateMcpServerPage />} />
           <Route path="mcp-servers/:serverId/edit" element={<EditMcpServerPage />} />
           <Route path="mcp-servers" element={<McpServersPage />} />

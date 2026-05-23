@@ -1,5 +1,5 @@
 
-import { Job } from '../types';
+import { JobDetail, JobStatus, PagedJobsResult } from '../types';
 import { getToken } from './authService';
 
 const API_BASE_URL = `${import.meta.env.VITE_API_URL}/v1/jobs`;
@@ -9,41 +9,21 @@ const getAuthHeaders = () => ({
   'Authorization': `Bearer ${getToken() || ''}`
 });
 
-export const getJobs = async (workspaceId: string): Promise<Job[]> => {
-  try {
-    const response = await fetch(`${API_BASE_URL}?workspaceId=${workspaceId}`, {
-      headers: getAuthHeaders()
-    });
-    if (!response.ok) throw new Error("API Error");
-    return await response.json();
-  } catch (error) {
-    console.error('Failed to fetch jobs:', error);
-    return [];
-  }
+export const getJobs = async (
+  workspaceId: string,
+  status?: JobStatus,
+  page = 1,
+  pageSize = 20
+): Promise<PagedJobsResult> => {
+  const params = new URLSearchParams({ workspaceId, page: String(page), pageSize: String(pageSize) });
+  if (status) params.set('status', status);
+  const response = await fetch(`${API_BASE_URL}?${params}`, { headers: getAuthHeaders() });
+  if (!response.ok) throw new Error('Failed to fetch jobs');
+  return response.json();
 };
 
-export const triggerSync = async (workspaceId: string, integrationId: string): Promise<Job> => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/sync`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ workspaceId, integrationId }),
-    });
-    if (!response.ok) throw new Error("API Error");
-    return await response.json();
-  } catch (error) {
-    console.error('Failed to trigger sync:', error);
-    throw error;
-  }
-};
-
-export const cancelJob = async (jobId: string): Promise<void> => {
-    try {
-        await fetch(`${API_BASE_URL}/${jobId}/cancel`, {
-            method: 'POST',
-            headers: getAuthHeaders(),
-        });
-    } catch (e) {
-        return Promise.resolve();
-    }
+export const getJobDetail = async (jobId: string): Promise<JobDetail> => {
+  const response = await fetch(`${API_BASE_URL}/${jobId}`, { headers: getAuthHeaders() });
+  if (!response.ok) throw new Error('Failed to fetch job detail');
+  return response.json();
 };

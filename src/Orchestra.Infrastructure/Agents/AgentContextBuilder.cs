@@ -55,7 +55,7 @@ public class AgentContextBuilder : IAgentContextBuilder
         sb.AppendLine($"- Ticket ID: {ticket.Id}");
         sb.AppendLine($"- Workspace ID: {ticket.WorkspaceId}");
         sb.AppendLine($"- Title: {ticket.Title}");
-        sb.AppendLine($"- Description: {ticket.Description}");
+        sb.AppendLine($"- Description:\n\n{ticket.Description}");
         sb.AppendLine();
         sb.AppendLine("[Comment History]");
 
@@ -119,7 +119,7 @@ public class AgentContextBuilder : IAgentContextBuilder
         sb.AppendLine($"- External Ticket ID: {externalTicket.ExternalTicketId}");
         sb.AppendLine($"- External URL: {externalTicket.ExternalUrl}");
         sb.AppendLine($"- Title: {externalTicket.Title}");
-        sb.AppendLine($"- Description: {externalTicket.Description}");
+        sb.AppendLine($"- Description:\n\n{externalTicket.Description}");
         sb.AppendLine($"- Status: {externalTicket.StatusName}");
         sb.AppendLine($"- Priority: {externalTicket.PriorityName}");
         sb.AppendLine();

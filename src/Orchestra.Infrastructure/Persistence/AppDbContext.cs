@@ -48,6 +48,10 @@ namespace Orchestra.Infrastructure.Persistence
 
         public DbSet<DataProtectionKey> DataProtectionKeys { get; set; } = null!;
 
+        public DbSet<Job> Jobs => Set<Job>();
+
+        public DbSet<JobStep> JobSteps => Set<JobStep>();
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -74,6 +78,8 @@ namespace Orchestra.Infrastructure.Persistence
             modelBuilder.ApplyConfiguration(new Configurations.AiCliIntegrationConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.SkillConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.AgentSkillConfiguration());
+            modelBuilder.ApplyConfiguration(new Configurations.JobConfiguration());
+            modelBuilder.ApplyConfiguration(new Configurations.JobStepConfiguration());
         }
     }
 }

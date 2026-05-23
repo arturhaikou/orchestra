@@ -98,7 +98,7 @@ public class AgentAGUIBuildService : IAgentAGUIBuildService
             agentId,
             agent.Model,
             agent.ProjectPrinciples,
-            cancellationToken);
+            cancellationToken: cancellationToken);
 
         var skillEntities = await _agentSkillDataAccess.GetSkillsByAgentIdAsync(agentId, cancellationToken);
         var skills = skillEntities

@@ -177,18 +177,59 @@ export interface CreateAgentFromTemplateRequest {
   aiCliIntegrationId?: string;
 }
 
-export interface Job {
+export type JobStatus = 'Pending' | 'Running' | 'Completed' | 'Failed';
+export type JobTriggerType = 'Ticket' | 'ManualApi' | 'Cli';
+export type JobStepType =
+  | 'AgentStarted'
+  | 'ThinkingMessage'
+  | 'ToolCallStarted'
+  | 'ToolCallCompleted'
+  | 'AgentCompleted'
+  | 'AgentFailed'
+  | 'SubAgentCallStarted'
+  | 'SubAgentCallCompleted';
+
+export interface JobSummary {
   id: string;
   workspaceId: string;
+  agentId: string;
+  agentName: string;
+  ticketTitle?: string;
   ticketId?: string;
-  integrationId?: string;
+  status: JobStatus;
+  triggerType: JobTriggerType;
+  createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
+}
+
+export interface JobStep {
+  id: string;
+  stepType: JobStepType;
+  sequence: number;
+  timestamp: string;
+  content?: string;
+  toolName?: string;
+  isJson: boolean;
+  durationMs?: number;
+  isError: boolean;
+  parentStepId?: string;
   agentId?: string;
-  workflowId?: string;
-  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
-  progress: number;
-  logs: string[];
-  startedAt: string;
-  type?: 'SYNC' | 'AUTOMATION' | 'ANALYSIS';
+  agentName?: string;
+}
+
+export interface JobDetail extends JobSummary {
+  initialPrompt: string;
+  finalResponse?: string;
+  errorMessage?: string;
+  steps: JobStep[];
+}
+
+export interface PagedJobsResult {
+  items: JobSummary[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 export interface WorkflowStep {

@@ -2,12 +2,15 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.Reflection;
 using Microsoft.Agents.AI;
+using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Agents.Templates;
 using Orchestra.Application.CodeReview.Models;
 using Orchestra.Application.Common.Interfaces;
+using Orchestra.Application.Jobs.DTOs;
 using Orchestra.Application.McpServers.Interfaces;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
+using Orchestra.Infrastructure.Agents;
 using Orchestra.Infrastructure.AiCliIntegrations;
 using Orchestra.Infrastructure.Tools.Services;
 
@@ -31,6 +34,7 @@ public class ToolRetrieverService : IToolRetrieverService
     private readonly IAgentMcpToolDataAccess _agentMcpToolDataAccess;
     private readonly IAgentSubAgentDataAccess _agentSubAgentDataAccess;
     private readonly IChatClientResolver _chatClientResolver;
+    private readonly IChatAgentRunner _chatAgentRunner;
     private readonly IBuiltInAgentTemplateRegistry _templateRegistry;
     private readonly IAiCliClientFactory _cliClientFactory;
     private readonly ILogger<ToolRetrieverService> _logger;
@@ -61,6 +65,7 @@ public class ToolRetrieverService : IToolRetrieverService
         IAgentMcpToolDataAccess agentMcpToolDataAccess,
         IAgentSubAgentDataAccess agentSubAgentDataAccess,
         IChatClientResolver chatClientResolver,
+        IChatAgentRunner chatAgentRunner,
         IBuiltInAgentTemplateRegistry templateRegistry,
         IAiCliClientFactory cliClientFactory,
         ILogger<ToolRetrieverService> logger)
@@ -77,6 +82,7 @@ public class ToolRetrieverService : IToolRetrieverService
         _agentMcpToolDataAccess = agentMcpToolDataAccess;
         _agentSubAgentDataAccess = agentSubAgentDataAccess;
         _chatClientResolver = chatClientResolver;
+        _chatAgentRunner = chatAgentRunner;
         _templateRegistry = templateRegistry;
         _cliClientFactory = cliClientFactory;
         _logger = logger;
@@ -86,9 +92,10 @@ public class ToolRetrieverService : IToolRetrieverService
         Guid agentId,
         string? modelIdentifier = null,
         string? projectPrinciples = null,
+        JobTrackingContext? jobTracking = null,
         CancellationToken cancellationToken = default)
     {
-        return await GetAgentToolsInternalAsync(agentId, modelIdentifier, projectPrinciples, depth: MaxSubAgentDepth, cancellationToken);
+        return await GetAgentToolsInternalAsync(agentId, modelIdentifier, projectPrinciples, depth: MaxSubAgentDepth, jobTracking, cancellationToken);
     }
 
     private async Task<IEnumerable<AIFunction>> GetAgentToolsInternalAsync(
@@ -96,6 +103,7 @@ public class ToolRetrieverService : IToolRetrieverService
         string? modelIdentifier,
         string? projectPrinciples,
         int depth,
+        JobTrackingContext? jobTracking,
         CancellationToken cancellationToken)
     {
         _logger.LogInformation("Retrieving tools for agent {AgentId} (depth {Depth})", agentId, depth);
@@ -120,7 +128,7 @@ public class ToolRetrieverService : IToolRetrieverService
         var nativeAiFunctions = await ResolveNativeToolsAsync(nativeActions, modelIdentifier, projectPrinciples, cancellationToken);
         var mcpAiFunctions = await ResolveMcpToolsIfAnyAsync(agent.WorkspaceId, mcpActions, cancellationToken);
         var connectedMcpFunctions = await ResolveConnectedMcpToolsAsync(agentId, agent.WorkspaceId, cancellationToken);
-        var subAgentFunctions = await ResolveSubAgentToolsAsync(agentId, depth, cancellationToken);
+        var subAgentFunctions = await ResolveSubAgentToolsAsync(agentId, depth, jobTracking, cancellationToken);
 
         var allFunctions = nativeAiFunctions
             .Concat(mcpAiFunctions)
@@ -303,6 +311,7 @@ public class ToolRetrieverService : IToolRetrieverService
     private async Task<List<AIFunction>> ResolveSubAgentToolsAsync(
         Guid parentAgentId,
         int depth,
+        JobTrackingContext? jobTracking,
         CancellationToken cancellationToken)
     {
         if (depth <= 0)
@@ -323,7 +332,7 @@ public class ToolRetrieverService : IToolRetrieverService
 
         foreach (var subAgentId in subAgentIds)
         {
-            var subAgentFunction = await BuildSubAgentAIFunctionAsync(subAgentId, depth - 1, cancellationToken);
+            var subAgentFunction = await BuildSubAgentAIFunctionAsync(subAgentId, depth - 1, jobTracking, cancellationToken);
             if (subAgentFunction is not null)
                 aiFunctions.Add(subAgentFunction);
         }
@@ -353,6 +362,7 @@ public class ToolRetrieverService : IToolRetrieverService
     private async Task<AIFunction?> BuildCliSubAgentAIFunctionAsync(
         Agent subAgent,
         int depth,
+        JobTrackingContext? jobTracking,
         CancellationToken cancellationToken)
     {
         if (subAgent.AiCliIntegrationId is null)
@@ -367,8 +377,16 @@ public class ToolRetrieverService : IToolRetrieverService
         {
             var template = _templateRegistry.GetByIdentifier(subAgent.TemplateIdentifier!);
             var isReadOnly = template?.IsReadOnlyCli ?? true;
-
             var instructions = subAgent.CustomInstructions ?? subAgent.ProjectPrinciples;
+
+            if (jobTracking is not null)
+            {
+                _logger.LogDebug(
+                    "Creating job-tracked CLI sub-agent AIFunction for agent {SubAgentName} ({SubAgentId})",
+                    subAgent.Name, subAgent.Id);
+                return CreateTrackedCliSubAgentFunction(subAgent, instructions, isReadOnly, jobTracking);
+            }
+
             AIFunction aiFunction;
 
             if (isReadOnly)
@@ -410,6 +428,7 @@ public class ToolRetrieverService : IToolRetrieverService
     private async Task<AIFunction?> BuildSubAgentAIFunctionAsync(
         Guid subAgentId,
         int depth,
+        JobTrackingContext? jobTracking,
         CancellationToken cancellationToken)
     {
         var subAgent = await _agentDataAccess.GetByIdAsync(subAgentId, cancellationToken);
@@ -423,7 +442,7 @@ public class ToolRetrieverService : IToolRetrieverService
         if (IsCliAgent(subAgent))
         {
             _logger.LogDebug("Resolving CLI sub-agent {SubAgentName} ({SubAgentId})", subAgent.Name, subAgent.Id);
-            return await BuildCliSubAgentAIFunctionAsync(subAgent, depth, cancellationToken);
+            return await BuildCliSubAgentAIFunctionAsync(subAgent, depth, jobTracking, cancellationToken);
         }
 
         // Otherwise, it's a model-based subagent
@@ -442,26 +461,34 @@ public class ToolRetrieverService : IToolRetrieverService
                 subAgent.Model,
                 cancellationToken);
 
-            var subAgentTools = await GetAgentToolsInternalAsync(
-                subAgentId,
-                subAgent.Model,
-                subAgent.ProjectPrinciples,
-                depth,
-                cancellationToken);
+            if (jobTracking is null)
+            {
+                var subAgentTools = await GetAgentToolsInternalAsync(
+                    subAgentId,
+                    subAgent.Model,
+                    subAgent.ProjectPrinciples,
+                    depth,
+                    jobTracking: null,
+                    cancellationToken);
 
-            var agentInstance = new ChatClientAgent(
-                chatClient,
-                instructions: subAgent.CustomInstructions ?? subAgent.ProjectPrinciples,
-                name: subAgent.Name,
-                tools: subAgentTools.ToArray());
+                var agentInstance = new ChatClientAgent(
+                    chatClient,
+                    instructions: subAgent.CustomInstructions ?? subAgent.ProjectPrinciples,
+                    name: subAgent.Name,
+                    tools: subAgentTools.ToArray());
 
-            var aiFunction = agentInstance.AsAIFunction();
+                _logger.LogDebug(
+                    "Created model-based sub-agent AIFunction for agent {SubAgentName} ({SubAgentId})",
+                    subAgent.Name, subAgentId);
+
+                return agentInstance.AsAIFunction();
+            }
 
             _logger.LogDebug(
-                "Created model-based sub-agent AIFunction for agent {SubAgentName} ({SubAgentId})",
+                "Creating job-tracked sub-agent AIFunction for agent {SubAgentName} ({SubAgentId})",
                 subAgent.Name, subAgentId);
 
-            return aiFunction;
+            return CreateTrackedSubAgentFunction(chatClient, subAgent, subAgentId, depth, jobTracking);
         }
         catch (Exception ex)
         {
@@ -470,6 +497,179 @@ public class ToolRetrieverService : IToolRetrieverService
                 subAgentId);
             return null;
         }
+    }
+
+    private AIFunction CreateTrackedSubAgentFunction(
+        IChatClient chatClient,
+        Agent subAgent,
+        Guid subAgentId,
+        int depth,
+        JobTrackingContext jobTracking)
+    {
+        var capturedChatClient = chatClient;
+        var capturedSubAgent = subAgent;
+        var capturedSubAgentId = subAgentId;
+        var capturedDepth = depth;
+        var capturedJobTracking = jobTracking;
+
+        Func<string, CancellationToken, Task<string?>> trackedCall = async (message, ct) =>
+        {
+            var callStepId = await capturedJobTracking.StepWriter.WriteAsync(
+                capturedJobTracking.JobId,
+                capturedJobTracking.WorkspaceId,
+                JobStepType.SubAgentCallStarted,
+                content: message,
+                toolName: capturedSubAgent.Name,
+                agentId: capturedSubAgent.Id,
+                agentName: capturedSubAgent.Name,
+                cancellationToken: ct);
+
+            try
+            {
+                var scopedWriter = new ScopedJobStepWriter(
+                    capturedJobTracking.StepWriter,
+                    callStepId,
+                    capturedSubAgent.Id,
+                    capturedSubAgent.Name);
+
+                var nestedJobTracking = new JobTrackingContext(
+                    scopedWriter,
+                    capturedJobTracking.JobId,
+                    capturedJobTracking.WorkspaceId);
+
+                var subAgentTools = await GetAgentToolsInternalAsync(
+                    capturedSubAgentId,
+                    capturedSubAgent.Model,
+                    capturedSubAgent.ProjectPrinciples,
+                    capturedDepth,
+                    nestedJobTracking,
+                    ct);
+
+                var result = await _chatAgentRunner.RunAsync(
+                    capturedChatClient,
+                    capturedSubAgent,
+                    subAgentTools.ToList(),
+                    message,
+                    nestedJobTracking,
+                    ct);
+
+                await capturedJobTracking.StepWriter.WriteAsync(
+                    capturedJobTracking.JobId,
+                    capturedJobTracking.WorkspaceId,
+                    JobStepType.SubAgentCallCompleted,
+                    content: result,
+                    toolName: capturedSubAgent.Name,
+                    agentId: capturedSubAgent.Id,
+                    agentName: capturedSubAgent.Name,
+                    cancellationToken: ct);
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await capturedJobTracking.StepWriter.WriteAsync(
+                    capturedJobTracking.JobId,
+                    capturedJobTracking.WorkspaceId,
+                    JobStepType.AgentFailed,
+                    content: ex.Message,
+                    toolName: capturedSubAgent.Name,
+                    agentId: capturedSubAgent.Id,
+                    agentName: capturedSubAgent.Name,
+                    isError: true,
+                    cancellationToken: ct);
+                throw;
+            }
+        };
+
+        return AIFunctionFactory.Create(trackedCall, SanitizeFunctionName(capturedSubAgent.Name), capturedSubAgent.Role);
+    }
+
+    private AIFunction CreateTrackedCliSubAgentFunction(
+        Agent subAgent,
+        string? instructions,
+        bool isReadOnly,
+        JobTrackingContext jobTracking)
+    {
+        var capturedSubAgent = subAgent;
+        var capturedInstructions = instructions;
+        var capturedIsReadOnly = isReadOnly;
+        var capturedJobTracking = jobTracking;
+
+        Func<string, CancellationToken, Task<string?>> trackedCall = async (message, ct) =>
+        {
+            var callStepId = await capturedJobTracking.StepWriter.WriteAsync(
+                capturedJobTracking.JobId,
+                capturedJobTracking.WorkspaceId,
+                JobStepType.SubAgentCallStarted,
+                content: message,
+                toolName: capturedSubAgent.Name,
+                agentId: capturedSubAgent.Id,
+                agentName: capturedSubAgent.Name,
+                cancellationToken: ct);
+
+            try
+            {
+                var scopedWriter = new ScopedJobStepWriter(
+                    capturedJobTracking.StepWriter,
+                    callStepId,
+                    capturedSubAgent.Id,
+                    capturedSubAgent.Name);
+
+                var client = capturedIsReadOnly
+                    ? await _cliClientFactory.CreateReadOnlyClientAsync(capturedSubAgent.AiCliIntegrationId!.Value, capturedSubAgent.Model, capturedSubAgent.ReasoningEffort, ct)
+                    : await _cliClientFactory.CreateClientAsync(capturedSubAgent.AiCliIntegrationId!.Value, capturedSubAgent.Model, capturedSubAgent.ReasoningEffort, ct);
+
+                await using var _ = client;
+
+                var result = await client.RunWithTrackingAsync(
+                    message,
+                    capturedInstructions,
+                    capturedSubAgent.Name,
+                    scopedWriter,
+                    capturedJobTracking.JobId,
+                    capturedJobTracking.WorkspaceId,
+                    ct);
+
+                await capturedJobTracking.StepWriter.WriteAsync(
+                    capturedJobTracking.JobId,
+                    capturedJobTracking.WorkspaceId,
+                    JobStepType.SubAgentCallCompleted,
+                    content: result,
+                    toolName: capturedSubAgent.Name,
+                    agentId: capturedSubAgent.Id,
+                    agentName: capturedSubAgent.Name,
+                    cancellationToken: ct);
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await capturedJobTracking.StepWriter.WriteAsync(
+                    capturedJobTracking.JobId,
+                    capturedJobTracking.WorkspaceId,
+                    JobStepType.AgentFailed,
+                    content: ex.Message,
+                    toolName: capturedSubAgent.Name,
+                    agentId: capturedSubAgent.Id,
+                    agentName: capturedSubAgent.Name,
+                    isError: true,
+                    cancellationToken: ct);
+                throw;
+            }
+        };
+
+        return AIFunctionFactory.Create(trackedCall, SanitizeFunctionName(capturedSubAgent.Name), capturedSubAgent.Role);
+    }
+
+    /// <summary>
+    /// Converts an agent display name into a valid AI function name
+    /// matching the pattern <c>^[a-zA-Z0-9_-]{1,128}$</c> required by all major AI providers.
+    /// Spaces and unsupported characters are replaced with underscores.
+    /// </summary>
+    private static string SanitizeFunctionName(string name)
+    {
+        var sanitized = System.Text.RegularExpressions.Regex.Replace(name, @"[^a-zA-Z0-9_-]", "_");
+        return sanitized.Length > 128 ? sanitized[..128] : sanitized;
     }
 
     private async Task<List<AIFunction>> ResolveMcpToolsAsync(

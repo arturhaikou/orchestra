@@ -4,7 +4,7 @@ import ModalErrorBanner from './ModalErrorBanner';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { marked } from 'marked';
 import { Ticket, TicketPriority, TicketStatus, Comment, Workflow, Agent, TicketStatusChangedEvent } from '../types';
-import { onTicketStatusChanged, offTicketStatusChanged, onReconnected, offReconnected } from '../services/signalRService';
+import { onTicketStatusChanged, onReconnected } from '../services/signalRService';
 import { addComment, updateTicket, getTickets, convertToExternal, deleteTicket, getTicketStatuses, getTicketPriorities, generateSummary } from '../services/ticketService';
 import { getWorkspacesWorkflows } from '../services/workflowService';
 import { getUser } from '../services/authService';
@@ -234,12 +234,12 @@ const TicketList: React.FC<TicketListProps> = () => {
       showStatusChangeToast(event.newStatus);
     };
 
-    onTicketStatusChanged(handleTicketStatusChanged);
-    onReconnected(loadInitialTickets);
+    const unsubscribeTicketStatus = onTicketStatusChanged(handleTicketStatusChanged);
+    const unsubscribeReconnected = onReconnected(loadInitialTickets);
 
     return () => {
-      offTicketStatusChanged();
-      offReconnected();
+      unsubscribeTicketStatus();
+      unsubscribeReconnected();
     };
   }, [workspaceId]);
 

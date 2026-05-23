@@ -101,7 +101,13 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddAGUI();
 
-builder.Services.AddSignalR();
+builder.Services.AddSignalR()
+    .AddStackExchangeRedis(builder.Configuration.GetConnectionString("redis")!)
+    .AddJsonProtocol(options =>
+    {
+        options.PayloadSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        options.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 
 // Configure CORS for Aspire UI integration
 builder.Services.AddCors(options =>

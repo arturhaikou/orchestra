@@ -3,6 +3,7 @@ using Orchestra.Application.Agents.DTOs;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Integrations.DTOs;
+using Orchestra.Application.Jobs.DTOs;
 using Orchestra.Application.Tickets.DTOs;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
@@ -127,11 +128,21 @@ public class AgentOrchestrationService : IAgentOrchestrationService
                 agentEntity.Name,
                 agentEntity.Model ?? "<system default>");
 
+            var jobContext = new JobContext(
+                WorkspaceId: ticket.WorkspaceId,
+                AgentId: agentEntity.Id,
+                AgentName: agentEntity.Name,
+                TriggerType: JobTriggerType.Ticket,
+                InitialPrompt: contextPrompt,
+                TicketId: ticket.Id,
+                TicketTitle: ticket.Title);
+
             var responseText = await _agentRuntimeService.ExecuteAgentAsync(
                 agentEntity.Id,
                 contextPrompt,
                 agentEntity.Model,
                 agentEntity.ProjectPrinciples,
+                jobContext,
                 cancellationToken);
 
             _logger.LogInformation(

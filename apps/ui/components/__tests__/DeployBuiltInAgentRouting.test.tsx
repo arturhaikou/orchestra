@@ -29,6 +29,8 @@ const mockTemplate: AgentTemplateDto = {
   toolLabel: 'Code Review Tools',
   usageGuide: 'Assign this agent to tickets requiring code review.',
   templateVersion: 1,
+  isCliAgent: false,
+  editableFields: [],
 };
 
 const LocationDisplay: React.FC = () => {

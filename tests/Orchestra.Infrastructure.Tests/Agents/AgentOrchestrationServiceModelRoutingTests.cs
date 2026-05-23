@@ -41,6 +41,7 @@ public class AgentOrchestrationServiceModelRoutingTests
                 Arg.Any<string>(),
                 Arg.Any<string?>(),
                 Arg.Any<string?>(),
+                null,
                 Arg.Any<CancellationToken>())
             .Returns("Agent response");
 
@@ -105,6 +106,7 @@ public class AgentOrchestrationServiceModelRoutingTests
             Arg.Any<string>(),
             agentModel,
             Arg.Any<string?>(),
+            null,
             Arg.Any<CancellationToken>());
     }
 
@@ -147,6 +149,7 @@ public class AgentOrchestrationServiceModelRoutingTests
             Arg.Any<string>(),
             null,
             Arg.Any<string?>(),
+            null,
             Arg.Any<CancellationToken>());
     }
 }

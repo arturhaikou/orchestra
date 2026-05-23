@@ -56,7 +56,7 @@ public class AgentOrchestrationServiceTests
             .BuildAgentContextWithIntegrationsAsync(ticket, agent, Arg.Any<CancellationToken>())
             .Returns("context prompt");
         _agentRuntimeService
-            .ExecuteAgentAsync(agentId, "context prompt", agent.Model, agent.ProjectPrinciples, Arg.Any<CancellationToken>())
+            .ExecuteAgentAsync(agentId, "context prompt", agent.Model, agent.ProjectPrinciples, null, Arg.Any<CancellationToken>())
             .Returns("response");
 
         return (ticketId, workspaceId, agentId);
@@ -118,7 +118,7 @@ public class AgentOrchestrationServiceTests
             .BuildAgentContextWithIntegrationsAsync(ticket, agent, Arg.Any<CancellationToken>())
             .Returns("context prompt");
         _agentRuntimeService
-            .ExecuteAgentAsync(agentId, "context prompt", agent.Model, agent.ProjectPrinciples, Arg.Any<CancellationToken>())
+            .ExecuteAgentAsync(agentId, "context prompt", agent.Model, agent.ProjectPrinciples, null, Arg.Any<CancellationToken>())
             .ThrowsAsync(new Exception("AI execution failed"));
 
         await _sut.ExecuteAgentForTicketAsync(ticketId);

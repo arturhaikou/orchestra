@@ -16,6 +16,7 @@ const baseAgent: Agent = {
   toolActionIds: [],
   toolCategories: [],
   avatarUrl: 'https://example.com/avatar.png',
+  subAgentIds: [],
 };
 
 describe('isBuiltInAgent', () => {

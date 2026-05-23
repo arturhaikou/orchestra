@@ -1,6 +1,7 @@
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using NSubstitute.ExceptionExtensions;
+using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Agents.Templates;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.McpServers.Interfaces;
@@ -55,6 +56,7 @@ public class ToolRetrieverServiceMcpTests
             _agentMcpToolDataAccess,
             _agentSubAgentDataAccess,
             Substitute.For<IChatClientResolver>(),
+            Substitute.For<IChatAgentRunner>(),
             _templateRegistry,
             _cliClientFactory,
             _logger);

@@ -33,6 +33,7 @@ public class AgentOrchestrationServiceNotificationTests
                 Arg.Any<string>(),
                 Arg.Any<string?>(),
                 Arg.Any<string?>(),
+                null,
                 Arg.Any<CancellationToken>())
             .Returns("Agent response");
 
@@ -117,6 +118,7 @@ public class AgentOrchestrationServiceNotificationTests
                 Arg.Any<string>(),
                 Arg.Any<string?>(),
                 Arg.Any<string?>(),
+                null,
                 Arg.Any<CancellationToken>())
             .ThrowsAsync(new InvalidOperationException("LLM timeout"));
 

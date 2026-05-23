@@ -8,19 +8,26 @@ var postgres = builder.AddPostgres("postgres")
 
 var database = postgres.AddDatabase("Orchestra");
 
+var redis = builder.AddRedis("redis")
+    .WithLifetime(ContainerLifetime.Persistent);
+
 var adfgenerator = builder.AddNodeApp("adfgenerator", "../../apps/adfgenerator", "index.js")
     .WithHttpEndpoint(port: 3300, env: "PORT");
 
 var worker = builder.AddProject<Projects.Orchestra_Worker>("worker")
     .WithReference(database)
+    .WithReference(redis)
     .WithReference(adfgenerator)
-    .WaitFor(database);
+    .WaitFor(database)
+    .WaitFor(redis);
 
 var api = builder.AddProject<Projects.Orchestra_ApiService>("api")
     .WithReference(database)
+    .WithReference(redis)
     .WithReference(adfgenerator)
     .WaitFor(database)
-    .WaitFor(worker);
+    .WaitFor(worker)
+    .WaitFor(redis);
 
 var copilotruntime = builder.AddNodeApp("copilotruntime", "../../apps/copilotkit-runtime", "index.js")
     .WithHttpEndpoint(port: 3001, env: "PORT")
