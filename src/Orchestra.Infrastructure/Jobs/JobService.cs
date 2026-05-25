@@ -95,6 +95,12 @@ public class JobService : IJobService
             case JobStatus.Failed:
                 job.MarkFailed(errorMessage ?? "Unknown error");
                 break;
+            case JobStatus.WaitingForInput:
+                // Status is set via reflection since there's no MarkSuspended method
+                var statusProperty = typeof(Job).GetProperty(nameof(Job.Status),
+                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                statusProperty?.GetSetMethod(nonPublic: true)?.Invoke(job, new object[] { status });
+                break;
         }
     }
 
@@ -144,4 +150,12 @@ public class JobService : IJobService
             step.ParentStepId,
             step.AgentId,
             step.AgentName);
+
+    public async Task SuspendJobAsync(
+        Guid jobId,
+        Guid questionId,
+        CancellationToken cancellationToken = default)
+    {
+        await UpdateJobStatusAsync(jobId, JobStatus.WaitingForInput, cancellationToken: cancellationToken);
+    }
 }

@@ -1,8 +1,9 @@
 
 import React from 'react';
-import { Search, Bell, Sun, Moon, Menu } from 'lucide-react';
+import { Search, Sun, Moon, Menu } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import ConnectionStatusBadge from './ConnectionStatusBadge';
+import AgentQuestionsBell from './notifications/AgentQuestionsBell';
 
 interface HeaderProps {
     isDarkMode: boolean;
@@ -53,10 +54,7 @@ const Header: React.FC<HeaderProps> = ({ isDarkMode, toggleTheme, toggleSidebar,
                 {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
              </button>
 
-             <button className="relative text-textMuted hover:text-text transition-colors p-2 rounded-full hover:bg-surfaceHighlight">
-               <Bell className="w-5 h-5" />
-               <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full ring-2 ring-surface"></span>
-             </button>
+             <AgentQuestionsBell workspaceId={workspaceId} />
           </div>
         </header>
     );

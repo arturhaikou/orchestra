@@ -5,6 +5,7 @@ using Orchestra.Application.Agents.Templates;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Jobs.DTOs;
 using Orchestra.Application.Jobs.Services;
+using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
 using Orchestra.Infrastructure.AiCliIntegrations;
 
@@ -17,35 +18,41 @@ public class AgentRuntimeService : IAgentRuntimeService
 {
     private readonly IChatClientResolver _chatClientResolver;
     private readonly IAgentDataAccess _agentDataAccess;
+    private readonly IJobDataAccess _jobDataAccess;
     private readonly IChatAgentRunner _chatAgentRunner;
     private readonly IToolRetrieverService _toolRetrieverService;
     private readonly IBuiltInAgentTemplateRegistry _templateRegistry;
     private readonly IAiCliClientFactory _cliClientFactory;
     private readonly IJobService _jobService;
     private readonly IJobStepWriter _jobStepWriter;
+    private readonly IConversationSnapshotRepository _snapshotRepository;
 
     public AgentRuntimeService(
         IChatClientResolver chatClientResolver,
         IAgentDataAccess agentDataAccess,
+        IJobDataAccess jobDataAccess,
         IChatAgentRunner chatAgentRunner,
         IToolRetrieverService toolRetrieverService,
         IBuiltInAgentTemplateRegistry templateRegistry,
         IAiCliClientFactory cliClientFactory,
         IJobService jobService,
-        IJobStepWriter jobStepWriter)
+        IJobStepWriter jobStepWriter,
+        IConversationSnapshotRepository snapshotRepository)
     {
         _chatClientResolver = chatClientResolver;
         _agentDataAccess = agentDataAccess;
+        _jobDataAccess = jobDataAccess;
         _chatAgentRunner = chatAgentRunner;
         _toolRetrieverService = toolRetrieverService;
         _templateRegistry = templateRegistry;
         _cliClientFactory = cliClientFactory;
         _jobService = jobService;
         _jobStepWriter = jobStepWriter;
+        _snapshotRepository = snapshotRepository;
     }
 
     /// <inheritdoc/>
-    public async Task<string> ExecuteAgentAsync(
+    public async Task<(string ResponseText, Guid? JobId)> ExecuteAgentAsync(
         Guid agentId,
         string contextPrompt,
         string? agentModel = null,
@@ -64,27 +71,40 @@ public class AgentRuntimeService : IAgentRuntimeService
         try
         {
             string result;
+            JobTrackingContext? jobTracking = null;
+
             if (IsCliAgent(agentEntity))
                 result = await ExecuteCliAgentAsync(agentEntity, contextPrompt, jobId, jobContext?.WorkspaceId, cancellationToken);
             else
+            {
+                jobTracking = jobId.HasValue && jobContext?.WorkspaceId is not null
+                    ? new JobTrackingContext(_jobStepWriter, jobId.Value, jobContext.WorkspaceId)
+                    : null;
+
                 result = await ExecuteChatAgentAsync(
                     agentEntity,
                     agentId,
                     agentModel,
                     projectPrinciples,
                     contextPrompt,
-                    jobId,
-                    jobContext?.WorkspaceId,
+                    jobTracking,
                     cancellationToken);
+            }
 
             if (jobId.HasValue && jobContext is not null)
-                await _jobService.UpdateJobStatusAsync(
-                    jobId.Value,
-                    JobStatus.Completed,
-                    finalResponse: result,
-                    cancellationToken: cancellationToken);
+            {
+                if (jobTracking?.SuspendedQuestionId is not null)
+                    await _jobService.SuspendJobAsync(
+                        jobId.Value, jobTracking.SuspendedQuestionId.Value, cancellationToken);
+                else
+                    await _jobService.UpdateJobStatusAsync(
+                        jobId.Value,
+                        JobStatus.Completed,
+                        finalResponse: result,
+                        cancellationToken: cancellationToken);
+            }
 
-            return result;
+            return (result, jobId);
         }
         catch (Exception ex)
         {
@@ -213,8 +233,7 @@ public class AgentRuntimeService : IAgentRuntimeService
         string? agentModel,
         string? projectPrinciples,
         string contextPrompt,
-        Guid? jobId,
-        Guid? workspaceId,
+        JobTrackingContext? jobTracking,
         CancellationToken cancellationToken)
     {
         var chatClient = await _chatClientResolver.ResolveAsync(
@@ -223,18 +242,21 @@ public class AgentRuntimeService : IAgentRuntimeService
                 $"Agent {agentEntity.Id} has no model configured. Set Agent.Model before executing."),
             cancellationToken);
 
+        var effectiveProjectPrinciples = projectPrinciples ?? agentEntity.ProjectPrinciples;
+
+        if (jobTracking is not null)
+        {
+            effectiveProjectPrinciples = (effectiveProjectPrinciples ?? "") +
+                "\n\nSYSTEM: If any tool returns a string starting with \"WAITING_FOR_USER_INPUT\", " +
+                "return that string verbatim and stop calling further tools.";
+        }
+
         var aiFunctions = await _toolRetrieverService.GetAgentToolsAsync(
             agentId,
             agentModel,
-            projectPrinciples,
-            jobTracking: jobId.HasValue && workspaceId.HasValue
-                ? new JobTrackingContext(_jobStepWriter, jobId.Value, workspaceId.Value)
-                : null,
+            effectiveProjectPrinciples,
+            jobTracking: jobTracking,
             cancellationToken);
-
-        var jobTracking = jobId.HasValue && workspaceId.HasValue
-            ? new JobTrackingContext(_jobStepWriter, jobId.Value, workspaceId.Value)
-            : null;
 
         var result = await _chatAgentRunner.RunAsync(
             chatClient,
@@ -242,8 +264,81 @@ public class AgentRuntimeService : IAgentRuntimeService
             aiFunctions.ToList(),
             contextPrompt,
             jobTracking,
-            cancellationToken);
+            cancellationToken: cancellationToken);
 
         return result ?? "Agent completed execution (no response text)";
+    }
+
+    /// <inheritdoc/>
+    public async Task ExecuteRestoredAgentAsync(
+        Guid jobId,
+        Guid questionId,
+        string answersJson,
+        CancellationToken cancellationToken = default)
+    {
+        var job = await _jobDataAccess.GetByIdAsync(jobId, cancellationToken)
+            ?? throw new InvalidOperationException($"Job {jobId} not found.");
+
+        var agentEntity = await _agentDataAccess.GetByIdAsync(job.AgentId, cancellationToken)
+            ?? throw new InvalidOperationException($"Agent {job.AgentId} not found.");
+
+        var snapshot = await _snapshotRepository.GetByJobAndAgentAsync(jobId, job.AgentId, cancellationToken)
+            ?? throw new InvalidOperationException($"No snapshot for job {jobId}.");
+
+        var chatClient = await _chatClientResolver.ResolveAsync(
+            agentEntity.WorkspaceId, agentEntity.Model!, cancellationToken);
+
+        var maxSequence = await _jobDataAccess.GetMaxSequenceAsync(jobId, cancellationToken);
+        _jobStepWriter.InitializeSequence(maxSequence);
+
+        var jobTracking = new JobTrackingContext(_jobStepWriter, jobId, job.WorkspaceId);
+
+        var aiFunctions = await _toolRetrieverService.GetAgentToolsAsync(
+            job.AgentId, agentEntity.Model, agentEntity.ProjectPrinciples,
+            jobTracking: jobTracking,
+            cancellationToken);
+
+#pragma warning disable MAAI001
+        var agent = chatClient.AsAIAgent(new ChatClientAgentOptions
+        {
+            Name = agentEntity.Name,
+            ChatOptions = new ChatOptions
+            {
+                Instructions = agentEntity.CustomInstructions ?? agentEntity.ProjectPrinciples,
+                Tools = aiFunctions.Cast<AITool>().ToList()
+            }
+        });
+
+        var session = await agent.DeserializeSessionAsync(
+            System.Text.Json.JsonDocument.Parse(snapshot.SerializedSessionJson).RootElement,
+            cancellationToken: cancellationToken);
+#pragma warning restore MAAI001
+
+        var resumeMessage =
+            $"The user has answered the pending question (QuestionId: {questionId}). " +
+            $"Answers: {answersJson}. Continue where you left off.";
+
+        await _jobService.UpdateJobStatusAsync(jobId, JobStatus.Running, cancellationToken: cancellationToken);
+
+        try
+        {
+            var response = await _chatAgentRunner.RunAsync(
+                chatClient,
+                agentEntity,
+                aiFunctions.ToList(),
+                resumeMessage,
+                jobTracking,
+                session: session,
+                cancellationToken: cancellationToken);
+
+            await _jobService.UpdateJobStatusAsync(
+                jobId, JobStatus.Completed, finalResponse: response, cancellationToken: cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            await _jobService.UpdateJobStatusAsync(
+                jobId, JobStatus.Failed, errorMessage: ex.Message, cancellationToken: cancellationToken);
+            throw;
+        }
     }
 }

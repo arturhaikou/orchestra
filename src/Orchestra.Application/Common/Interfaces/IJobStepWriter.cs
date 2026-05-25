@@ -4,6 +4,8 @@ namespace Orchestra.Application.Common.Interfaces;
 
 public interface IJobStepWriter
 {
+    void InitializeSequence(int startingValue);
+
     Task<Guid> WriteAsync(
         Guid jobId,
         Guid workspaceId,

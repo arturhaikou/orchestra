@@ -29,12 +29,22 @@ public interface IAgentRuntimeService
     /// </param>
     /// <param name="jobContext">The job context for tracking job execution (nullable).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The text response from the agent execution.</returns>
-    Task<string> ExecuteAgentAsync(
+    /// <returns>A tuple containing the text response from agent execution and the optional job ID.</returns>
+    Task<(string ResponseText, Guid? JobId)> ExecuteAgentAsync(
         Guid agentId,
         string contextPrompt,
         string? agentModel = null,
         string? projectPrinciples = null,
         JobContext? jobContext = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Restores a suspended background job agent from its saved session snapshot and
+    /// continues execution, injecting the user's answers as a new message.
+    /// </summary>
+    Task ExecuteRestoredAgentAsync(
+        Guid jobId,
+        Guid questionId,
+        string answersJson,
         CancellationToken cancellationToken = default);
 }

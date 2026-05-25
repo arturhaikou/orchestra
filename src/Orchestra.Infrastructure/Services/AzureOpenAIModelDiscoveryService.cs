@@ -19,10 +19,14 @@ public sealed class AzureOpenAIModelDiscoveryService : IAzureOpenAIModelDiscover
     private const string ApiVersion = "2024-10-21";
 
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IAzureOpenAILimitsService _limitsService;
 
-    public AzureOpenAIModelDiscoveryService(IHttpClientFactory httpClientFactory)
+    public AzureOpenAIModelDiscoveryService(
+        IHttpClientFactory httpClientFactory,
+        IAzureOpenAILimitsService limitsService)
     {
         _httpClientFactory = httpClientFactory;
+        _limitsService = limitsService;
     }
 
     /// <inheritdoc/>
@@ -64,7 +68,16 @@ public sealed class AzureOpenAIModelDiscoveryService : IAzureOpenAIModelDiscover
                 .Select(element => element.GetProperty("id").GetString()!)
                 .ToList();
 
-            return deployments.AsReadOnly();
+            if (!IsAiProxyEndpoint(endpoint))
+                return deployments.AsReadOnly();
+
+            var accessChecks = await Task.WhenAll(
+                deployments.Select(id => _limitsService.IsModelAccessibleAsync(endpoint, apiKey, id, cancellationToken)));
+
+            return deployments
+                .Where((_, i) => accessChecks[i])
+                .ToList()
+                .AsReadOnly();
         }
         catch (AIProviderCommunicationException)
         {
@@ -81,4 +94,7 @@ public sealed class AzureOpenAIModelDiscoveryService : IAzureOpenAIModelDiscover
                 ex);
         }
     }
+
+    private static bool IsAiProxyEndpoint(string endpoint)
+        => endpoint.Contains("ai-proxy", StringComparison.OrdinalIgnoreCase);
 }

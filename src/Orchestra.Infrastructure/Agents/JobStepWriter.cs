@@ -17,6 +17,9 @@ public class JobStepWriter : IJobStepWriter
         _notificationService = notificationService;
     }
 
+    public void InitializeSequence(int startingValue) =>
+        Interlocked.Exchange(ref _sequenceCounter, startingValue);
+
     public async Task<Guid> WriteAsync(
         Guid jobId,
         Guid workspaceId,

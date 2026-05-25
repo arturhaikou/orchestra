@@ -11,6 +11,7 @@ const FILTERS: Array<{ label: string; value?: JobStatus }> = [
   { label: 'Running', value: 'Running' },
   { label: 'Completed', value: 'Completed' },
   { label: 'Failed', value: 'Failed' },
+  { label: 'Waiting', value: 'WaitingForInput' },
 ];
 
 const JobStatusFilter: React.FC<Props> = ({ selected, onChange }) => (

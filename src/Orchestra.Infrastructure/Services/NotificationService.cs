@@ -216,4 +216,37 @@ public class NotificationService : INotificationService
                 jobId);
         }
     }
+
+    public async Task NotifyAgentQuestionAskedAsync(
+        Guid workspaceId,
+        Guid questionId,
+        CancellationToken cancellationToken = default)
+    {
+        var groupName = $"workspace-{workspaceId}";
+
+        var payload = new
+        {
+            workspaceId = workspaceId,
+            questionId = questionId
+        };
+
+        try
+        {
+            await _hubContext.Clients.Group(groupName)
+                .SendAsync("AgentQuestionAsked", payload, cancellationToken);
+
+            _logger.LogDebug(
+                "Dispatched AgentQuestionAsked notification. WorkspaceId={WorkspaceId} QuestionId={QuestionId}",
+                workspaceId,
+                questionId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Failed to dispatch AgentQuestionAsked notification. WorkspaceId={WorkspaceId} QuestionId={QuestionId}",
+                workspaceId,
+                questionId);
+        }
+    }
 }

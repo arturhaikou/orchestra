@@ -25,6 +25,7 @@
     <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.1.0" />
     <PackageReference Include="ModelContextProtocol" Version="1.2.0" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.15.0" />
+    <PackageReference Include="StackExchange.Redis" Version="2.8.0" />
   </ItemGroup>
 
   <ItemGroup>

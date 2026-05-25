@@ -18,4 +18,8 @@ public interface INotificationService
     Task NotifyJobCreatedAsync(Guid workspaceId, JobSummaryDto job, CancellationToken cancellationToken = default);
     Task NotifyJobStatusChangedAsync(Guid workspaceId, Guid jobId, JobStatus newStatus, CancellationToken cancellationToken = default);
     Task NotifyJobStepAddedAsync(Guid workspaceId, Guid jobId, JobStepDto step, CancellationToken cancellationToken = default);
+    Task NotifyAgentQuestionAskedAsync(
+        Guid workspaceId,
+        Guid questionId,
+        CancellationToken cancellationToken = default);
 }

@@ -177,7 +177,7 @@ export interface CreateAgentFromTemplateRequest {
   aiCliIntegrationId?: string;
 }
 
-export type JobStatus = 'Pending' | 'Running' | 'Completed' | 'Failed';
+export type JobStatus = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'WaitingForInput';
 export type JobTriggerType = 'Ticket' | 'ManualApi' | 'Cli';
 export type JobStepType =
   | 'AgentStarted'
@@ -496,6 +496,26 @@ export interface WorkspaceProviderUpdateRequest {
   apiKey?: string;
   /** The model identifier to use as the workspace default. Must appear in the validated model list. */
   defaultModelId: string;
+}
+
+export type QuestionType = 'Text' | 'Radio' | 'Checkbox';
+
+export interface QuestionItem {
+  question: string;
+  hint?: string;
+  type: QuestionType;
+  options?: string[];
+  allowCustom?: boolean;
+}
+
+export interface AgentQuestion {
+  id: string;
+  jobId: string;
+  agentId: string;
+  workspaceId: string;
+  questions: QuestionItem[];
+  status: 'Pending' | 'Answered';
+  createdAt: string;
 }
 
 /** Three-state connection status reflected from the last Connect verification. */

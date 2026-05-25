@@ -13,7 +13,9 @@ public record CreateAgentRequest(
     string Role,
     string[] Capabilities,
     string[]? ToolActionIds,
+    /// <summary>Custom instructions for the agent (unlimited length; directly persisted to database text column).</summary>
     string? CustomInstructions,
+    /// <summary>Project principles for code review agents (unlimited length; directly persisted to database text column).</summary>
     string? ProjectPrinciples,
     string? Model,
     string? ReasoningEffort = null,

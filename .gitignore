@@ -82,7 +82,7 @@ Thumbs.db
 requirements/
 # Test results
 TestResults/
-
+plans/
 specification/
 
 .github/agents/

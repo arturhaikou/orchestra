@@ -20,4 +20,12 @@ public interface IJobService
         CancellationToken cancellationToken = default);
 
     Task<JobDetailDto?> GetJobAsync(Guid jobId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Transitions the job to WaitingForInput and records which question caused the suspension.
+    /// </summary>
+    Task SuspendJobAsync(
+        Guid jobId,
+        Guid questionId,
+        CancellationToken cancellationToken = default);
 }

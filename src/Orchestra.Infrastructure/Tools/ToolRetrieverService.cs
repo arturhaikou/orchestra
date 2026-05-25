@@ -36,12 +36,14 @@ public class ToolRetrieverService : IToolRetrieverService
     private readonly IChatClientResolver _chatClientResolver;
     private readonly IChatAgentRunner _chatAgentRunner;
     private readonly IBuiltInAgentTemplateRegistry _templateRegistry;
-    private readonly IAiCliClientFactory _cliClientFactory;
-    private readonly ILogger<ToolRetrieverService> _logger;
+    private readonly IAiCliClientFactory _cliClientFactory;    private readonly IAgentQuestionRepository _agentQuestionRepository;
+    private readonly INotificationService _notificationService;    private readonly ILogger<ToolRetrieverService> _logger;
 
     private const string ReviewPullRequestActionName = "review_pull_request";
     private const string ReviewMergeRequestActionName = "review_merge_request";
     private const int MaxSubAgentDepth = 3;
+
+    private const string AskQuestionsActionName = "ask_questions";
 
     private static readonly Dictionary<string, Type> ServiceTypeMap = new()
     {
@@ -50,6 +52,7 @@ public class ToolRetrieverService : IToolRetrieverService
         ["Orchestra.Infrastructure.Tools.Services.IGitLabToolService"] = typeof(IGitLabToolService),
         ["Orchestra.Infrastructure.Tools.Services.IConfluenceToolService"] = typeof(IConfluenceToolService),
         ["Orchestra.Infrastructure.Tools.Services.IInternalToolService"] = typeof(IInternalToolService),
+        ["Orchestra.Infrastructure.Tools.Services.IAgentQuestionsToolService"] = typeof(IAgentQuestionsToolService),
     };
 
     public ToolRetrieverService(
@@ -68,6 +71,8 @@ public class ToolRetrieverService : IToolRetrieverService
         IChatAgentRunner chatAgentRunner,
         IBuiltInAgentTemplateRegistry templateRegistry,
         IAiCliClientFactory cliClientFactory,
+        IAgentQuestionRepository agentQuestionRepository,
+        INotificationService notificationService,
         ILogger<ToolRetrieverService> logger)
     {
         _serviceProvider = serviceProvider;
@@ -85,6 +90,8 @@ public class ToolRetrieverService : IToolRetrieverService
         _chatAgentRunner = chatAgentRunner;
         _templateRegistry = templateRegistry;
         _cliClientFactory = cliClientFactory;
+        _agentQuestionRepository = agentQuestionRepository;
+        _notificationService = notificationService;
         _logger = logger;
     }
 
@@ -125,7 +132,10 @@ public class ToolRetrieverService : IToolRetrieverService
         var nativeActions = toolActions.Where(a => !a.IsMcpTool).ToList();
         var mcpActions = toolActions.Where(a => a.IsMcpTool).ToList();
 
-        var nativeAiFunctions = await ResolveNativeToolsAsync(nativeActions, modelIdentifier, projectPrinciples, cancellationToken);
+        var askQuestionsAssigned = nativeActions.Any(a => a.Name == AskQuestionsActionName);
+        var resolveableNativeActions = nativeActions.Where(a => a.Name != AskQuestionsActionName).ToList();
+
+        var nativeAiFunctions = await ResolveNativeToolsAsync(resolveableNativeActions, modelIdentifier, projectPrinciples, cancellationToken);
         var mcpAiFunctions = await ResolveMcpToolsIfAnyAsync(agent.WorkspaceId, mcpActions, cancellationToken);
         var connectedMcpFunctions = await ResolveConnectedMcpToolsAsync(agentId, agent.WorkspaceId, cancellationToken);
         var subAgentFunctions = await ResolveSubAgentToolsAsync(agentId, depth, jobTracking, cancellationToken);
@@ -135,6 +145,18 @@ public class ToolRetrieverService : IToolRetrieverService
             .Concat(connectedMcpFunctions)
             .Concat(subAgentFunctions)
             .ToList();
+
+        if (askQuestionsAssigned && jobTracking is not null)
+        {
+            var askQuestionsTool = AskQuestionsFunction.Create(
+                jobTracking,
+                agentId,
+                _agentQuestionRepository,
+                _notificationService,
+                _logger);
+
+            allFunctions.Add(askQuestionsTool);
+        }
 
         _logger.LogInformation("Retrieved {Count} tools for agent {AgentId}", allFunctions.Count, agentId);
 

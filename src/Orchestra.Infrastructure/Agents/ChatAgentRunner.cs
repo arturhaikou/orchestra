@@ -17,13 +17,16 @@ namespace Orchestra.Infrastructure.Agents;
 public class ChatAgentRunner : IChatAgentRunner
 {
     private readonly IAgentSkillDataAccess _agentSkillDataAccess;
+    private readonly IConversationSnapshotRepository _snapshotRepository;
     private readonly ILogger<ChatAgentRunner> _logger;
 
     public ChatAgentRunner(
         IAgentSkillDataAccess agentSkillDataAccess,
+        IConversationSnapshotRepository snapshotRepository,
         ILogger<ChatAgentRunner> logger)
     {
         _agentSkillDataAccess = agentSkillDataAccess;
+        _snapshotRepository = snapshotRepository;
         _logger = logger;
     }
 
@@ -33,7 +36,8 @@ public class ChatAgentRunner : IChatAgentRunner
         IList<AIFunction> tools,
         string message,
         JobTrackingContext? jobTracking,
-        CancellationToken cancellationToken)
+        object? session = null,
+        CancellationToken cancellationToken = default)
     {
         // Step 1: Load skills and build ChatClientAgentOptions
         var skills = await _agentSkillDataAccess.GetSkillsByAgentIdAsync(agentEntity.Id, cancellationToken);
@@ -106,13 +110,33 @@ public class ChatAgentRunner : IChatAgentRunner
             var agentWithMiddleware = agent
                 .AsBuilder()
                 .Use(
-                    runFunc: (msgs, session, opts, inner, ct) =>
-                        runMiddleware.HandleAsync(msgs, session, opts, inner, ct),
+                    runFunc: (msgs, sessionParam, opts, inner, ct) =>
+                        runMiddleware.HandleAsync(msgs, sessionParam, opts, inner, ct),
                     runStreamingFunc: null)
                 .Use((a, ctx, next, ct) => funcMiddleware.HandleAsync(a, ctx, next, ct))
                 .Build();
 
-            var response = await agentWithMiddleware.RunAsync(message, cancellationToken: cancellationToken);
+#pragma warning disable MAAI001
+            var agentSession = session as Microsoft.Agents.AI.AgentSession;
+            agentSession ??= await agent.CreateSessionAsync(cancellationToken);
+#pragma warning restore MAAI001
+
+            var response = await agentWithMiddleware.RunAsync(message, session: agentSession, cancellationToken: cancellationToken);
+
+            if (jobTracking.SuspendedQuestionId is not null)
+            {
+#pragma warning disable MAAI001
+                var serialized = await agent.SerializeSessionAsync(agentSession, cancellationToken: cancellationToken);
+#pragma warning restore MAAI001
+
+                var snapshot = AgentConversationSnapshot.Create(
+                    jobTracking.JobId,
+                    agentEntity.Id,
+                    serialized.ToString());
+
+                await _snapshotRepository.SaveAsync(snapshot, cancellationToken);
+            }
+
             return response.Text;
         }
         else

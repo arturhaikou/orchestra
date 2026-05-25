@@ -18,6 +18,7 @@ using Orchestra.Infrastructure.Integrations;
 using Orchestra.Infrastructure.Agents;
 using Orchestra.Infrastructure.Jobs;
 using Orchestra.Infrastructure.Persistence;
+using Orchestra.Infrastructure.Repositories;
 using Orchestra.Infrastructure.Security;
 using Orchestra.Infrastructure.Integrations.Providers;
 using Orchestra.Infrastructure.Integrations.Providers.Jira;
@@ -74,7 +75,9 @@ public static class Extensions
         builder.Services.AddScoped<IWorkspaceAIProviderRepository, EfWorkspaceAIProviderRepository>();
         builder.Services.AddScoped<IProviderCredentialEncryptionService, DataProtectionCredentialEncryptionService>();
         builder.Services.AddScoped<IAIProviderResolver, AIProviderResolver>();
+        builder.Services.AddMemoryCache();
         builder.Services.AddScoped<IAzureOpenAIModelDiscoveryService, AzureOpenAIModelDiscoveryService>();
+        builder.Services.AddSingleton<IAzureOpenAILimitsService, AzureOpenAILimitsService>();
         builder.Services.AddScoped<IOllamaModelDiscoveryService, OllamaModelDiscoveryService>();
         builder.Services.AddScoped<IWorkspaceProviderService, WorkspaceProviderService>();
         // Bind ADF conversion service configuration from appsettings.json
@@ -115,6 +118,8 @@ public static class Extensions
         builder.Services.AddScoped<IJobDataAccess, JobDataAccess>();
         builder.Services.AddScoped<IJobStepWriter, JobStepWriter>();
         builder.Services.AddScoped<IJobService, JobService>();
+        builder.Services.AddScoped<IAgentQuestionRepository, AgentQuestionRepository>();
+        builder.Services.AddScoped<IConversationSnapshotRepository, ConversationSnapshotRepository>();
         builder.Services.AddScoped<IToolService, ToolService>();
         builder.Services.AddScoped<IToolCategoryDataAccess, ToolCategoryDataAccess>();
         builder.Services.AddScoped<IAgentToolActionDataAccess, AgentToolActionDataAccess>();

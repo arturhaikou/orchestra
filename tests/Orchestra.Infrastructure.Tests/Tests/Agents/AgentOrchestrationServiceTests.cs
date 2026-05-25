@@ -3,7 +3,10 @@ using NSubstitute.ExceptionExtensions;
 using Orchestra.Application.Agents.DTOs;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Common.Interfaces;
+using Orchestra.Application.Jobs.DTOs;
+using Orchestra.Application.Jobs.Services;
 using Orchestra.Application.Tickets.DTOs;
+using Orchestra.Domain.Enums;
 using Orchestra.Infrastructure.Agents;
 
 namespace Orchestra.Infrastructure.Tests.Tests.Agents;
@@ -17,6 +20,7 @@ public class AgentOrchestrationServiceTests
     private readonly IAgentRuntimeService _agentRuntimeService = Substitute.For<IAgentRuntimeService>();
     private readonly IAgentDataAccess _agentDataAccess = Substitute.For<IAgentDataAccess>();
     private readonly ITicketDataAccess _ticketDataAccess = Substitute.For<ITicketDataAccess>();
+    private readonly IJobService _jobService = Substitute.For<IJobService>();
     private readonly IAgentContextBuilder _agentContextBuilder = Substitute.For<IAgentContextBuilder>();
     private readonly INotificationService _notificationService = Substitute.For<INotificationService>();
     private readonly ILogger<AgentOrchestrationService> _logger = Substitute.For<ILogger<AgentOrchestrationService>>();
@@ -28,6 +32,7 @@ public class AgentOrchestrationServiceTests
             _agentRuntimeService,
             _agentDataAccess,
             _ticketDataAccess,
+            _jobService,
             _agentContextBuilder,
             _notificationService,
             _logger);
@@ -55,9 +60,30 @@ public class AgentOrchestrationServiceTests
         _agentContextBuilder
             .BuildAgentContextWithIntegrationsAsync(ticket, agent, Arg.Any<CancellationToken>())
             .Returns("context prompt");
+        
+        var jobId = Guid.NewGuid();
         _agentRuntimeService
-            .ExecuteAgentAsync(agentId, "context prompt", agent.Model, agent.ProjectPrinciples, null, Arg.Any<CancellationToken>())
-            .Returns("response");
+            .ExecuteAgentAsync(agentId, "context prompt", agent.Model, agent.ProjectPrinciples, Arg.Any<JobContext?>(), Arg.Any<CancellationToken>())
+            .Returns(("response", jobId));
+        
+        _jobService
+            .GetJobAsync(jobId, Arg.Any<CancellationToken>())
+            .Returns(new JobDetailDto(
+                Id: jobId,
+                WorkspaceId: workspaceId,
+                AgentId: agentId,
+                AgentName: agent.Name,
+                TicketTitle: ticket.Title,
+                TicketId: ticket.Id,
+                Status: JobStatus.Completed,
+                TriggerType: JobTriggerType.Ticket,
+                CreatedAt: DateTime.UtcNow,
+                StartedAt: null,
+                CompletedAt: null,
+                InitialPrompt: "context prompt",
+                FinalResponse: "response",
+                ErrorMessage: null,
+                Steps: new List<JobStepDto>()));
 
         return (ticketId, workspaceId, agentId);
     }
@@ -118,7 +144,7 @@ public class AgentOrchestrationServiceTests
             .BuildAgentContextWithIntegrationsAsync(ticket, agent, Arg.Any<CancellationToken>())
             .Returns("context prompt");
         _agentRuntimeService
-            .ExecuteAgentAsync(agentId, "context prompt", agent.Model, agent.ProjectPrinciples, null, Arg.Any<CancellationToken>())
+            .ExecuteAgentAsync(agentId, "context prompt", agent.Model, agent.ProjectPrinciples, Arg.Any<JobContext?>(), Arg.Any<CancellationToken>())
             .ThrowsAsync(new Exception("AI execution failed"));
 
         await _sut.ExecuteAgentForTicketAsync(ticketId);
@@ -143,4 +169,65 @@ public class AgentOrchestrationServiceTests
             Arg.Any<TicketStatusChangedNotification>(),
             Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task ExecuteAgentForTicketAsync_DoesNotMarkTicketCompleted_WhenJobSuspendedForInput()
+    {
+        var workspaceId = Guid.NewGuid();
+        var agentId = Guid.NewGuid();
+
+        var agent = new AgentBuilder()
+            .WithId(agentId)
+            .WithWorkspaceId(workspaceId)
+            .Build();
+
+        var ticket = new TicketBuilder()
+            .WithWorkspaceId(workspaceId)
+            .WithStatusId(ToDoStatusId)
+            .Build();
+        ticket.UpdateAssignments(agentId, null, null, null);
+        var ticketId = ticket.Id;
+
+        _ticketDataAccess.GetTicketByIdAsync(ticketId, Arg.Any<CancellationToken>()).Returns(ticket);
+        _agentDataAccess.GetByIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(agent);
+        _agentContextBuilder
+            .BuildAgentContextWithIntegrationsAsync(ticket, agent, Arg.Any<CancellationToken>())
+            .Returns("context prompt");
+
+        var jobId = Guid.NewGuid();
+        _agentRuntimeService
+            .ExecuteAgentAsync(agentId, "context prompt", agent.Model, agent.ProjectPrinciples, Arg.Any<JobContext?>(), Arg.Any<CancellationToken>())
+            .Returns(("response", jobId));
+
+        _jobService
+            .GetJobAsync(jobId, Arg.Any<CancellationToken>())
+            .Returns(new JobDetailDto(
+                Id: jobId,
+                WorkspaceId: workspaceId,
+                AgentId: agentId,
+                AgentName: agent.Name,
+                TicketTitle: ticket.Title,
+                TicketId: ticket.Id,
+                Status: JobStatus.WaitingForInput,
+                TriggerType: JobTriggerType.Ticket,
+                CreatedAt: DateTime.UtcNow,
+                StartedAt: null,
+                CompletedAt: null,
+                InitialPrompt: "context prompt",
+                FinalResponse: null,
+                ErrorMessage: null,
+                Steps: new List<JobStepDto>()));
+
+        await _sut.ExecuteAgentForTicketAsync(ticketId);
+
+        // Verify that job service was called to check the job status
+        await _jobService.Received(1).GetJobAsync(jobId, Arg.Any<CancellationToken>());
+
+        // Verify that ticket was NOT marked as Completed
+        await _notificationService.DidNotReceive().NotifyTicketStatusChangedAsync(
+            Arg.Is<TicketStatusChangedNotification>(n =>
+                n.NewStatus == "Completed"),
+            Arg.Any<CancellationToken>());
+    }
 }
+

@@ -206,3 +206,15 @@ export const onJobStepAdded = (handler: (data: any) => void): (() => void) => {
   activeConnection.on('JobStepAdded', handler);
   return () => activeConnection?.off('JobStepAdded', handler);
 };
+
+export const onAgentQuestionAsked = (handler: (data: { workspaceId: string; questionId: string }) => void): (() => void) => {
+  if (!activeConnection) return () => {};
+  activeConnection.on('AgentQuestionAsked', handler);
+  return () => activeConnection?.off('AgentQuestionAsked', handler);
+};
+
+export const onAgentQuestionResolved = (handler: (data: { workspaceId: string; questionId: string }) => void): (() => void) => {
+  if (!activeConnection) return () => {};
+  activeConnection.on('AgentQuestionResolved', handler);
+  return () => activeConnection?.off('AgentQuestionResolved', handler);
+};

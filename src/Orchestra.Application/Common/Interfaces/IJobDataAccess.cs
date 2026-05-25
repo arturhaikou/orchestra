@@ -16,6 +16,9 @@ public interface IJobDataAccess
         int limit,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<Job>> GetByStatusAsync(JobStatus status, CancellationToken cancellationToken = default);
+
     Task AddStepAsync(JobStep step, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<JobStep>> GetStepsByJobIdAsync(Guid jobId, CancellationToken cancellationToken = default);
+    Task<int> GetMaxSequenceAsync(Guid jobId, CancellationToken cancellationToken = default);
 }

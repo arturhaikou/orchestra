@@ -27,6 +27,8 @@ public class ScopedJobStepWriter : IJobStepWriter
         _agentName = agentName;
     }
 
+    public void InitializeSequence(int startingValue) => _inner.InitializeSequence(startingValue);
+
     public Task<Guid> WriteAsync(
         Guid jobId,
         Guid workspaceId,

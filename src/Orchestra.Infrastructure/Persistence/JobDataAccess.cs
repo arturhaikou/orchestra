@@ -84,4 +84,19 @@ public class JobDataAccess : IJobDataAccess
             .OrderBy(s => s.Sequence)
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<int> GetMaxSequenceAsync(Guid jobId, CancellationToken cancellationToken = default)
+    {
+        return await _context.JobSteps
+            .Where(s => s.JobId == jobId)
+            .MaxAsync(s => (int?)s.Sequence, cancellationToken) ?? 0;
+    }
+
+    public async Task<IReadOnlyList<Job>> GetByStatusAsync(JobStatus status, CancellationToken cancellationToken = default)
+    {
+        return await _context.Jobs
+            .AsNoTracking()
+            .Where(j => j.Status == status)
+            .ToListAsync(cancellationToken);
+    }
 }

@@ -113,8 +113,8 @@ public class Agent
     /// <param name="name">The agent name (required, max 200 characters).</param>
     /// <param name="role">The agent role (required, max 200 characters).</param>
     /// <param name="capabilities">The agent capabilities (optional).</param>
-    /// <param name="customInstructions">The custom instructions (nullable; max 5000 characters).</param>
-    /// <param name="projectPrinciples">The project principles for review agents (nullable; max 5000 characters).</param>
+    /// <param name="customInstructions">The custom instructions (nullable, unlimited length).</param>
+    /// <param name="projectPrinciples">The project principles for review agents (nullable, unlimited length).</param>
     /// <param name="model">Optional LLM model override.</param>
     /// <returns>A new Agent instance.</returns>
     /// <exception cref="ArgumentException">Thrown when field-level validation fails.</exception>
@@ -191,8 +191,8 @@ public class Agent
     /// <param name="name">The new name (required, max 200 characters).</param>
     /// <param name="role">The new role (required, max 200 characters).</param>
     /// <param name="capabilities">The new capabilities.</param>
-    /// <param name="customInstructions">The new custom instructions (nullable; max 5000 characters).</param>
-    /// <param name="projectPrinciples">The new project principles for review agents (nullable; max 5000 characters).</param>
+    /// <param name="customInstructions">The new custom instructions (nullable, unlimited length).</param>
+    /// <param name="projectPrinciples">The new project principles for review agents (nullable, unlimited length).</param>
     /// <exception cref="ArgumentException">Thrown when field-level validation fails.</exception>
     public void UpdateProfile(
         string name,
@@ -217,16 +217,12 @@ public class Agent
         {
             if (customInstructions.Trim().Length == 0)
                 throw new ArgumentException("CustomInstructions cannot be whitespace.", nameof(customInstructions));
-            if (customInstructions.Length > 5000)
-                throw new ArgumentException("CustomInstructions cannot exceed 5000 characters.", nameof(customInstructions));
         }
 
         if (projectPrinciples != null)
         {
             if (projectPrinciples.Trim().Length == 0)
                 throw new ArgumentException("ProjectPrinciples cannot be whitespace.", nameof(projectPrinciples));
-            if (projectPrinciples.Length > 5000)
-                throw new ArgumentException("ProjectPrinciples cannot exceed 5000 characters.", nameof(projectPrinciples));
         }
 
         Name = name.Trim();

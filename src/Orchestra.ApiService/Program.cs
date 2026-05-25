@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
 using Orchestra.Application.Common;
 using Microsoft.Agents.AI.Hosting.AGUI.AspNetCore;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -101,8 +102,12 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddAGUI();
 
+var redisConnectionString = builder.Configuration.GetConnectionString("redis")!;
+builder.Services.AddSingleton<IConnectionMultiplexer>(
+    ConnectionMultiplexer.Connect(redisConnectionString));
+
 builder.Services.AddSignalR()
-    .AddStackExchangeRedis(builder.Configuration.GetConnectionString("redis")!)
+    .AddStackExchangeRedis(redisConnectionString)
     .AddJsonProtocol(options =>
     {
         options.PayloadSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;

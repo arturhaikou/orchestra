@@ -52,6 +52,10 @@ namespace Orchestra.Infrastructure.Persistence
 
         public DbSet<JobStep> JobSteps => Set<JobStep>();
 
+        public DbSet<AgentQuestion> AgentQuestions => Set<AgentQuestion>();
+
+        public DbSet<AgentConversationSnapshot> AgentConversationSnapshots => Set<AgentConversationSnapshot>();
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -80,6 +84,8 @@ namespace Orchestra.Infrastructure.Persistence
             modelBuilder.ApplyConfiguration(new Configurations.AgentSkillConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.JobConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.JobStepConfiguration());
+            modelBuilder.ApplyConfiguration(new Configurations.AgentQuestionConfiguration());
+            modelBuilder.ApplyConfiguration(new Configurations.AgentConversationSnapshotConfiguration());
         }
     }
 }

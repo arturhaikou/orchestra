@@ -4,6 +4,7 @@ using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Integrations.DTOs;
 using Orchestra.Application.Jobs.DTOs;
+using Orchestra.Application.Jobs.Services;
 using Orchestra.Application.Tickets.DTOs;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
@@ -19,6 +20,7 @@ public class AgentOrchestrationService : IAgentOrchestrationService
     private readonly IAgentRuntimeService _agentRuntimeService;
     private readonly IAgentDataAccess _agentDataAccess;
     private readonly ITicketDataAccess _ticketDataAccess;
+    private readonly IJobService _jobService;
     private readonly IAgentContextBuilder _agentContextBuilder;
     private readonly INotificationService _notificationService;
     private readonly ILogger<AgentOrchestrationService> _logger;
@@ -32,6 +34,7 @@ public class AgentOrchestrationService : IAgentOrchestrationService
         IAgentRuntimeService agentRuntimeService,
         IAgentDataAccess agentDataAccess,
         ITicketDataAccess ticketDataAccess,
+        IJobService jobService,
         IAgentContextBuilder agentContextBuilder,
         INotificationService notificationService,
         ILogger<AgentOrchestrationService> logger)
@@ -39,6 +42,7 @@ public class AgentOrchestrationService : IAgentOrchestrationService
         _agentRuntimeService = agentRuntimeService;
         _agentDataAccess = agentDataAccess;
         _ticketDataAccess = ticketDataAccess;
+        _jobService = jobService;
         _agentContextBuilder = agentContextBuilder;
         _notificationService = notificationService;
         _logger = logger;
@@ -137,7 +141,7 @@ public class AgentOrchestrationService : IAgentOrchestrationService
                 TicketId: ticket.Id,
                 TicketTitle: ticket.Title);
 
-            var responseText = await _agentRuntimeService.ExecuteAgentAsync(
+            var (responseText, jobId) = await _agentRuntimeService.ExecuteAgentAsync(
                 agentEntity.Id,
                 contextPrompt,
                 agentEntity.Model,
@@ -149,17 +153,34 @@ public class AgentOrchestrationService : IAgentOrchestrationService
                 "Agent execution completed successfully for ticket {TicketId}",
                 ticketId);
 
-            // 7. Success - Update ticket status to Completed
-            ticket.UpdateStatus(CompletedStatusId);
-            await _ticketDataAccess.UpdateTicketAsync(ticket, cancellationToken);
+            // 7. Update ticket status - but only to Completed if the job is not suspended waiting for input
+            bool shouldMarkCompleted = true;
+            if (jobId.HasValue)
+            {
+                var job = await _jobService.GetJobAsync(jobId.Value, cancellationToken);
+                if (job?.Status == JobStatus.WaitingForInput)
+                {
+                    shouldMarkCompleted = false;
+                    _logger.LogInformation(
+                        "Job {JobId} is waiting for user input; keeping ticket {TicketId} in In Progress status",
+                        jobId.Value,
+                        ticketId);
+                }
+            }
 
-            await _notificationService.NotifyTicketStatusChangedAsync(
-                new TicketStatusChangedNotification(
-                    ticket.WorkspaceId,
-                    ticket.Id,
-                    "Completed",
-                    "In Progress"),
-                cancellationToken);
+            if (shouldMarkCompleted)
+            {
+                ticket.UpdateStatus(CompletedStatusId);
+                await _ticketDataAccess.UpdateTicketAsync(ticket, cancellationToken);
+
+                await _notificationService.NotifyTicketStatusChangedAsync(
+                    new TicketStatusChangedNotification(
+                        ticket.WorkspaceId,
+                        ticket.Id,
+                        "Completed",
+                        "In Progress"),
+                    cancellationToken);
+            }
 
             // 8. Log completion
             _logger.LogInformation(

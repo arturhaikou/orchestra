@@ -3,6 +3,9 @@ using NSubstitute.ExceptionExtensions;
 using Orchestra.Application.Agents.DTOs;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Common.Interfaces;
+using Orchestra.Application.Jobs.DTOs;
+using Orchestra.Application.Jobs.Services;
+using Orchestra.Domain.Enums;
 using Orchestra.Infrastructure.Agents;
 
 namespace Orchestra.Infrastructure.Tests.Agents;
@@ -16,6 +19,7 @@ public class AgentOrchestrationServiceNotificationTests
         IAgentRuntimeService runtimeService,
         IAgentDataAccess agentDataAccess,
         ITicketDataAccess ticketDataAccess,
+        IJobService jobService,
         IAgentContextBuilder contextBuilder,
         INotificationService notificationService)
         BuildSut()
@@ -23,19 +27,40 @@ public class AgentOrchestrationServiceNotificationTests
         var runtimeService = Substitute.For<IAgentRuntimeService>();
         var agentDataAccess = Substitute.For<IAgentDataAccess>();
         var ticketDataAccess = Substitute.For<ITicketDataAccess>();
+        var jobService = Substitute.For<IJobService>();
         var contextBuilder = Substitute.For<IAgentContextBuilder>();
         var notificationService = Substitute.For<INotificationService>();
         var logger = Substitute.For<ILogger<AgentOrchestrationService>>();
 
+        var jobId = Guid.NewGuid();
         runtimeService
             .ExecuteAgentAsync(
                 Arg.Any<Guid>(),
                 Arg.Any<string>(),
                 Arg.Any<string?>(),
                 Arg.Any<string?>(),
-                null,
+                Arg.Any<JobContext?>(),
                 Arg.Any<CancellationToken>())
-            .Returns("Agent response");
+            .Returns(("Agent response", jobId));
+
+        jobService
+            .GetJobAsync(jobId, Arg.Any<CancellationToken>())
+            .Returns(new JobDetailDto(
+                Id: jobId,
+                WorkspaceId: Guid.Empty,
+                AgentId: Guid.Empty,
+                AgentName: "Test Agent",
+                TicketTitle: "Test Ticket",
+                TicketId: Guid.Empty,
+                Status: JobStatus.Completed,
+                TriggerType: JobTriggerType.Ticket,
+                CreatedAt: DateTime.UtcNow,
+                StartedAt: null,
+                CompletedAt: null,
+                InitialPrompt: "prompt",
+                FinalResponse: "response",
+                ErrorMessage: null,
+                Steps: new List<JobStepDto>()));
 
         contextBuilder
             .BuildAgentContextWithIntegrationsAsync(
@@ -48,11 +73,12 @@ public class AgentOrchestrationServiceNotificationTests
             runtimeService,
             agentDataAccess,
             ticketDataAccess,
+            jobService,
             contextBuilder,
             notificationService,
             logger);
 
-        return (sut, runtimeService, agentDataAccess, ticketDataAccess, contextBuilder, notificationService);
+        return (sut, runtimeService, agentDataAccess, ticketDataAccess, jobService, contextBuilder, notificationService);
     }
 
     private static void SetupTicketAndAgent(
@@ -89,7 +115,7 @@ public class AgentOrchestrationServiceNotificationTests
     public async Task ExecuteAgentForTicketAsync_OnSuccess_SendsNotificationWithSuccessStatus()
     {
         // Arrange
-        var (sut, _, agentDataAccess, ticketDataAccess, _, notificationService) = BuildSut();
+        var (sut, _, agentDataAccess, ticketDataAccess, _, _, notificationService) = BuildSut();
         SetupTicketAndAgent(ticketDataAccess, agentDataAccess, out var ticketId, out _, out var workspaceId);
 
         // Act
@@ -109,7 +135,7 @@ public class AgentOrchestrationServiceNotificationTests
     public async Task ExecuteAgentForTicketAsync_OnFailure_SendsNotificationWithFailedStatus()
     {
         // Arrange
-        var (sut, runtimeService, agentDataAccess, ticketDataAccess, _, notificationService) = BuildSut();
+        var (sut, runtimeService, agentDataAccess, ticketDataAccess, _, _, notificationService) = BuildSut();
         SetupTicketAndAgent(ticketDataAccess, agentDataAccess, out var ticketId, out _, out var workspaceId);
 
         runtimeService
@@ -118,7 +144,7 @@ public class AgentOrchestrationServiceNotificationTests
                 Arg.Any<string>(),
                 Arg.Any<string?>(),
                 Arg.Any<string?>(),
-                null,
+                Arg.Any<JobContext?>(),
                 Arg.Any<CancellationToken>())
             .ThrowsAsync(new InvalidOperationException("LLM timeout"));
 
@@ -139,7 +165,7 @@ public class AgentOrchestrationServiceNotificationTests
     public async Task ExecuteAgentForTicketAsync_WhenNotificationThrows_ReturnsResultUnchanged()
     {
         // Arrange
-        var (sut, _, agentDataAccess, ticketDataAccess, _, notificationService) = BuildSut();
+        var (sut, _, agentDataAccess, ticketDataAccess, _, _, notificationService) = BuildSut();
         SetupTicketAndAgent(ticketDataAccess, agentDataAccess, out var ticketId, out _, out _);
 
         notificationService
@@ -160,7 +186,7 @@ public class AgentOrchestrationServiceNotificationTests
     public async Task ExecuteAgentForTicketAsync_OnSuccess_NotificationContainsAgentNameAndTicketTitle()
     {
         // Arrange
-        var (sut, _, agentDataAccess, ticketDataAccess, _, notificationService) = BuildSut();
+        var (sut, _, agentDataAccess, ticketDataAccess, _, _, notificationService) = BuildSut();
         SetupTicketAndAgent(ticketDataAccess, agentDataAccess, out var ticketId, out _, out _);
 
         // Act
@@ -178,7 +204,7 @@ public class AgentOrchestrationServiceNotificationTests
     public async Task ExecuteAgentForTicketAsync_WhenTicketNotFound_DoesNotSendNotification()
     {
         // Arrange
-        var (sut, _, _, ticketDataAccess, _, notificationService) = BuildSut();
+        var (sut, _, _, ticketDataAccess, _, _, notificationService) = BuildSut();
         var ticketId = Guid.NewGuid();
         ticketDataAccess.GetTicketByIdAsync(ticketId, Arg.Any<CancellationToken>())
             .Returns((Ticket?)null);
