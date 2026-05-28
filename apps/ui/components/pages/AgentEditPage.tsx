@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Loader2, AlertTriangle, Info, Plus, X, RefreshCw } from 'lucide-react';
-import { Agent, Skill, Tool, ModelMetadataDto } from '../../types';
-import { getAgent, updateAgent, saveAgentToolAssignments, getAgents } from '../../services/agentService';
+import { Agent, Skill, Tool, ModelMetadataDto, OptionalToolDto } from '../../types';
+import { getAgent, updateAgent, saveAgentToolAssignments, getAgents, getAgentTemplates, getAgentOptionalTools, saveAgentOptionalTools } from '../../services/agentService';
 import { getTools } from '../../services/toolService';
 import { fetchWorkspaceModels } from '../../services/workspaceService';
 import { getSkills } from '../../services/skillService';
@@ -19,6 +19,7 @@ import MarkdownPreviewToggle from '../agents/MarkdownPreviewToggle';
 import { getMcpServers } from '../../services/mcpServerService';
 import { useAgentMcpAssignments } from '../../hooks/useAgentMcpAssignments';
 import { McpServer, McpToolSelection, ToolCatalogueEntry } from '../../types';
+import AgentOptionalToolsSection from '../agents/AgentOptionalToolsSection';
 
 interface FormState {
   name: string;
@@ -61,6 +62,8 @@ const AgentEditPage: React.FC = () => {
   const [availableSkills, setAvailableSkills] = useState<Skill[]>([]);
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
   const [isSkillsModalOpen, setIsSkillsModalOpen] = useState(false);
+  const [availableOptionalTools, setAvailableOptionalTools] = useState<OptionalToolDto[]>([]);
+  const [selectedOptionalTools, setSelectedOptionalTools] = useState<string[]>([]);
 
   const { assignments: mcpAssignments } = useAgentMcpAssignments(agentId, !!agentId);
 
@@ -101,6 +104,19 @@ const AgentEditPage: React.FC = () => {
         selectedModel: loaded.model || 'Default',
       });
       setSelectedReasoningEffort(loaded.reasoningEffort || '');
+
+      // Load optional tools if the agent has a template
+      if (loaded.templateId) {
+        getAgentTemplates(workspaceId!)
+          .then(templates => {
+            const tmpl = templates.find(t => t.templateId === loaded.templateId);
+            setAvailableOptionalTools(tmpl?.availableOptionalTools ?? []);
+          })
+          .catch(() => setAvailableOptionalTools([]));
+        getAgentOptionalTools(agentId!)
+          .then(setSelectedOptionalTools)
+          .catch(() => setSelectedOptionalTools([]));
+      }
 
       // Load available models depending on agent type
       if (loaded.aiCliIntegrationId) {
@@ -189,6 +205,11 @@ const AgentEditPage: React.FC = () => {
     try {
       const payload: Partial<Agent> = buildUpdatePayload();
       await updateAgent(agentId!, payload);
+
+      if (availableOptionalTools.length > 0) {
+        await saveAgentOptionalTools(agentId!, selectedOptionalTools);
+      }
+
       setToast({ message: 'Agent updated successfully', type: 'success' });
       navigate(`/workspaces/${workspaceId}/agents`);
     } catch (error: any) {
@@ -221,13 +242,13 @@ const AgentEditPage: React.FC = () => {
     }
 
     // Sub-agents
-    if (JSON.stringify(selectedSubAgentIds.sort()) !== JSON.stringify((agent?.subAgentIds || []).sort())) {
+    if (!isBuiltIn && JSON.stringify(selectedSubAgentIds.sort()) !== JSON.stringify((agent?.subAgentIds || []).sort())) {
       payload.subAgentIds = selectedSubAgentIds;
     }
 
     // Skills
     const originalSkillIds = (agent?.skills ?? []).map(s => s.id).sort();
-    if (JSON.stringify([...selectedSkillIds].sort()) !== JSON.stringify(originalSkillIds)) {
+    if (!isBuiltIn && JSON.stringify([...selectedSkillIds].sort()) !== JSON.stringify(originalSkillIds)) {
       payload.skillIds = selectedSkillIds;
     }
 
@@ -441,6 +462,7 @@ const AgentEditPage: React.FC = () => {
           )}
 
           {/* Sub-Agents Section */}
+          {(!isBuiltIn || selectedSubAgentIds.length > 0) && (
           <section className="space-y-3">
             <h2 className="text-lg font-semibold text-text">Sub-Agents</h2>
             {selectedSubAgentIds.length > 0 && (
@@ -455,30 +477,36 @@ const AgentEditPage: React.FC = () => {
                         <p className="text-sm font-medium text-text truncate">{subAgent.name}</p>
                         <p className="text-xs text-textMuted truncate">{subAgent.role}</p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedSubAgentIds(prev => prev.filter(i => i !== id))}
-                        className="text-textMuted hover:text-red-400 transition-colors p-1 rounded hover:bg-red-500/10 flex-shrink-0"
-                        aria-label={`Remove ${subAgent.name}`}
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                      {!isBuiltIn && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedSubAgentIds(prev => prev.filter(i => i !== id))}
+                          className="text-textMuted hover:text-red-400 transition-colors p-1 rounded hover:bg-red-500/10 flex-shrink-0"
+                          aria-label={`Remove ${subAgent.name}`}
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   );
                 })}
               </div>
             )}
-            <button
-              type="button"
-              onClick={() => setIsSubAgentsModalOpen(true)}
-              className="flex items-center gap-2 px-3 py-2 border border-dashed border-border rounded-lg text-sm text-textMuted hover:text-primary hover:border-primary/50 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Add Sub-Agent
-            </button>
+            {!isBuiltIn && (
+              <button
+                type="button"
+                onClick={() => setIsSubAgentsModalOpen(true)}
+                className="flex items-center gap-2 px-3 py-2 border border-dashed border-border rounded-lg text-sm text-textMuted hover:text-primary hover:border-primary/50 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Add Sub-Agent
+              </button>
+            )}
           </section>
+          )}
 
           {/* Skills Section */}
+          {(!isBuiltIn || selectedSkillIds.length > 0) && (
           <section className="space-y-3">
             <h2 className="text-lg font-semibold text-text">Skills</h2>
             {selectedSkillIds.length > 0 && (
@@ -492,28 +520,33 @@ const AgentEditPage: React.FC = () => {
                         <p className="text-sm font-medium text-text truncate">{skill.name}</p>
                         <p className="text-xs text-textMuted truncate">{skill.description}</p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedSkillIds(prev => prev.filter(i => i !== id))}
-                        className="text-textMuted hover:text-red-400 transition-colors p-1 rounded hover:bg-red-500/10 flex-shrink-0"
-                        aria-label={`Remove ${skill.name}`}
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                      {!isBuiltIn && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedSkillIds(prev => prev.filter(i => i !== id))}
+                          className="text-textMuted hover:text-red-400 transition-colors p-1 rounded hover:bg-red-500/10 flex-shrink-0"
+                          aria-label={`Remove ${skill.name}`}
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   );
                 })}
               </div>
             )}
-            <button
-              type="button"
-              onClick={() => setIsSkillsModalOpen(true)}
-              className="flex items-center gap-2 px-3 py-2 border border-dashed border-border rounded-lg text-sm text-textMuted hover:text-primary hover:border-primary/50 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Add Skill
-            </button>
+            {!isBuiltIn && (
+              <button
+                type="button"
+                onClick={() => setIsSkillsModalOpen(true)}
+                className="flex items-center gap-2 px-3 py-2 border border-dashed border-border rounded-lg text-sm text-textMuted hover:text-primary hover:border-primary/50 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Add Skill
+              </button>
+            )}
           </section>
+          )}
 
           {/* Instructions Section */}
           <section className="space-y-4">
@@ -568,6 +601,12 @@ const AgentEditPage: React.FC = () => {
             alreadySelectedIds={selectedSkillIds}
             onCommit={ids => { setSelectedSkillIds(ids); setIsSkillsModalOpen(false); }}
             onDiscard={() => setIsSkillsModalOpen(false)}
+          />
+
+          <AgentOptionalToolsSection
+            availableOptionalTools={availableOptionalTools}
+            selectedMethodNames={selectedOptionalTools}
+            onChange={setSelectedOptionalTools}
           />
 
           <div className="flex justify-end gap-3 pt-4 border-t border-border">

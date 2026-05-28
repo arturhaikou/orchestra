@@ -31,6 +31,7 @@ const mockTemplate: AgentTemplateDto = {
   templateVersion: 1,
   isCliAgent: false,
   editableFields: [],
+  availableOptionalTools: [],
 };
 
 const LocationDisplay: React.FC = () => {

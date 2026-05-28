@@ -182,3 +182,28 @@ export const getAgentMcpAssignments = async (
 
   return response.json();
 };
+
+export const getAgentOptionalTools = async (agentId: string): Promise<string[]> => {
+  const response = await fetch(`${API_BASE_URL}/${agentId}/optional-tools`, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Backend error: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return data.selectedMethodNames ?? [];
+};
+
+export const saveAgentOptionalTools = async (agentId: string, methodNames: string[]): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/${agentId}/optional-tools`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ methodNames }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Backend error: ${response.statusText}`);
+  }
+};

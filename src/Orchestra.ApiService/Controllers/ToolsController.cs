@@ -17,17 +17,20 @@ public class ToolsController : ControllerBase
     private readonly IToolService _toolService;
     private readonly IWorkspaceAuthorizationService _workspaceAuthorizationService;
     private readonly IAgentToolAssignmentService _agentToolAssignmentService;
+    private readonly IAgentOptionalToolService _agentOptionalToolService;
     private readonly ILogger<ToolsController> _logger;
 
     public ToolsController(
         IToolService toolService,
         IWorkspaceAuthorizationService workspaceAuthorizationService,
         IAgentToolAssignmentService agentToolAssignmentService,
+        IAgentOptionalToolService agentOptionalToolService,
         ILogger<ToolsController> logger)
     {
         _toolService = toolService;
         _workspaceAuthorizationService = workspaceAuthorizationService;
         _agentToolAssignmentService = agentToolAssignmentService;
+        _agentOptionalToolService = agentOptionalToolService;
         _logger = logger;
     }
 
@@ -295,5 +298,73 @@ public class ToolsController : ControllerBase
         var userId = GetUserIdFromClaims();
         var result = await _agentToolAssignmentService.GetAssignmentsAsync(userId, agentId, cancellationToken);
         return Ok(result);
+    }
+
+    [HttpGet]
+    [Route("/v1/agents/{agentId}/optional-tools")]
+    [ProducesResponseType(typeof(AgentOptionalToolSelectionsDto), 200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(typeof(ErrorResponse), 403)]
+    [ProducesResponseType(typeof(ErrorResponse), 404)]
+    [ProducesResponseType(typeof(ErrorResponse), 500)]
+    public async Task<IActionResult> GetAgentOptionalTools(
+        [FromRoute] Guid agentId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var userId = GetUserIdFromClaims();
+            var selectedMethodNames = await _agentOptionalToolService.GetCurrentSelectionsAsync(userId, agentId, cancellationToken);
+            return Ok(new AgentOptionalToolSelectionsDto(selectedMethodNames));
+        }
+        catch (ArgumentException ex)
+        {
+            return NotFound(new ErrorResponse(ex.Message));
+        }
+        catch (Application.Common.Exceptions.UnauthorizedWorkspaceAccessException ex)
+        {
+            _logger.LogWarning(ex, "Unauthorized optional tools access for agent {AgentId}", agentId);
+            return StatusCode(403, new ErrorResponse(ex.Message));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting optional tools for agent {AgentId}", agentId);
+            return StatusCode(500, new ErrorResponse("An unexpected error occurred"));
+        }
+    }
+
+    [HttpPut]
+    [Route("/v1/agents/{agentId}/optional-tools")]
+    [ProducesResponseType(204)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(typeof(ErrorResponse), 400)]
+    [ProducesResponseType(typeof(ErrorResponse), 403)]
+    [ProducesResponseType(typeof(ErrorResponse), 404)]
+    [ProducesResponseType(typeof(ErrorResponse), 500)]
+    public async Task<IActionResult> SaveAgentOptionalTools(
+        [FromRoute] Guid agentId,
+        [FromBody] SaveAgentOptionalToolsRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var userId = GetUserIdFromClaims();
+            await _agentOptionalToolService.SaveSelectionsAsync(userId, agentId, request.MethodNames, cancellationToken);
+            return NoContent();
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new ErrorResponse(ex.Message));
+        }
+        catch (Application.Common.Exceptions.UnauthorizedWorkspaceAccessException ex)
+        {
+            _logger.LogWarning(ex, "Unauthorized optional tools save for agent {AgentId}", agentId);
+            return StatusCode(403, new ErrorResponse(ex.Message));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error saving optional tools for agent {AgentId}", agentId);
+            return StatusCode(500, new ErrorResponse("An unexpected error occurred"));
+        }
     }
 }

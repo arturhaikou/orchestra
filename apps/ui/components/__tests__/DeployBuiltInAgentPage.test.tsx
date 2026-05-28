@@ -32,6 +32,7 @@ const createMockTemplate = (overrides: Partial<AgentTemplateDto> = {}): AgentTem
   templateVersion: 1,
   isCliAgent: false,
   editableFields: [],
+  availableOptionalTools: [],
   ...overrides,
 });
 

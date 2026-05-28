@@ -1015,6 +1015,128 @@ public class JiraToolService : IJiraToolService
         }
     }
 
+    public async Task<object> AddCommentAsync(
+        string workspaceId,
+        string integrationId,
+        string issueKey,
+        string comment)
+    {
+        try
+        {
+            _logger.LogInformation(
+                "Adding comment to JIRA issue {IssueKey} in workspace {WorkspaceId}",
+                issueKey,
+                workspaceId);
+
+            if (!Guid.TryParse(workspaceId, out var workspaceGuid))
+            {
+                return new
+                {
+                    success = false,
+                    error = $"Invalid GUID format for workspaceId: {workspaceId}",
+                    errorCode = "INVALID_WORKSPACE_ID"
+                };
+            }
+
+            var integration = await _integrationResolver.ResolveAsync(workspaceGuid, integrationId, ProviderType.JIRA);
+
+            var apiClient = _apiClientFactory.CreateClient(integration);
+
+            var jiraType = IntegrationTypeDetector.DetectJiraType(integration.Url);
+            var commentBody = await _contentConverter.ConvertMarkdownToCommentBodyAsync(comment, jiraType);
+
+            await apiClient.AddCommentAsync(issueKey, commentBody);
+
+            var issueUrl = $"{integration.Url.TrimEnd('/')}/browse/{issueKey}";
+
+            _logger.LogInformation(
+                "Successfully added comment to JIRA issue {IssueKey} in workspace {WorkspaceId}",
+                issueKey,
+                workspaceId);
+
+            return new
+            {
+                success = true,
+                issueKey = issueKey,
+                url = issueUrl,
+                message = $"Successfully added comment to JIRA issue {issueKey}"
+            };
+        }
+        catch (IntegrationNotFoundException ex)
+        {
+            _logger.LogError(ex,
+                "Integration not found for workspace {WorkspaceId}",
+                workspaceId);
+
+            return new
+            {
+                success = false,
+                error = $"Integration not found for workspace {workspaceId}",
+                errorCode = "INTEGRATION_NOT_FOUND"
+            };
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogError(ex,
+                "Invalid operation while adding comment to JIRA issue {IssueKey}: {ErrorMessage}",
+                issueKey,
+                ex.Message);
+
+            return new
+            {
+                success = false,
+                error = ex.Message,
+                errorCode = ex.Message.Contains("integrationId is required") ? "INTEGRATION_ID_REQUIRED" :
+                           ex.Message.Contains("No active integration found for the supplied ID") ? "INTEGRATION_NOT_FOUND" :
+                           ex.Message.Contains("not a Jira integration") ? "INTEGRATION_WRONG_PROVIDER" :
+                           "INVALID_OPERATION"
+            };
+        }
+        catch (HttpRequestException ex) when (ex.InnerException is System.Net.Sockets.SocketException)
+        {
+            _logger.LogError(ex,
+                "Failed to connect to JIRA for workspace {WorkspaceId}",
+                workspaceId);
+
+            return new
+            {
+                success = false,
+                error = "Failed to connect to JIRA. Please verify the integration URL.",
+                errorCode = "JIRA_NETWORK_ERROR"
+            };
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex,
+                "Failed to communicate with JIRA adding comment to issue {IssueKey} in workspace {WorkspaceId}: {ErrorMessage}",
+                issueKey,
+                workspaceId,
+                ex.Message);
+
+            return new
+            {
+                success = false,
+                error = $"Failed to communicate with JIRA: {ex.Message}",
+                errorCode = "JIRA_HTTP_ERROR"
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Unexpected error adding comment to JIRA issue {IssueKey} in workspace {WorkspaceId}: {ErrorMessage}",
+                issueKey,
+                workspaceId,
+                ex.Message);
+
+            return new
+            {
+                success = false,
+                error = $"Unexpected error: {ex.Message}",
+                errorCode = "UNEXPECTED_ERROR"
+            };
+        }
+    }
+
     private async Task<string> GetProjectIdAsync(
         IJiraApiClient apiClient,
         Integration integration,

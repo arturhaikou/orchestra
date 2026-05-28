@@ -460,6 +460,10 @@ public class AgentService : IAgentService
             var toolActionIds = await ResolveToolActionIdsFromProviders(request.WorkspaceId, template, cancellationToken);
             await ValidateAndAssignToolActions(request.WorkspaceId, agent.Id, toolActionIds, cancellationToken);
         }
+        else if (request.SelectedOptionalToolMethodNames is { Count: > 0 })
+        {
+            await AssignOptionalToolActionsAsync(agent.Id, template, request.SelectedOptionalToolMethodNames, cancellationToken);
+        }
 
         return await MapToDtoAsync(agent, cancellationToken);
     }
@@ -487,6 +491,12 @@ public class AgentService : IAgentService
 
         if (request.ToolActionIds is not null)
             lockedViolations.Add("tools");
+
+        if (request.SkillIds is not null)
+            lockedViolations.Add("skills");
+
+        if (request.SubAgentIds is not null)
+            lockedViolations.Add("sub-agents");
 
         if (lockedViolations.Count > 0)
         {
@@ -520,6 +530,28 @@ public class AgentService : IAgentService
             .Select(i => template.ProviderToolMethodMap[i.Provider])
             .Distinct()
             .ToList();
+    }
+
+    private async Task AssignOptionalToolActionsAsync(
+        Guid agentId,
+        BuiltInAgentTemplate template,
+        IReadOnlyList<string> selectedMethodNames,
+        CancellationToken cancellationToken)
+    {
+        var allOptionalMethodNames = template.OptionalProviderToolMethodMap!
+            .Values
+            .SelectMany(v => v)
+            .ToHashSet();
+
+        var unknown = selectedMethodNames.Where(n => !allOptionalMethodNames.Contains(n)).ToList();
+        if (unknown.Count > 0)
+            throw new ArgumentException($"Unknown optional tool method names: {string.Join(", ", unknown)}.");
+
+        var toolActions = await _toolActionDataAccess.GetByNamesAsync(selectedMethodNames.ToList(), cancellationToken);
+        var toolActionIds = toolActions.Select(ta => ta.Id).ToList();
+
+        if (toolActionIds.Count > 0)
+            await _agentToolActionDataAccess.AssignToolActionsAsync(agentId, toolActionIds, cancellationToken);
     }
 
     private static Agent CreateAgentFromTemplate(CreateAgentFromTemplateRequest request, BuiltInAgentTemplate template)
@@ -670,7 +702,8 @@ public class AgentService : IAgentService
             UsageGuide: resolved.ResolvedGuide ?? string.Empty,
             TemplateVersion: template?.Version ?? 0,
             IsCliAgent: template?.IsCliAgent ?? false,
-            EditableFields: template?.EditableFields ?? Array.Empty<string>());
+            EditableFields: template?.EditableFields ?? Array.Empty<string>(),
+            AvailableOptionalTools: resolved.AvailableOptionalTools);
     }
 
     private static IReadOnlyList<TemplatePrerequisiteDto> MapPrerequisites(ResolvedTemplate resolved)

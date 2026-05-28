@@ -84,7 +84,10 @@ public class TemplateAvailabilityResolver : ITemplateAvailabilityResolver
     {
         var alreadyDeployed = CheckAlreadyDeployed(template, deployedAgents);
         if (alreadyDeployed is not null)
-            return alreadyDeployed;
+        {
+            var optionalTools = await ResolveAvailableOptionalToolsAsync(template, workspaceId, cancellationToken);
+            return alreadyDeployed with { AvailableOptionalTools = optionalTools };
+        }
 
         if (template.IsCliAgent)
             return await ResolveCliTemplateAsync(template, workspaceId, cancellationToken);
@@ -107,7 +110,8 @@ public class TemplateAvailabilityResolver : ITemplateAvailabilityResolver
             ExistingAgentId: null,
             resolvedToolActions,
             providerLabels,
-            resolvedGuide);
+            resolvedGuide,
+            AvailableOptionalTools: new List<OptionalToolDto>());
     }
 
     private async Task<ResolvedTemplate> ResolveCliTemplateAsync(
@@ -127,8 +131,11 @@ public class TemplateAvailabilityResolver : ITemplateAvailabilityResolver
                 ExistingAgentId: null,
                 ResolvedToolActions: new List<ResolvedToolAction>(),
                 ProviderLabels: new List<ProviderLabel>(),
-                ResolvedGuide: template.GuideTemplate);
+                ResolvedGuide: template.GuideTemplate,
+                AvailableOptionalTools: new List<OptionalToolDto>());
         }
+
+        var availableOptionalTools = await ResolveAvailableOptionalToolsAsync(template, workspaceId, cancellationToken);
 
         return new ResolvedTemplate(
             template.Identifier,
@@ -137,7 +144,40 @@ public class TemplateAvailabilityResolver : ITemplateAvailabilityResolver
             ExistingAgentId: null,
             ResolvedToolActions: new List<ResolvedToolAction>(),
             ProviderLabels: new List<ProviderLabel>(),
-            ResolvedGuide: template.GuideTemplate);
+            ResolvedGuide: template.GuideTemplate,
+            AvailableOptionalTools: availableOptionalTools);
+    }
+
+    private async Task<List<OptionalToolDto>> ResolveAvailableOptionalToolsAsync(
+        BuiltInAgentTemplate template,
+        Guid workspaceId,
+        CancellationToken cancellationToken)
+    {
+        if (template.OptionalProviderToolMethodMap is null)
+            return new List<OptionalToolDto>();
+
+        var integrations = await _integrationDataAccess.GetByWorkspaceIdAsync(workspaceId, cancellationToken);
+        var codeSourceIntegrations = integrations.Where(i => i.Types.Contains(IntegrationType.CODE_SOURCE)).ToList();
+
+        var result = new List<OptionalToolDto>();
+        var seenMethodNames = new HashSet<string>();
+
+        foreach (var integration in codeSourceIntegrations)
+        {
+            if (!template.OptionalProviderToolMethodMap.TryGetValue(integration.Provider, out var methodNames))
+                continue;
+
+            foreach (var methodName in methodNames)
+            {
+                if (!seenMethodNames.Add(methodName))
+                    continue;
+
+                var label = template.OptionalProviderToolLabelMap?.GetValueOrDefault(methodName) ?? methodName;
+                result.Add(new OptionalToolDto(integration.Provider.ToString(), methodName, label));
+            }
+        }
+
+        return result;
     }
 
     private static ResolvedTemplate? CheckAlreadyDeployed(BuiltInAgentTemplate template, List<Agent> deployedAgents)
@@ -153,7 +193,8 @@ public class TemplateAvailabilityResolver : ITemplateAvailabilityResolver
             ExistingAgentId: existing.Id,
             ResolvedToolActions: new List<ResolvedToolAction>(),
             ProviderLabels: new List<ProviderLabel>(),
-            ResolvedGuide: null);
+            ResolvedGuide: null,
+            AvailableOptionalTools: new List<OptionalToolDto>());
     }
 
     private static List<ProviderType> FindMatchedProviders(BuiltInAgentTemplate template, List<IntegrationDto> integrations)
@@ -242,7 +283,8 @@ public class TemplateAvailabilityResolver : ITemplateAvailabilityResolver
             ExistingAgentId: null,
             ResolvedToolActions: new List<ResolvedToolAction>(),
             ProviderLabels: new List<ProviderLabel>(),
-            ResolvedGuide: null);
+            ResolvedGuide: null,
+            AvailableOptionalTools: new List<OptionalToolDto>());
     }
 
     private static ResolvedTemplate CreateErrorResult(string templateId)
@@ -254,7 +296,8 @@ public class TemplateAvailabilityResolver : ITemplateAvailabilityResolver
             ExistingAgentId: null,
             ResolvedToolActions: new List<ResolvedToolAction>(),
             ProviderLabels: new List<ProviderLabel>(),
-            ResolvedGuide: null);
+            ResolvedGuide: null,
+            AvailableOptionalTools: new List<OptionalToolDto>());
     }
 
     public async Task ValidatePrerequisitesAsync(

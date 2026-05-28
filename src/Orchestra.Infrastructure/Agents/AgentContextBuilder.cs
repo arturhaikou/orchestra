@@ -1,3 +1,4 @@
+using Orchestra.Application.AiCliIntegrations.Interfaces;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Domain.Entities;
@@ -14,17 +15,26 @@ public class AgentContextBuilder : IAgentContextBuilder
     private readonly IIntegrationDataAccess _integrationDataAccess;
     private readonly ITicketProviderFactory _ticketProviderFactory;
     private readonly IAgentToolActionDataAccess _agentToolActionDataAccess;
+    private readonly IAgentSubAgentDataAccess _agentSubAgentDataAccess;
+    private readonly IAgentDataAccess _agentDataAccess;
+    private readonly IAiCliIntegrationDataAccess _cliIntegrationDataAccess;
 
     public AgentContextBuilder(
         ITicketDataAccess ticketDataAccess,
         IIntegrationDataAccess integrationDataAccess,
         ITicketProviderFactory ticketProviderFactory,
-        IAgentToolActionDataAccess agentToolActionDataAccess)
+        IAgentToolActionDataAccess agentToolActionDataAccess,
+        IAgentSubAgentDataAccess agentSubAgentDataAccess,
+        IAgentDataAccess agentDataAccess,
+        IAiCliIntegrationDataAccess cliIntegrationDataAccess)
     {
         _ticketDataAccess = ticketDataAccess;
         _integrationDataAccess = integrationDataAccess;
         _ticketProviderFactory = ticketProviderFactory;
         _agentToolActionDataAccess = agentToolActionDataAccess;
+        _agentSubAgentDataAccess = agentSubAgentDataAccess;
+        _agentDataAccess = agentDataAccess;
+        _cliIntegrationDataAccess = cliIntegrationDataAccess;
     }
 
     public async Task<string> BuildContextPromptAsync(
@@ -168,7 +178,22 @@ public class AgentContextBuilder : IAgentContextBuilder
             contextPrompt = EnrichContextWithIntegrations(contextPrompt, integrationSummaries);
         }
 
-        // Phase 3: Append [Project Principles] block for review agents.
+        // Phase 3: Inject [Available CLI Integrations] for push_branch tool disambiguation.
+        // Collects CLI integration IDs from the agent itself and any assigned sub-agents.
+        var cliIntegrationIds = await CollectCliIntegrationIdsAsync(agent, cancellationToken);
+        if (cliIntegrationIds.Count > 0)
+        {
+            var cliIntegrations = new List<Orchestra.Domain.Entities.AiCliIntegration>();
+            foreach (var cliId in cliIntegrationIds)
+            {
+                var cli = await _cliIntegrationDataAccess.GetByIdAsync(cliId, cancellationToken);
+                if (cli != null)
+                    cliIntegrations.Add(cli);
+            }
+            contextPrompt = EnrichContextWithCliIntegrations(contextPrompt, cliIntegrations);
+        }
+
+        // Phase 4: Append [Project Principles] block for review agents.
         // No-op for non-review agents (ProjectPrinciples is null).
         if (!string.IsNullOrWhiteSpace(agent.ProjectPrinciples))
         {
@@ -204,5 +229,44 @@ public class AgentContextBuilder : IAgentContextBuilder
         }
 
         return sb.ToString();
+    }
+
+    private static string EnrichContextWithCliIntegrations(
+        string contextPrompt,
+        IReadOnlyList<Orchestra.Domain.Entities.AiCliIntegration> cliIntegrations)
+    {
+        if (cliIntegrations.Count == 0)
+            return contextPrompt;
+
+        var sb = new StringBuilder(contextPrompt);
+        sb.AppendLine();
+        sb.AppendLine("[Available CLI Integrations]");
+        foreach (var cli in cliIntegrations)
+        {
+            sb.AppendLine($"- ID: {cli.Id} | Name: {cli.Name} | WorkingDirectory: {cli.WorkingDirectory}");
+        }
+        return sb.ToString();
+    }
+
+    private async Task<List<Guid>> CollectCliIntegrationIdsAsync(
+        Agent agent,
+        CancellationToken cancellationToken)
+    {
+        var ids = new List<Guid>();
+
+        if (agent.AiCliIntegrationId.HasValue)
+            ids.Add(agent.AiCliIntegrationId.Value);
+
+        var subAgentIds = await _agentSubAgentDataAccess
+            .GetSubAgentIdsByParentAgentIdAsync(agent.Id, cancellationToken);
+
+        foreach (var subAgentId in subAgentIds)
+        {
+            var subAgent = await _agentDataAccess.GetByIdAsync(subAgentId, cancellationToken);
+            if (subAgent?.AiCliIntegrationId.HasValue == true)
+                ids.Add(subAgent.AiCliIntegrationId.Value);
+        }
+
+        return ids;
     }
 }

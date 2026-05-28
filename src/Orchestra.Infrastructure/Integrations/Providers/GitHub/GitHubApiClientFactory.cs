@@ -41,4 +41,28 @@ public class GitHubApiClientFactory : IGitHubApiClientFactory
 
         return new GitHubApiClient(httpClient, owner, repo, apiToken, _logger);
     }
+
+    public string GetAuthenticatedRemoteUrl(Integration integration)
+    {
+        if (string.IsNullOrEmpty(integration.Url))
+            throw new InvalidOperationException("GitHub integration URL is required.");
+
+        var uri = new Uri(integration.Url);
+        var segments = uri.AbsolutePath.Trim('/').Split('/');
+
+        if (segments.Length < 2)
+            throw new InvalidOperationException("Invalid GitHub repository URL format. Expected: https://github.com/{owner}/{repo}");
+
+        var owner = segments[0];
+        var repo = segments[1].EndsWith(".git", StringComparison.OrdinalIgnoreCase)
+            ? segments[1][..^4]
+            : segments[1];
+
+        if (string.IsNullOrEmpty(integration.EncryptedApiKey))
+            throw new InvalidOperationException("GitHub API token is required.");
+
+        var token = _credentialEncryptionService.Decrypt(integration.EncryptedApiKey);
+        var encodedToken = Uri.EscapeDataString(token);
+        return $"{uri.Scheme}://x-access-token:{encodedToken}@{uri.Authority}/{owner}/{repo}.git";
+    }
 }

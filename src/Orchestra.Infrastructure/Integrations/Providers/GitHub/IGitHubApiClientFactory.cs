@@ -5,4 +5,5 @@ namespace Orchestra.Infrastructure.Integrations.Providers.GitHub;
 public interface IGitHubApiClientFactory
 {
     IGitHubApiClient CreateClient(Integration integration);
+    string GetAuthenticatedRemoteUrl(Integration integration);
 }

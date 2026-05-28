@@ -35,4 +35,6 @@ public interface IGitHubApiClient
     Task<GitHubReviewSubmissionResult> SubmitPullRequestReviewAsync(int prNumber, string reviewEvent, string body, IReadOnlyList<GitHubInlineReviewComment>? comments = null, CancellationToken cancellationToken = default);
 
     Task<string> GetFileContentAsync(string path, string? gitRef, CancellationToken cancellationToken = default);
+
+    Task<GitHubCreatedPullRequest> CreatePullRequestAsync(string title, string body, string headBranch, string baseBranch, bool draft = false, CancellationToken cancellationToken = default);
 }

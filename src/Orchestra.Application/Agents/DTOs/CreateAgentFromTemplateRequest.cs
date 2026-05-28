@@ -6,4 +6,5 @@ public record CreateAgentFromTemplateRequest(
     string ProjectPrinciples,
     string? Model,
     Guid? AiCliIntegrationId = null,
-    string? ReasoningEffort = null);
+    string? ReasoningEffort = null,
+    IReadOnlyList<string>? SelectedOptionalToolMethodNames = null);

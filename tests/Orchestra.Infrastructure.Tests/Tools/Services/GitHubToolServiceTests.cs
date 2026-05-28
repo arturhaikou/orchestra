@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Reflection;
 using Microsoft.Extensions.Logging;
 using NSubstitute.ExceptionExtensions;
+using Orchestra.Application.AiCliIntegrations.Interfaces;
 using Orchestra.Application.CodeReview;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Infrastructure.Integrations.Providers.GitHub;
@@ -23,12 +24,13 @@ public class GitHubToolServiceTests : ServiceTestFixture<GitHubToolService>
     private readonly IGitHubApiClient _apiClient = Substitute.For<IGitHubApiClient>();
     private readonly IIntegrationResolver _integrationResolver = Substitute.For<IIntegrationResolver>();
     private readonly ICodeReviewPipeline _codeReviewPipeline = Substitute.For<ICodeReviewPipeline>();
+    private readonly IAiCliIntegrationDataAccess _cliIntegrationDataAccess = Substitute.For<IAiCliIntegrationDataAccess>();
     private readonly GitHubToolService _sut;
 
     public GitHubToolServiceTests()
     {
         _apiClientFactory.CreateClient(Arg.Any<Integration>()).Returns(_apiClient);
-        _sut = new GitHubToolService(_apiClientFactory, _integrationResolver, _codeReviewPipeline, Logger);
+        _sut = new GitHubToolService(_apiClientFactory, _integrationResolver, _codeReviewPipeline, _cliIntegrationDataAccess, Logger);
     }
 
     [Fact]

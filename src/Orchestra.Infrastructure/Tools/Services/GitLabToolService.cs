@@ -1,8 +1,11 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orchestra.Application.AiCliIntegrations.Interfaces;
 using Orchestra.Application.CodeReview;
 using Orchestra.Application.CodeReview.Models;
 using Orchestra.Application.Common.Interfaces;
@@ -17,17 +20,20 @@ public class GitLabToolService : IGitLabToolService
     private readonly IGitLabApiClientFactory _apiClientFactory;
     private readonly IIntegrationResolver _integrationResolver;
     private readonly ICodeReviewPipeline _codeReviewPipeline;
+    private readonly IAiCliIntegrationDataAccess _cliIntegrationDataAccess;
     private readonly ILogger<GitLabToolService> _logger;
 
     public GitLabToolService(
         IGitLabApiClientFactory apiClientFactory,
         IIntegrationResolver integrationResolver,
         ICodeReviewPipeline codeReviewPipeline,
+        IAiCliIntegrationDataAccess cliIntegrationDataAccess,
         ILogger<GitLabToolService> logger)
     {
         _apiClientFactory = apiClientFactory;
         _integrationResolver = integrationResolver;
         _codeReviewPipeline = codeReviewPipeline;
+        _cliIntegrationDataAccess = cliIntegrationDataAccess;
         _logger = logger;
     }
 
@@ -267,6 +273,191 @@ public class GitLabToolService : IGitLabToolService
         {
             _logger.LogError(ex, "GitLab API error in UpdateIssueAsync for workspace {WorkspaceId}", workspaceId);
             return new GitLabUpdateIssueResult { Success = false, Error = $"Unexpected error: {ex.Message}" };
+        }
+    }
+
+    public async Task<GitLabPushBranchResult> PushBranchAsync(
+        string workspaceId,
+        string integrationId,
+        string cliIntegrationId,
+        string branchName)
+    {
+        try
+        {
+            _logger.LogInformation("GitLab push_branch: workspaceId={WorkspaceId} branch={Branch}", workspaceId, branchName);
+
+            if (string.IsNullOrWhiteSpace(workspaceId))
+                return new GitLabPushBranchResult { Success = false, Error = "Workspace ID is required." };
+
+            if (string.IsNullOrWhiteSpace(cliIntegrationId))
+                return new GitLabPushBranchResult { Success = false, Error = "CLI integration ID is required." };
+
+            if (string.IsNullOrWhiteSpace(branchName))
+                return new GitLabPushBranchResult { Success = false, Error = "Branch name is required." };
+
+            if (!Guid.TryParse(workspaceId, out var workspaceGuid))
+                return new GitLabPushBranchResult { Success = false, Error = $"Invalid workspace ID format: {workspaceId}" };
+
+            if (!Guid.TryParse(cliIntegrationId, out var cliGuid))
+                return new GitLabPushBranchResult { Success = false, Error = $"Invalid CLI integration ID format: {cliIntegrationId}" };
+
+            var cliIntegration = await _cliIntegrationDataAccess.GetByIdAsync(cliGuid);
+            if (cliIntegration == null)
+                return new GitLabPushBranchResult { Success = false, Error = $"CLI integration {cliIntegrationId} not found." };
+
+            if (cliIntegration.WorkspaceId != workspaceGuid)
+                return new GitLabPushBranchResult { Success = false, Error = "CLI integration does not belong to this workspace." };
+
+            var repositoryPath = cliIntegration.WorkingDirectory;
+
+            if (!Directory.Exists(repositoryPath) || !Directory.Exists(Path.Combine(repositoryPath, ".git")))
+                return new GitLabPushBranchResult { Success = false, Error = $"CLI integration working directory '{repositoryPath}' is not a local git repository." };
+
+            var integration = await _integrationResolver.ResolveAsync(workspaceGuid, integrationId, ProviderType.GITLAB);
+            var remoteUrl = _apiClientFactory.GetAuthenticatedRemoteUrl(integration);
+
+            var result = await RunGitPushAsync(repositoryPath, remoteUrl, branchName);
+
+            if (!result.Success)
+            {
+                _logger.LogWarning("git push failed for workspace {WorkspaceId}: {Error}", workspaceId, result.Error);
+                return new GitLabPushBranchResult { Success = false, Branch = branchName, Error = result.Error };
+            }
+
+            _logger.LogInformation("Successfully pushed branch {Branch} for workspace {WorkspaceId}", branchName, workspaceId);
+            return new GitLabPushBranchResult { Success = true, Branch = branchName, Output = result.Output };
+        }
+        catch (InvalidOperationException ex) when (
+            ex.Message.Contains("integrationId is required") ||
+            ex.Message.Contains("No active integration found for the supplied ID"))
+        {
+            _logger.LogWarning(ex, "Integration resolution failed for workspace {WorkspaceId}", workspaceId);
+            return new GitLabPushBranchResult { Success = false, Error = ex.Message };
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("No active GitLab integration"))
+        {
+            _logger.LogWarning(ex, "No GitLab integration for workspace {WorkspaceId}", workspaceId);
+            return new GitLabPushBranchResult { Success = false, Error = ex.Message };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error pushing branch for workspace {WorkspaceId}", workspaceId);
+            return new GitLabPushBranchResult { Success = false, Error = "An unexpected error occurred. Please try again." };
+        }
+    }
+
+    private static async Task<(bool Success, string? Output, string? Error)> RunGitPushAsync(
+        string repositoryPath,
+        string remoteUrl,
+        string branchName)
+    {
+        using var process = new System.Diagnostics.Process
+        {
+            StartInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "git",
+                Arguments = $"push {remoteUrl} {branchName}:{branchName}",
+                WorkingDirectory = repositoryPath,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            }
+        };
+
+        process.Start();
+        var stdout = await process.StandardOutput.ReadToEndAsync();
+        var stderr = await process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+
+        var output = RedactCredentials(string.IsNullOrWhiteSpace(stdout) ? stderr.Trim() : stdout.Trim());
+
+        if (process.ExitCode != 0)
+            return (false, null, string.IsNullOrWhiteSpace(stderr) ? $"git push exited with code {process.ExitCode}" : RedactCredentials(stderr.Trim()));
+
+        return (true, output, null);
+    }
+
+    private static string RedactCredentials(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return text;
+
+        return Regex.Replace(text, @"https://[^\s/@]+:[^\s/@]+@", "https://***:***@", RegexOptions.IgnoreCase);
+    }
+
+    public async Task<GitLabCreateMergeRequestResult> CreateMergeRequestAsync(
+        string workspaceId,
+        string integrationId,
+        string title,
+        string description,
+        string sourceBranch,
+        string targetBranch)
+    {
+        try
+        {
+            _logger.LogInformation("GitLab create_mr: workspaceId={WorkspaceId} source={SourceBranch} target={TargetBranch}", workspaceId, sourceBranch, targetBranch);
+
+            if (string.IsNullOrWhiteSpace(workspaceId))
+                return new GitLabCreateMergeRequestResult { Success = false, Error = "Workspace ID is required." };
+
+            if (string.IsNullOrWhiteSpace(title))
+                return new GitLabCreateMergeRequestResult { Success = false, Error = "Title is required." };
+
+            if (string.IsNullOrWhiteSpace(sourceBranch))
+                return new GitLabCreateMergeRequestResult { Success = false, Error = "Source branch is required." };
+
+            if (string.IsNullOrWhiteSpace(targetBranch))
+                return new GitLabCreateMergeRequestResult { Success = false, Error = "Target branch is required." };
+
+            if (!Guid.TryParse(workspaceId, out var workspaceGuid))
+                return new GitLabCreateMergeRequestResult { Success = false, Error = $"Invalid workspace ID format: {workspaceId}" };
+
+            var integration = await _integrationResolver.ResolveAsync(workspaceGuid, integrationId, ProviderType.GITLAB);
+            var apiClient = _apiClientFactory.CreateClient(integration);
+            var mr = await apiClient.CreateMergeRequestAsync(title, description, sourceBranch, targetBranch);
+
+            _logger.LogInformation("Successfully created GitLab merge request !{Iid} for workspace {WorkspaceId}", mr.Iid, workspaceId);
+
+            return new GitLabCreateMergeRequestResult
+            {
+                Success = true,
+                Iid = mr.Iid,
+                Url = mr.WebUrl,
+                Title = mr.Title,
+                SourceBranch = mr.SourceBranch,
+                TargetBranch = mr.TargetBranch,
+            };
+        }
+        catch (InvalidOperationException ex) when (
+            ex.Message.Contains("integrationId is required") ||
+            ex.Message.Contains("No active integration found for the supplied ID"))
+        {
+            _logger.LogWarning(ex, "Integration resolution failed for workspace {WorkspaceId}", workspaceId);
+            return new GitLabCreateMergeRequestResult { Success = false, Error = ex.Message };
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("No active GitLab integration"))
+        {
+            _logger.LogWarning(ex, "No GitLab integration for workspace {WorkspaceId}", workspaceId);
+            return new GitLabCreateMergeRequestResult { Success = false, Error = ex.Message };
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "GitLab API error creating merge request for workspace {WorkspaceId}", workspaceId);
+
+            if (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
+                ex.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                return new GitLabCreateMergeRequestResult { Success = false, Error = "Failed to authenticate with GitLab. Please verify the API token." };
+
+            if (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+                return new GitLabCreateMergeRequestResult { Success = false, Error = "GitLab project not found or insufficient permissions." };
+
+            return new GitLabCreateMergeRequestResult { Success = false, Error = "An error occurred while creating the merge request. Please try again." };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error creating GitLab merge request for workspace {WorkspaceId}", workspaceId);
+            return new GitLabCreateMergeRequestResult { Success = false, Error = "An unexpected error occurred. Please try again." };
         }
     }
 

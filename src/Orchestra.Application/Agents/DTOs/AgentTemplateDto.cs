@@ -12,7 +12,8 @@ public record AgentTemplateDto(
     string UsageGuide,
     int TemplateVersion,
     bool IsCliAgent,
-    IReadOnlyList<string> EditableFields
+    IReadOnlyList<string> EditableFields,
+    IReadOnlyList<OptionalToolDto> AvailableOptionalTools
 );
 
 public record TemplatePrerequisiteDto(

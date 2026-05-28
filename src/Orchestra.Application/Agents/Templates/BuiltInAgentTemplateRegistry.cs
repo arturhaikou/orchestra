@@ -41,7 +41,7 @@ public class BuiltInAgentTemplateRegistry : IBuiltInAgentTemplateRegistry
             Capabilities: new[] { "Code Review" },
             RequiredIntegrationType: IntegrationType.CODE_SOURCE,
             ToolActionMethodNames: new[] { "review_pull_request", "review_merge_request" },
-            LockedFields: new HashSet<string> { "name", "role", "capabilities", "tools" },
+            LockedFields: new HashSet<string> { "name", "role", "capabilities", "tools", "skills", "sub-agents" },
             EditableFields: new[] { "projectPrinciples" },
             GuideTemplate: "Create a ticket and provide a {providerLabel} link. The agent will automatically review the code changes based on your project principles.",
             ProviderLabelMap: new Dictionary<ProviderType, string>
@@ -66,7 +66,7 @@ public class BuiltInAgentTemplateRegistry : IBuiltInAgentTemplateRegistry
             Capabilities: new[] { "Codebase Search", "Exploration", "Summarization" },
             RequiredIntegrationType: null,
             ToolActionMethodNames: Array.Empty<string>(),
-            LockedFields: new HashSet<string> { "name", "role", "capabilities", "tools" },
+            LockedFields: new HashSet<string> { "name", "role", "capabilities", "tools", "skills", "sub-agents" },
             EditableFields: Array.Empty<string>(),
             GuideTemplate: "Assign a ticket describing what to search for in the codebase. The agent will explore the code and return a comprehensive summary.",
             ProviderLabelMap: null,
@@ -98,13 +98,24 @@ public class BuiltInAgentTemplateRegistry : IBuiltInAgentTemplateRegistry
             Capabilities: new[] { "Code Generation", "Code Editing", "Refactoring", "Bug Fixing", "Test Writing" },
             RequiredIntegrationType: null,
             ToolActionMethodNames: Array.Empty<string>(),
-            LockedFields: new HashSet<string> { "name", "role", "capabilities", "tools" },
+            LockedFields: new HashSet<string> { "name", "role", "capabilities", "tools", "skills", "sub-agents" },
             EditableFields: Array.Empty<string>(),
             GuideTemplate: "Assign a ticket describing the coding task. The agent will implement, edit, test, and verify changes directly in the codebase.",
             ProviderLabelMap: null,
             ProviderToolMethodMap: null,
             IsCliAgent: true,
             IsReadOnlyCli: false,
+            OptionalProviderToolMethodMap: new Dictionary<ProviderType, IReadOnlyList<string>>
+            {
+                { ProviderType.GITHUB, new[] { "push_branch", "create_pr" } },
+                { ProviderType.GITLAB, new[] { "push_branch", "create_mr" } }
+            },
+            OptionalProviderToolLabelMap: new Dictionary<string, string>
+            {
+                { "push_branch", "Push Branch" },
+                { "create_pr", "Create Pull Request" },
+                { "create_mr", "Create Merge Request" }
+            },
             DefaultCustomInstructions:
                 """
                 You are an elite software engineer with full read/write access to the codebase.

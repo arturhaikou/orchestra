@@ -439,6 +439,39 @@ public class GitHubApiClient : IGitHubApiClient
         return new StringContent(json, Encoding.UTF8, "application/json");
     }
 
+    public async Task<GitHubCreatedPullRequest> CreatePullRequestAsync(string title, string body, string headBranch, string baseBranch, bool draft = false, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var url = $"/repos/{_owner}/{_repo}/pulls";
+            var payload = new
+            {
+                title,
+                body,
+                head = headBranch,
+                @base = baseBranch,
+                draft
+            };
+            var json = JsonSerializer.Serialize(payload);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.PostAsync(url, content, cancellationToken);
+            var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+            await ThrowForGitHubStatusAsync(response, cancellationToken);
+
+            //var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+            return JsonSerializer.Deserialize<GitHubCreatedPullRequest>(responseContent, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            }) ?? throw new InvalidOperationException("Failed to parse pull request response from GitHub");
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Error creating pull request in {Owner}/{Repo}", _owner, _repo);
+            throw;
+        }
+    }
+
     public async Task<string> GetFileContentAsync(string path, string? gitRef, CancellationToken cancellationToken = default)
     {
         try

@@ -8,6 +8,7 @@ import { fetchWorkspaceModels } from '../../services/workspaceService';
 import { isReasoningModel, REASONING_EFFORT_OPTIONS } from '../../utils/reasoningModels';
 import Toast from '../Toast';
 import TemplateDetailsCard from '../agents/TemplateDetailsCard';
+import AgentOptionalToolsSection from '../agents/AgentOptionalToolsSection';
 
 const CLI_PROVIDER_LABELS: Record<AiCliProviderType, string> = {
   [AiCliProviderType.GITHUB_COPILOT]: 'GitHub Copilot',
@@ -36,7 +37,7 @@ const DeployBuiltInAgentPage: React.FC = () => {
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [selectedReasoningEffort, setSelectedReasoningEffort] = useState<string>('');
-
+  const [selectedOptionalTools, setSelectedOptionalTools] = useState<string[]>([]);
   const agentsPath = `/workspaces/${workspaceId}/agents`;
 
   useEffect(() => {
@@ -121,6 +122,7 @@ const DeployBuiltInAgentPage: React.FC = () => {
         model: selectedModel || undefined,
         reasoningEffort: (selectedModel && isReasoningModel(selectedModel) && selectedReasoningEffort) ? selectedReasoningEffort : undefined,
         aiCliIntegrationId: template.isCliAgent ? selectedCliIntegrationId : undefined,
+        selectedOptionalToolMethodNames: selectedOptionalTools.length > 0 ? selectedOptionalTools : undefined,
       });
       setToast({ message: 'Agent deployed successfully', type: 'success' });
       navigate(agentsPath);
@@ -335,6 +337,12 @@ const DeployBuiltInAgentPage: React.FC = () => {
               />
             </div>
           )}
+
+          <AgentOptionalToolsSection
+            availableOptionalTools={template.availableOptionalTools ?? []}
+            selectedMethodNames={selectedOptionalTools}
+            onChange={setSelectedOptionalTools}
+          />
         </div>
       )}
 

@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using Xunit;
+using Orchestra.Application.AiCliIntegrations.Interfaces;
 using Orchestra.Application.CodeReview;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Domain.Enums;
@@ -27,12 +28,13 @@ public class GitLabToolServiceTests : ServiceTestFixture<GitLabToolService>
     private readonly IGitLabApiClient _apiClient = Substitute.For<IGitLabApiClient>();
     private readonly IIntegrationResolver _integrationResolver = Substitute.For<IIntegrationResolver>();
     private readonly ICodeReviewPipeline _codeReviewPipeline = Substitute.For<ICodeReviewPipeline>();
+    private readonly IAiCliIntegrationDataAccess _cliIntegrationDataAccess = Substitute.For<IAiCliIntegrationDataAccess>();
     private readonly GitLabToolService _sut;
 
     public GitLabToolServiceTests()
     {
         _apiClientFactory.CreateClient(Arg.Any<Integration>()).Returns(_apiClient);
-        _sut = new GitLabToolService(_apiClientFactory, _integrationResolver, _codeReviewPipeline, Logger);
+        _sut = new GitLabToolService(_apiClientFactory, _integrationResolver, _codeReviewPipeline, _cliIntegrationDataAccess, Logger);
     }
 
     #region Attribute Verification Tests

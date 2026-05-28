@@ -46,4 +46,26 @@ public class GitLabApiClientFactory : IGitLabApiClientFactory
 
         return new GitLabApiClient(httpClient, apiBaseUrl, projectPath, apiToken, _logger);
     }
+
+    public string GetAuthenticatedRemoteUrl(Integration integration)
+    {
+        if (string.IsNullOrEmpty(integration.Url))
+            throw new InvalidOperationException("GitLab integration URL is required.");
+
+        var uri = new Uri(integration.Url);
+        var projectPath = uri.AbsolutePath.Trim('/');
+
+        if (string.IsNullOrEmpty(projectPath) || !projectPath.Contains('/'))
+            throw new InvalidOperationException("Invalid GitLab URL format. Expected: https://gitlab.com/{namespace}/{project}");
+
+        if (projectPath.EndsWith(".git", StringComparison.OrdinalIgnoreCase))
+            projectPath = projectPath[..^4];
+
+        if (string.IsNullOrEmpty(integration.EncryptedApiKey))
+            throw new InvalidOperationException("GitLab API token is required.");
+
+        var token = _credentialEncryptionService.Decrypt(integration.EncryptedApiKey);
+        var encodedToken = Uri.EscapeDataString(token);
+        return $"{uri.Scheme}://oauth2:{encodedToken}@{uri.Authority}/{projectPath}.git";
+    }
 }

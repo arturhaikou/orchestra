@@ -60,7 +60,8 @@ public class AgentServiceGetTemplatesTests
                     {
                         new(ProviderType.GITHUB, "Pull Request")
                     },
-                    ResolvedGuide: "Create a ticket and provide a Pull Request link.")
+                    ResolvedGuide: "Create a ticket and provide a Pull Request link.",
+                    AvailableOptionalTools: new List<OptionalToolDto>())
             });
 
         var results = await _sut.GetAgentTemplatesAsync(userId, workspaceId);
@@ -113,7 +114,8 @@ public class AgentServiceGetTemplatesTests
                     {
                         new(ProviderType.GITHUB, "Pull Request")
                     },
-                    ResolvedGuide: "Create a ticket and provide a Pull Request link.")
+                    ResolvedGuide: "Create a ticket and provide a Pull Request link.",
+                    AvailableOptionalTools: new List<OptionalToolDto>())
             });
 
         var results = await _sut.GetAgentTemplatesAsync(userId, workspaceId);
@@ -152,7 +154,8 @@ public class AgentServiceGetTemplatesTests
                     ExistingAgentId: null,
                     ResolvedToolActions: new List<ResolvedToolAction>(),
                     ProviderLabels: new List<ProviderLabel>(),
-                    ResolvedGuide: "generic guide text")
+                    ResolvedGuide: "generic guide text",
+                    AvailableOptionalTools: new List<OptionalToolDto>())
             });
 
         var results = await _sut.GetAgentTemplatesAsync(userId, workspaceId);

@@ -5,4 +5,5 @@ namespace Orchestra.Infrastructure.Integrations.Providers.GitLab;
 public interface IGitLabApiClientFactory
 {
     IGitLabApiClient CreateClient(Integration integration);
+    string GetAuthenticatedRemoteUrl(Integration integration);
 }

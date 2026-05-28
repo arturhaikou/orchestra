@@ -575,6 +575,12 @@ public class ToolRetrieverService : IToolRetrieverService
                     nestedJobTracking,
                     ct);
 
+                if (nestedJobTracking.SuspendedQuestionId.HasValue)
+                {
+                    capturedJobTracking.SuspendedQuestionId = nestedJobTracking.SuspendedQuestionId;
+                    return result;
+                }
+
                 await capturedJobTracking.StepWriter.WriteAsync(
                     capturedJobTracking.JobId,
                     capturedJobTracking.WorkspaceId,
@@ -643,6 +649,8 @@ public class ToolRetrieverService : IToolRetrieverService
 
                 await using var _ = client;
 
+                var subAgentCustomTools = (await GetAgentToolsAsync(capturedSubAgent.Id, cancellationToken: ct)).ToList();
+
                 var result = await client.RunWithTrackingAsync(
                     message,
                     capturedInstructions,
@@ -650,6 +658,7 @@ public class ToolRetrieverService : IToolRetrieverService
                     scopedWriter,
                     capturedJobTracking.JobId,
                     capturedJobTracking.WorkspaceId,
+                    customTools: subAgentCustomTools.Count > 0 ? subAgentCustomTools : null,
                     ct);
 
                 await capturedJobTracking.StepWriter.WriteAsync(

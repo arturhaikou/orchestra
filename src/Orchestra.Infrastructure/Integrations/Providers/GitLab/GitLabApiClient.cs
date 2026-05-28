@@ -458,4 +458,33 @@ public class GitLabApiClient : IGitLabApiClient
             };
         }
     }
+
+    public async Task<GitLabMergeRequest> CreateMergeRequestAsync(string title, string description, string sourceBranch, string targetBranch, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var url = $"/api/v4/projects/{EncodedProjectPath}/merge_requests";
+            var payload = new
+            {
+                title,
+                description,
+                source_branch = sourceBranch,
+                target_branch = targetBranch,
+            };
+            var json = JsonSerializer.Serialize(payload);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.PostAsync(url, content, cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+            return JsonSerializer.Deserialize<GitLabMergeRequest>(responseContent, _jsonOptions)
+                ?? throw new InvalidOperationException("Failed to parse created merge request response from GitLab");
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Error creating merge request in GitLab project {Project}", _projectPath);
+            throw;
+        }
+    }
 }

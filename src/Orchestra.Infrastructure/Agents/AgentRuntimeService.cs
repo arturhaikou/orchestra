@@ -184,12 +184,16 @@ public class AgentRuntimeService : IAgentRuntimeService
 
         await using var _ = client;
 
+        var customTools = (await _toolRetrieverService.GetAgentToolsAsync(
+            agent.Id,
+            cancellationToken: cancellationToken)).ToList();
+
         await _jobStepWriter.WriteAsync(jobId, workspaceId, JobStepType.AgentStarted, cancellationToken: cancellationToken);
         try
         {
             var result = await client.RunWithTrackingAsync(
                 contextPrompt, agent.CustomInstructions, agent.Name,
-                _jobStepWriter, jobId, workspaceId, cancellationToken);
+                _jobStepWriter, jobId, workspaceId, customTools, cancellationToken);
 
             await _jobStepWriter.WriteAsync(jobId, workspaceId, JobStepType.AgentCompleted, content: result, cancellationToken: cancellationToken);
             return result;
@@ -331,8 +335,12 @@ public class AgentRuntimeService : IAgentRuntimeService
                 session: session,
                 cancellationToken: cancellationToken);
 
-            await _jobService.UpdateJobStatusAsync(
-                jobId, JobStatus.Completed, finalResponse: response, cancellationToken: cancellationToken);
+            if (jobTracking.SuspendedQuestionId is not null)
+                await _jobService.SuspendJobAsync(
+                    jobId, jobTracking.SuspendedQuestionId.Value, cancellationToken);
+            else
+                await _jobService.UpdateJobStatusAsync(
+                    jobId, JobStatus.Completed, finalResponse: response, cancellationToken: cancellationToken);
         }
         catch (Exception ex)
         {

@@ -7,5 +7,6 @@ public record ResolvedTemplate(
     Guid? ExistingAgentId,
     List<ResolvedToolAction> ResolvedToolActions,
     List<ProviderLabel> ProviderLabels,
-    string? ResolvedGuide
+    string? ResolvedGuide,
+    List<OptionalToolDto> AvailableOptionalTools
 );

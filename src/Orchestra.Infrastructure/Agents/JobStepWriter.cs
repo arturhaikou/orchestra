@@ -9,6 +9,7 @@ public class JobStepWriter : IJobStepWriter
 {
     private readonly IJobDataAccess _jobDataAccess;
     private readonly INotificationService _notificationService;
+    private readonly SemaphoreSlim _writeLock = new(1, 1);
     private int _sequenceCounter;
 
     public JobStepWriter(IJobDataAccess jobDataAccess, INotificationService notificationService)
@@ -37,7 +38,16 @@ public class JobStepWriter : IJobStepWriter
         var sequence = Interlocked.Increment(ref _sequenceCounter);
 
         var step = JobStep.Create(jobId, stepType, sequence, content, isJson, toolName, durationMs, isError, parentStepId, agentId, agentName);
-        await _jobDataAccess.AddStepAsync(step, cancellationToken);
+
+        await _writeLock.WaitAsync(cancellationToken);
+        try
+        {
+            await _jobDataAccess.AddStepAsync(step, cancellationToken);
+        }
+        finally
+        {
+            _writeLock.Release();
+        }
 
         var stepDto = new JobStepDto(
             step.Id,

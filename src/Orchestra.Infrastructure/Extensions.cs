@@ -208,6 +208,7 @@ public static class Extensions
         builder.Services.AddScoped<IMcpServerQueryServiceNew, McpServerQueryServiceNew>();
         builder.Services.AddScoped<IAgentMcpToolDataAccess, AgentMcpToolDataAccess>();
         builder.Services.AddScoped<IAgentToolAssignmentService, AgentToolAssignmentService>();
+        builder.Services.AddScoped<IAgentOptionalToolService, AgentOptionalToolService>();
         builder.Services.AddScoped<IMcpServerImpactCounter, McpServerImpactCounter>();
         builder.Services.AddScoped<IMcpServerCommandService, McpServerCommandService>();
         builder.Services.AddScoped<IMcpServerToolFetcher, McpServerToolFetcher>();

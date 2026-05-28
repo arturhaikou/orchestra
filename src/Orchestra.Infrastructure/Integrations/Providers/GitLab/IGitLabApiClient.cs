@@ -75,6 +75,8 @@ public interface IGitLabApiClient
     /// <param name="newLine">
     /// Line number in the new file version. Null when commenting on a purely removed line.
     /// </param>
+    Task<GitLabMergeRequest> CreateMergeRequestAsync(string title, string description, string sourceBranch, string targetBranch, CancellationToken cancellationToken = default);
+
     Task<GitLabDiscussionResult> CreateMergeRequestDiscussionAsync(
         int mrIid,
         string body,

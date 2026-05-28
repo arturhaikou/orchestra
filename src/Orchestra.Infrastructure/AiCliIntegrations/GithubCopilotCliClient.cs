@@ -3,6 +3,8 @@ using System.Diagnostics;
 using System.Text.Json;
 using GitHub.Copilot.SDK;
 using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Domain.Enums;
 
@@ -17,13 +19,15 @@ public sealed class GithubCopilotCliClient : IAiCliClient
     private readonly string? _modelId;
     private readonly string? _reasoningEffort;
     private readonly IList<string> _allowedTools;
+    private readonly ILogger? _logger;
 
-    private GithubCopilotCliClient(CopilotClient copilotClient, string? modelId, string? reasoningEffort, IList<string> allowedTools)
+    private GithubCopilotCliClient(CopilotClient copilotClient, string? modelId, string? reasoningEffort, IList<string> allowedTools, ILogger? logger = null)
     {
         _copilotClient = copilotClient;
         _modelId = modelId;
         _reasoningEffort = reasoningEffort;
         _allowedTools = allowedTools;
+        _logger = logger;
     }
 
     public static async Task<GithubCopilotCliClient> CreateAsync(
@@ -93,14 +97,15 @@ public sealed class GithubCopilotCliClient : IAiCliClient
         IJobStepWriter stepWriter,
         Guid jobId,
         Guid workspaceId,
+        IReadOnlyList<AIFunction>? customTools = null,
         CancellationToken cancellationToken = default)
     {
-        var config = BuildSessionConfig(instructions, name, _allowedTools);
+        var config = BuildSessionConfig(instructions, name, _allowedTools, customTools);
         var toolStartTimes = new ConcurrentDictionary<string, (string ToolName, Stopwatch Timer)>();
 
         await using var session = await _copilotClient.CreateSessionAsync(config, cancellationToken);
 
-        using var _ = session.On(evt => HandleSessionEvent(evt, stepWriter, jobId, workspaceId, toolStartTimes));
+        using var _ = session.On(evt => HandleSessionEvent(evt, stepWriter, jobId, workspaceId, toolStartTimes, _logger));
 
         var response = await session.SendAndWaitAsync(
             new MessageOptions { Prompt = prompt },
@@ -110,7 +115,7 @@ public sealed class GithubCopilotCliClient : IAiCliClient
         return response?.Data.Content;
     }
 
-    private SessionConfig BuildSessionConfig(string? instructions, string name, IList<string> tools)
+    private SessionConfig BuildSessionConfig(string? instructions, string name, IList<string> tools, IReadOnlyList<AIFunction>? customTools = null)
     {
         var agentConfig = new CustomAgentConfig
         {
@@ -132,6 +137,14 @@ public sealed class GithubCopilotCliClient : IAiCliClient
         if (_reasoningEffort is not null)
             config.ReasoningEffort = _reasoningEffort;
 
+        if (customTools?.Count > 0)
+        {
+            config.Tools = customTools.ToList();
+            foreach (var toolName in customTools.Select(t => t.Name).ToList()){
+                agentConfig.Tools.Add(toolName);
+            }
+        }
+
         return config;
     }
 
@@ -140,20 +153,21 @@ public sealed class GithubCopilotCliClient : IAiCliClient
         IJobStepWriter stepWriter,
         Guid jobId,
         Guid workspaceId,
-        ConcurrentDictionary<string, (string ToolName, Stopwatch Timer)> toolStartTimes)
+        ConcurrentDictionary<string, (string ToolName, Stopwatch Timer)> toolStartTimes,
+        ILogger? logger)
     {
         switch (evt)
         {
             case ToolExecutionStartEvent startEvt:
-                HandleToolStart(startEvt, stepWriter, jobId, workspaceId, toolStartTimes);
+                HandleToolStart(startEvt, stepWriter, jobId, workspaceId, toolStartTimes, logger);
                 break;
 
             case ToolExecutionCompleteEvent completeEvt:
-                HandleToolComplete(completeEvt, stepWriter, jobId, workspaceId, toolStartTimes);
+                HandleToolComplete(completeEvt, stepWriter, jobId, workspaceId, toolStartTimes, logger);
                 break;
 
             case AssistantMessageEvent messageEvt when messageEvt.Data?.Content is { Length: > 0 } content:
-                _ = stepWriter.WriteAsync(jobId, workspaceId, JobStepType.ThinkingMessage, content: content);
+                FireAndForget(stepWriter.WriteAsync(jobId, workspaceId, JobStepType.ThinkingMessage, content: content), logger);
                 break;
         }
     }
@@ -163,7 +177,8 @@ public sealed class GithubCopilotCliClient : IAiCliClient
         IJobStepWriter stepWriter,
         Guid jobId,
         Guid workspaceId,
-        ConcurrentDictionary<string, (string ToolName, Stopwatch Timer)> toolStartTimes)
+        ConcurrentDictionary<string, (string ToolName, Stopwatch Timer)> toolStartTimes,
+        ILogger? logger)
     {
         var toolName = startEvt.Data?.ToolName ?? "unknown";
         var toolCallId = startEvt.Data?.ToolCallId ?? string.Empty;
@@ -172,8 +187,8 @@ public sealed class GithubCopilotCliClient : IAiCliClient
         if (!string.IsNullOrEmpty(toolCallId))
             toolStartTimes[toolCallId] = (toolName, Stopwatch.StartNew());
 
-        _ = stepWriter.WriteAsync(jobId, workspaceId, JobStepType.ToolCallStarted,
-            content: argsJson, toolName: toolName, isJson: true);
+        FireAndForget(stepWriter.WriteAsync(jobId, workspaceId, JobStepType.ToolCallStarted,
+            content: argsJson, toolName: toolName, isJson: true), logger);
     }
 
     private static void HandleToolComplete(
@@ -181,7 +196,8 @@ public sealed class GithubCopilotCliClient : IAiCliClient
         IJobStepWriter stepWriter,
         Guid jobId,
         Guid workspaceId,
-        ConcurrentDictionary<string, (string ToolName, Stopwatch Timer)> toolStartTimes)
+        ConcurrentDictionary<string, (string ToolName, Stopwatch Timer)> toolStartTimes,
+        ILogger? logger)
     {
         var toolCallId = completeEvt.Data?.ToolCallId ?? string.Empty;
         toolStartTimes.TryRemove(toolCallId, out var startEntry);
@@ -191,9 +207,9 @@ public sealed class GithubCopilotCliClient : IAiCliClient
         var resultJson = SerializeResult(completeEvt.Data?.Result);
         var isError = completeEvt.Data?.Success == false;
 
-        _ = stepWriter.WriteAsync(jobId, workspaceId, JobStepType.ToolCallCompleted,
+        FireAndForget(stepWriter.WriteAsync(jobId, workspaceId, JobStepType.ToolCallCompleted,
             content: resultJson, toolName: toolName, isJson: true,
-            durationMs: durationMs, isError: isError);
+            durationMs: durationMs, isError: isError), logger);
     }
 
     private static string? SerializeArguments(object? arguments)
@@ -209,6 +225,13 @@ public sealed class GithubCopilotCliClient : IAiCliClient
         try { return JsonSerializer.Serialize(result); }
         catch { return result.ToString(); }
     }
+
+    private static void FireAndForget(Task task, ILogger? logger) =>
+        task.ContinueWith(
+            t => logger?.LogWarning(t.Exception, "Failed to write job step"),
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted,
+            TaskScheduler.Default);
 
     public async ValueTask DisposeAsync()
         => await _copilotClient.DisposeAsync();

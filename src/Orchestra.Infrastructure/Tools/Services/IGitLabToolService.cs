@@ -57,6 +57,25 @@ public class GitLabUpdateIssueResult
     public string? Error { get; set; }
 }
 
+public class GitLabCreateMergeRequestResult
+{
+    public bool Success { get; set; }
+    public int Iid { get; set; }
+    public string? Url { get; set; }
+    public string? Title { get; set; }
+    public string? SourceBranch { get; set; }
+    public string? TargetBranch { get; set; }
+    public string? Error { get; set; }
+}
+
+public class GitLabPushBranchResult
+{
+    public bool Success { get; set; }
+    public string? Branch { get; set; }
+    public string? Output { get; set; }
+    public string? Error { get; set; }
+}
+
 [ToolCategory("GitLab", ProviderType.GITLAB, "Interact with GitLab repositories and issues")]
 public interface IGitLabToolService
 {
@@ -98,6 +117,24 @@ public interface IGitLabToolService
         [Description("The GitLab issue IID (project-scoped ID)")] string issueIid,
         [Description("New title (optional; if null or empty, omit from update)")] string? title,
         [Description("New description (optional; if null or empty, omit from update)")] string? description);
+
+    [ToolAction("push_branch", "Push Branch to Remote", DangerLevel.Moderate)]
+    [Description("Push a local git branch to the GitLab remote using the integration credentials. Use this before creating a merge request when the branch has not yet been pushed.")]
+    Task<GitLabPushBranchResult> PushBranchAsync(
+        [Description("The workspace ID (GUID)")] string workspaceId,
+        [Description("The ID of the specific GitLab integration instance to use.")] string integrationId,
+        [Description("The ID of the CLI integration whose WorkingDirectory points to the local git repository. Choose from the [Available CLI Integrations] block in your context.")] string cliIntegrationId,
+        [Description("The name of the branch to push")] string branchName);
+
+    [ToolAction("create_mr", "Create Merge Request", DangerLevel.Moderate)]
+    [Description("Create a new merge request in the workspace's connected GitLab repository")]
+    Task<GitLabCreateMergeRequestResult> CreateMergeRequestAsync(
+        [Description("The workspace ID (GUID)")] string workspaceId,
+        [Description("The ID of the specific GitLab integration instance to use. Required when the workspace has multiple GitLab integrations configured.")] string integrationId,
+        [Description("The merge request title")] string title,
+        [Description("The merge request description")] string description,
+        [Description("The source branch name (the branch with the changes)")] string sourceBranch,
+        [Description("The target branch name to merge into (e.g. 'main')")] string targetBranch);
 
     [ToolAction("review_merge_request", "Review Merge Request", DangerLevel.Moderate)]
     [Description("Performs an automated code review of a GitLab merge request, analysing the diff and submitting structured findings.")]

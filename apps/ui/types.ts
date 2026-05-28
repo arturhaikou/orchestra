@@ -147,6 +147,12 @@ export interface TemplatePrerequisiteDto {
   satisfied: boolean;
 }
 
+export interface OptionalToolDto {
+  provider: string;
+  methodName: string;
+  label: string;
+}
+
 export interface TemplateAvailabilityDto {
   status: 'AVAILABLE' | 'UNAVAILABLE' | 'ALREADY_DEPLOYED' | 'ERROR';
   reason?: string | null;
@@ -166,6 +172,7 @@ export interface AgentTemplateDto {
   usageGuide: string;
   isCliAgent: boolean;
   editableFields: string[];
+  availableOptionalTools: OptionalToolDto[];
 }
 
 export interface CreateAgentFromTemplateRequest {
@@ -175,6 +182,7 @@ export interface CreateAgentFromTemplateRequest {
   model?: string;
   reasoningEffort?: string | null;
   aiCliIntegrationId?: string;
+  selectedOptionalToolMethodNames?: string[];
 }
 
 export type JobStatus = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'WaitingForInput';

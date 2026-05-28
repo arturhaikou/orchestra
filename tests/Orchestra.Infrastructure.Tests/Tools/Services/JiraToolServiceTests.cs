@@ -73,6 +73,18 @@ public class JiraToolServiceTests : ServiceTestFixture<JiraToolService>
         Assert.Equal(DangerLevel.Safe, attr.DangerLevel);
     }
 
+    [Fact]
+    public void IJiraToolService_HasToolActionAttribute_ForAddComment_WithModerateDangerLevel()
+    {
+        var method = typeof(IJiraToolService).GetMethod("AddCommentAsync");
+        var attr = method?.GetCustomAttribute<ToolActionAttribute>();
+
+        Assert.NotNull(attr);
+        Assert.Equal("add_comment", attr!.Name);
+        Assert.Equal(DangerLevel.Moderate, attr.DangerLevel);
+        Assert.NotEmpty(attr.Description);
+    }
+
     #endregion
 
     #region FR-02: Integration Resolution by ID Tests
@@ -186,6 +198,50 @@ public class JiraToolServiceTests : ServiceTestFixture<JiraToolService>
         var resultDict = SerializeToDict(result);
         Assert.False(GetBooleanValue(resultDict["success"]));
         Assert.Contains("not a Jira integration", resultDict["error"].ToString());
+    }
+
+    #endregion
+
+    #region AddCommentAsync Tests
+
+    [Fact]
+    public async Task AddCommentAsync_ReturnsError_WhenWorkspaceIdIsInvalid()
+    {
+        var result = await _sut.AddCommentAsync("not-a-guid", "integration-id", "PROJ-1", "A comment");
+
+        var resultDict = SerializeToDict(result);
+        Assert.False(GetBooleanValue(resultDict["success"]));
+        Assert.Equal("INVALID_WORKSPACE_ID", resultDict["errorCode"].ToString());
+    }
+
+    [Fact]
+    public async Task AddCommentAsync_ReturnsError_WhenIntegrationNotFound()
+    {
+        _integrationResolver
+            .ResolveAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<ProviderType>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new Orchestra.Application.Common.Exceptions.IntegrationNotFoundException(Guid.NewGuid()));
+
+        var result = await _sut.AddCommentAsync(
+            _testWorkspaceId.ToString(), "some-integration-id", "PROJ-1", "A comment");
+
+        var resultDict = SerializeToDict(result);
+        Assert.False(GetBooleanValue(resultDict["success"]));
+        Assert.Equal("INTEGRATION_NOT_FOUND", resultDict["errorCode"].ToString());
+    }
+
+    [Fact]
+    public async Task AddCommentAsync_ReturnsError_WhenIntegrationIdIsEmpty()
+    {
+        _integrationResolver
+            .ResolveAsync(Arg.Any<Guid>(), Arg.Is<string>(s => string.IsNullOrWhiteSpace(s)), Arg.Any<ProviderType>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("integrationId is required for this tool action; no integration credentials were accessed."));
+
+        var result = await _sut.AddCommentAsync(
+            _testWorkspaceId.ToString(), string.Empty, "PROJ-1", "A comment");
+
+        var resultDict = SerializeToDict(result);
+        Assert.False(GetBooleanValue(resultDict["success"]));
+        Assert.Contains("integrationId is required", resultDict["error"].ToString());
     }
 
     #endregion

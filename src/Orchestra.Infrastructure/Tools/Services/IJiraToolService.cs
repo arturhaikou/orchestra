@@ -41,6 +41,14 @@ public interface IJiraToolService
         [Description("The ID of the specific Jira integration instance to use. Required when the workspace has multiple Jira integrations configured.")] string integrationId,
         [Description("The Jira issue key to retrieve (e.g., PROJ-123)")] string issueKey);
 
+    [ToolAction("add_comment", "Add a comment to a Jira issue", DangerLevel.Moderate)]
+    [Description("Add a comment to an existing Jira issue")]
+    Task<object> AddCommentAsync(
+        [Description("The workspace ID where the Jira integration is configured")] string workspaceId,
+        [Description("The ID of the specific Jira integration instance to use. Required when the workspace has multiple Jira integrations configured.")] string integrationId,
+        [Description("The Jira issue key to comment on (e.g., PROJ-123)")] string issueKey,
+        [Description("The comment body in markdown format")] string comment);
+
     [ToolAction("create_epic", "Create a new Jira epic", DangerLevel.Moderate)]
     [Description("Create a new Jira epic with multiple child stories")]
     Task<object> CreateEpicAsync(
