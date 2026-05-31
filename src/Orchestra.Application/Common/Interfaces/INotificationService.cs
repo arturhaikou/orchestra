@@ -1,6 +1,7 @@
 using Orchestra.Application.Agents.DTOs;
 using Orchestra.Application.Jobs.DTOs;
 using Orchestra.Application.Tickets.DTOs;
+using Orchestra.Application.Workflows.DTOs;
 using Orchestra.Domain.Enums;
 
 namespace Orchestra.Application.Common.Interfaces;
@@ -22,4 +23,8 @@ public interface INotificationService
         Guid workspaceId,
         Guid questionId,
         CancellationToken cancellationToken = default);
+
+    Task NotifyWorkflowStepStartedAsync(WorkflowStepStartedNotification notification, CancellationToken cancellationToken = default);
+    Task NotifyWorkflowStepCompletedAsync(WorkflowStepCompletedNotification notification, CancellationToken cancellationToken = default);
+    Task NotifyWorkflowExecutionStatusChangedAsync(WorkflowExecutionStatusChangedNotification notification, CancellationToken cancellationToken = default);
 }

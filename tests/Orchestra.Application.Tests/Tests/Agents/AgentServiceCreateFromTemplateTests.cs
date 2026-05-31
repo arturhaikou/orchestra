@@ -117,7 +117,7 @@ public class AgentServiceCreateFromTemplateTests
 
         Assert.Equal("Code Review Agent", result.Name);
         Assert.Equal("Automated code reviewer", result.Role);
-        Assert.Equal("code-review", result.TemplateIdentifier);
+        Assert.Equal("code-review", result.TemplateId);
         Assert.Equal(1, result.TemplateVersion);
         Assert.Equal(request.ProjectPrinciples, result.ProjectPrinciples);
         Assert.Null(result.CustomInstructions);

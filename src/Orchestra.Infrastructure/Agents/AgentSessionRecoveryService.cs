@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Agents.Services;
+using Orchestra.Application.Workflows.Interfaces;
 using Orchestra.Domain.Enums;
 
 namespace Orchestra.Infrastructure.Agents;
@@ -27,6 +28,7 @@ public class AgentSessionRecoveryService(
         var jobDataAccess = scope.ServiceProvider.GetRequiredService<IJobDataAccess>();
         var questionRepository = scope.ServiceProvider.GetRequiredService<IAgentQuestionRepository>();
         var runtimeService = scope.ServiceProvider.GetRequiredService<IAgentRuntimeService>();
+        var workflowEngine = scope.ServiceProvider.GetRequiredService<IWorkflowExecutionEngine>();
 
         var waitingJobs = await jobDataAccess.GetByStatusAsync(
             JobStatus.WaitingForInput, CancellationToken.None);
@@ -51,6 +53,15 @@ public class AgentSessionRecoveryService(
                     answeredQuestion.Id,
                     answeredQuestion.AnswersJson!,
                     CancellationToken.None);
+
+                var finishedJob = await jobDataAccess.GetByIdAsync(job.Id, CancellationToken.None);
+                if (finishedJob?.WorkflowExecutionId.HasValue == true)
+                {
+                    if (finishedJob.Status == JobStatus.Completed)
+                        await workflowEngine.HandleJobCompletedAsync(job.Id, finishedJob.FinalResponse, CancellationToken.None);
+                    else if (finishedJob.Status == JobStatus.WaitingForInput)
+                        await workflowEngine.HandleJobWaitingForInputAsync(job.Id, CancellationToken.None);
+                }
             }
             catch (Exception ex)
             {

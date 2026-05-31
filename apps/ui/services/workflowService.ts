@@ -1,89 +1,90 @@
 
-import { Workflow } from '../types';
+import { WorkflowDefinition, WorkflowExecution } from '../types';
 import { getToken } from './authService';
 
-const API_BASE_URL = `${import.meta.env.VITE_API_URL}/v1/workflows`;
+const DEFINITIONS_URL = `${import.meta.env.VITE_API_URL}/v1/workflow-definitions`;
+const EXECUTIONS_URL = `${import.meta.env.VITE_API_URL}/v1/workflow-executions`;
 
 const getAuthHeaders = () => ({
   'Content-Type': 'application/json',
   'Authorization': `Bearer ${getToken() || ''}`
 });
 
-export const getWorkspacesWorkflows = async (workspaceId: string): Promise<Workflow[]> => {
-  try {
-    const response = await fetch(`${API_BASE_URL}?workspaceId=${workspaceId}`, {
-      headers: getAuthHeaders()
-    });
-
-    const contentType = response.headers.get("content-type");
-    if (contentType && contentType.includes("text/html")) throw new Error("Not JSON");
-
-    if (!response.ok) {
-      throw new Error(`Backend error: ${response.statusText}`);
-    }
-    return await response.json();
-  } catch (error) {
-    console.error('Failed to fetch workflows:', error);
-    return [];
-  }
+const handleResponse = async <T>(response: Response): Promise<T> => {
+  const contentType = response.headers.get('content-type');
+  if (contentType?.includes('text/html')) throw new Error('Unexpected HTML response');
+  if (!response.ok) throw new Error(`Request failed: ${response.statusText}`);
+  return response.json();
 };
 
-export const createWorkflow = async (workspaceId: string, data: { name: string; nodes: any[]; edges: any[] }): Promise<Workflow> => {
-  try {
-    const response = await fetch(API_BASE_URL, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ workspaceId, ...data }),
-    });
-
-    const contentType = response.headers.get("content-type");
-    if (contentType && contentType.includes("text/html")) throw new Error("Not JSON");
-
-    if (!response.ok) {
-      throw new Error(`Backend error: ${response.statusText}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Failed to create workflow:', error);
-    throw error;
-  }
+export const getWorkflowDefinitions = async (workspaceId: string): Promise<WorkflowDefinition[]> => {
+  const response = await fetch(`${DEFINITIONS_URL}?workspaceId=${workspaceId}`, {
+    headers: getAuthHeaders()
+  });
+  return handleResponse<WorkflowDefinition[]>(response);
 };
 
-export const updateWorkflow = async (id: string, data: Partial<Workflow>): Promise<Workflow> => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/${id}`, {
-      method: 'PUT',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data),
-    });
-
-    const contentType = response.headers.get("content-type");
-    if (contentType && contentType.includes("text/html")) throw new Error("Not JSON");
-
-    if (!response.ok) {
-      throw new Error(`Backend error: ${response.statusText}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Failed to update workflow:', error);
-    throw error;
-  }
+export const getWorkflowDefinition = async (id: string): Promise<WorkflowDefinition> => {
+  const response = await fetch(`${DEFINITIONS_URL}/${id}`, { headers: getAuthHeaders() });
+  return handleResponse<WorkflowDefinition>(response);
 };
 
-export const deleteWorkflow = async (id: string): Promise<void> => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/${id}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders(),
-    });
+export interface CreateWorkflowStepPayload {
+  order: number;
+  agentId: string;
+  instructionOverride?: string | null;
+  passPreviousOutput: boolean;
+}
 
-    if (!response.ok) {
-      throw new Error(`Backend error: ${response.statusText}`);
-    }
-  } catch (error) {
-    console.error('Failed to delete workflow:', error);
-    throw error;
-  }
+export interface CreateWorkflowPayload {
+  workspaceId: string;
+  name: string;
+  description?: string | null;
+  steps: CreateWorkflowStepPayload[];
+}
+
+export const createWorkflowDefinition = async (payload: CreateWorkflowPayload): Promise<WorkflowDefinition> => {
+  const response = await fetch(DEFINITIONS_URL, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload)
+  });
+  return handleResponse<WorkflowDefinition>(response);
+};
+
+export interface UpdateWorkflowPayload {
+  name: string;
+  description?: string | null;
+  steps: CreateWorkflowStepPayload[];
+}
+
+export const updateWorkflowDefinition = async (id: string, payload: UpdateWorkflowPayload): Promise<WorkflowDefinition> => {
+  const response = await fetch(`${DEFINITIONS_URL}/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload)
+  });
+  return handleResponse<WorkflowDefinition>(response);
+};
+
+export const deleteWorkflowDefinition = async (id: string): Promise<void> => {
+  const response = await fetch(`${DEFINITIONS_URL}/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders()
+  });
+  if (!response.ok) throw new Error(`Delete failed: ${response.statusText}`);
+};
+
+export const getWorkflowExecutionsByTicket = async (ticketId: string): Promise<WorkflowExecution[]> => {
+  const response = await fetch(`${EXECUTIONS_URL}?ticketId=${ticketId}`, {
+    headers: getAuthHeaders()
+  });
+  return handleResponse<WorkflowExecution[]>(response);
+};
+
+export const getWorkflowExecution = async (executionId: string): Promise<WorkflowExecution> => {
+  const response = await fetch(`${EXECUTIONS_URL}/${executionId}`, {
+    headers: getAuthHeaders()
+  });
+  return handleResponse<WorkflowExecution>(response);
 };

@@ -5,6 +5,8 @@ using Orchestra.Application.Agents.Templates;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Jobs.DTOs;
 using Orchestra.Application.Jobs.Services;
+using Orchestra.Application.Tickets.Common;
+using Orchestra.Application.Tickets.DTOs;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
 using Orchestra.Infrastructure.AiCliIntegrations;
@@ -26,6 +28,12 @@ public class AgentRuntimeService : IAgentRuntimeService
     private readonly IJobService _jobService;
     private readonly IJobStepWriter _jobStepWriter;
     private readonly IConversationSnapshotRepository _snapshotRepository;
+    private readonly ITicketDataAccess _ticketDataAccess;
+    private readonly INotificationService _notificationService;
+    private readonly ITicketIdParsingService _ticketIdParsingService;
+
+    // Status GUID from seeding
+    private static readonly Guid CompletedStatusId = Guid.Parse("88888888-8888-8888-8888-888888888888");
 
     public AgentRuntimeService(
         IChatClientResolver chatClientResolver,
@@ -37,7 +45,10 @@ public class AgentRuntimeService : IAgentRuntimeService
         IAiCliClientFactory cliClientFactory,
         IJobService jobService,
         IJobStepWriter jobStepWriter,
-        IConversationSnapshotRepository snapshotRepository)
+        IConversationSnapshotRepository snapshotRepository,
+        ITicketDataAccess ticketDataAccess,
+        INotificationService notificationService,
+        ITicketIdParsingService ticketIdParsingService)
     {
         _chatClientResolver = chatClientResolver;
         _agentDataAccess = agentDataAccess;
@@ -49,6 +60,9 @@ public class AgentRuntimeService : IAgentRuntimeService
         _jobService = jobService;
         _jobStepWriter = jobStepWriter;
         _snapshotRepository = snapshotRepository;
+        _ticketDataAccess = ticketDataAccess;
+        _notificationService = notificationService;
+        _ticketIdParsingService = ticketIdParsingService;
     }
 
     /// <inheritdoc/>
@@ -130,7 +144,9 @@ public class AgentRuntimeService : IAgentRuntimeService
                 jobContext.TriggerType,
                 jobContext.InitialPrompt,
                 jobContext.TicketId,
-                jobContext.TicketTitle),
+                jobContext.TicketTitle,
+                jobContext.ParentJobId,
+                jobContext.WorkflowExecutionId),
             cancellationToken);
 
         await _jobService.UpdateJobStatusAsync(
@@ -282,6 +298,8 @@ public class AgentRuntimeService : IAgentRuntimeService
     {
         var job = await _jobDataAccess.GetByIdAsync(jobId, cancellationToken)
             ?? throw new InvalidOperationException($"Job {jobId} not found.");
+        
+        var ticketId = job.TicketId;
 
         var agentEntity = await _agentDataAccess.GetByIdAsync(job.AgentId, cancellationToken)
             ?? throw new InvalidOperationException($"Agent {job.AgentId} not found.");
@@ -339,8 +357,31 @@ public class AgentRuntimeService : IAgentRuntimeService
                 await _jobService.SuspendJobAsync(
                     jobId, jobTracking.SuspendedQuestionId.Value, cancellationToken);
             else
+            {
                 await _jobService.UpdateJobStatusAsync(
                     jobId, JobStatus.Completed, finalResponse: response, cancellationToken: cancellationToken);
+
+                // Update ticket to Completed only for standalone (non-workflow) jobs.
+                // Workflow step jobs defer ticket lifecycle to the workflow engine.
+                if (ticketId.HasValue && !job.WorkflowExecutionId.HasValue)
+                {
+                    var ticket = await _ticketDataAccess.GetTicketByIdAsync(ticketId.Value, cancellationToken);
+                    if (ticket is not null)
+                    {
+                        ticket.UpdateStatus(CompletedStatusId);
+                        await _ticketDataAccess.UpdateTicketAsync(ticket, cancellationToken);
+
+                        var ticketIdForNotification = BuildCompositeTicketId(ticket);
+                        await _notificationService.NotifyTicketStatusChangedAsync(
+                            new TicketStatusChangedNotification(
+                                ticket.WorkspaceId,
+                                ticketIdForNotification,
+                                "Completed",
+                                "In Progress"),
+                            cancellationToken);
+                    }
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -348,5 +389,12 @@ public class AgentRuntimeService : IAgentRuntimeService
                 jobId, JobStatus.Failed, errorMessage: ex.Message, cancellationToken: cancellationToken);
             throw;
         }
+    }
+
+    private string BuildCompositeTicketId(Ticket ticket)
+    {
+        return (ticket.IntegrationId.HasValue && !string.IsNullOrEmpty(ticket.ExternalTicketId))
+            ? _ticketIdParsingService.BuildCompositeId(ticket.IntegrationId.Value, ticket.ExternalTicketId)
+            : ticket.Id.ToString();
     }
 }

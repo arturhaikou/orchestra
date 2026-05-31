@@ -3,10 +3,10 @@ import { Bot, Sparkles, RefreshCw, X, Send, Loader2, MessageSquare, Plus, Save, 
 import ModalErrorBanner from './ModalErrorBanner';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { marked } from 'marked';
-import { Ticket, TicketPriority, TicketStatus, Comment, Workflow, Agent, TicketStatusChangedEvent } from '../types';
+import { Ticket, TicketPriority, TicketStatus, Comment, WorkflowDefinition, Agent, TicketStatusChangedEvent } from '../types';
 import { onTicketStatusChanged, onReconnected } from '../services/signalRService';
 import { addComment, updateTicket, getTickets, convertToExternal, deleteTicket, getTicketStatuses, getTicketPriorities, generateSummary } from '../services/ticketService';
-import { getWorkspacesWorkflows } from '../services/workflowService';
+import { getWorkflowDefinitions } from '../services/workflowService';
 import { getUser } from '../services/authService';
 import { getAgents } from '../services/agentService';
 import { IntegrationSelector } from './IntegrationSelector';
@@ -74,7 +74,7 @@ const TicketList: React.FC<TicketListProps> = () => {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const selectedTicketRef = useRef<Ticket | null>(null);
-  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const [workflows, setWorkflows] = useState<WorkflowDefinition[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [statuses, setStatuses] = useState<TicketStatus[]>([]);
   const [priorities, setPriorities] = useState<TicketPriority[]>([]);
@@ -208,7 +208,7 @@ const TicketList: React.FC<TicketListProps> = () => {
     loadInitialTickets();
 
     const loadWorkflows = async () => {
-        const wfs = await getWorkspacesWorkflows(workspaceId);
+        const wfs = await getWorkflowDefinitions(workspaceId!);
         setWorkflows(wfs);
     };
     loadWorkflows();
@@ -222,9 +222,14 @@ const TicketList: React.FC<TicketListProps> = () => {
 
         const updated = [...prevTickets];
         const ticket = { ...updated[ticketIndex] };
+        
+        // Handle null status by creating a minimal status object
         if (ticket.status) {
           ticket.status = { ...ticket.status, name: event.newStatus };
+        } else {
+          ticket.status = { id: '', name: event.newStatus, color: '' };
         }
+        
         updated[ticketIndex] = ticket;
         return updated;
       });

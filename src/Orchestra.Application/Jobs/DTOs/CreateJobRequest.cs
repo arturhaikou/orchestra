@@ -9,4 +9,6 @@ public record CreateJobRequest(
     JobTriggerType TriggerType,
     string InitialPrompt,
     Guid? TicketId = null,
-    string? TicketTitle = null);
+    string? TicketTitle = null,
+    Guid? ParentJobId = null,
+    Guid? WorkflowExecutionId = null);

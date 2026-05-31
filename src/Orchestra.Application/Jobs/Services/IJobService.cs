@@ -28,4 +28,15 @@ public interface IJobService
         Guid jobId,
         Guid questionId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates a parent workflow job that tracks the overall state of a workflow execution.
+    /// </summary>
+    Task<Guid> CreateWorkflowJobAsync(
+        Guid workspaceId,
+        string workflowName,
+        Guid workflowExecutionId,
+        Guid? ticketId,
+        string? ticketTitle,
+        CancellationToken cancellationToken = default);
 }

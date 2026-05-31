@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Common.Configuration;
 using Orchestra.Application.Common.Interfaces;
+using Orchestra.Application.Workflows.Interfaces;
 
 namespace Orchestra.Worker;
 
@@ -87,7 +88,7 @@ public class AgentExecutionWorker : BackgroundService
 
             // Execute agents for each ticket with separate scopes (concurrent execution allowed)
             var tasks = allTickets.Select(ticket =>
-                ExecuteTicketAsync(ticket.Id, cancellationToken));
+                ExecuteTicketAsync(ticket.Id, ticket.AssignedWorkflowId, cancellationToken));
 
             await Task.WhenAll(tasks);
         }
@@ -95,12 +96,26 @@ public class AgentExecutionWorker : BackgroundService
 
     private async Task ExecuteTicketAsync(
         Guid ticketId,
+        Guid? assignedWorkflowId,
         CancellationToken cancellationToken)
     {
         try
         {
             // Create a separate scope for each ticket execution to avoid DbContext concurrency issues
             await using var scope = _serviceProvider.CreateAsyncScope();
+
+            if (assignedWorkflowId.HasValue)
+            {
+                var workflowEngine = scope.ServiceProvider.GetRequiredService<IWorkflowExecutionEngine>();
+                await workflowEngine.StartWorkflowAsync(ticketId, assignedWorkflowId.Value, cancellationToken);
+
+                _logger.LogInformation(
+                    "Started workflow execution for ticket {TicketId} with workflow {WorkflowId}",
+                    ticketId,
+                    assignedWorkflowId.Value);
+                return;
+            }
+
             var orchestrationService = scope.ServiceProvider
                 .GetRequiredService<IAgentOrchestrationService>();
 

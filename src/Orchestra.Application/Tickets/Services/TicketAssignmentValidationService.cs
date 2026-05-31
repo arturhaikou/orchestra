@@ -1,4 +1,5 @@
 using Orchestra.Application.Common.Interfaces;
+using Orchestra.Application.Workflows.Interfaces;
 
 namespace Orchestra.Application.Tickets.Services;
 
@@ -9,10 +10,14 @@ namespace Orchestra.Application.Tickets.Services;
 public class TicketAssignmentValidationService : ITicketAssignmentValidationService
 {
     private readonly IAgentDataAccess _agentDataAccess;
+    private readonly IWorkflowDefinitionRepository _workflowRepository;
 
-    public TicketAssignmentValidationService(IAgentDataAccess agentDataAccess)
+    public TicketAssignmentValidationService(
+        IAgentDataAccess agentDataAccess,
+        IWorkflowDefinitionRepository workflowRepository)
     {
         _agentDataAccess = agentDataAccess;
+        _workflowRepository = workflowRepository;
     }
 
     /// <summary>
@@ -47,7 +52,6 @@ public class TicketAssignmentValidationService : ITicketAssignmentValidationServ
 
     /// <summary>
     /// Validates workflow exists and returns its workspace ID.
-    /// Note: Currently skipped until Workflow entity exists.
     /// </summary>
     /// <param name="workflowId">The workflow ID to validate (null is allowed for unassignment)</param>
     /// <param name="cancellationToken">Cancellation token</param>
@@ -55,14 +59,19 @@ public class TicketAssignmentValidationService : ITicketAssignmentValidationServ
     /// <exception cref="ArgumentException">Thrown when workflowId is provided but workflow not found</exception>
     public async Task<Guid?> ValidateAndGetWorkflowWorkspaceAsync(Guid? workflowId, CancellationToken cancellationToken = default)
     {
-        // If no workflow is being assigned, return null (unassignment case)
         if (!workflowId.HasValue)
         {
             return null;
         }
 
-        // TODO: Implement workflow validation when Workflow entity is created
-        // For now, return null to skip validation (matching current TicketService behavior)
-        return await Task.FromResult<Guid?>(null);
+        var workflow = await _workflowRepository.GetByIdAsync(workflowId.Value, cancellationToken);
+
+        if (workflow is null)
+        {
+            throw new ArgumentException(
+                $"Workflow with ID {workflowId.Value} not found.");
+        }
+
+        return workflow.WorkspaceId;
     }
 }

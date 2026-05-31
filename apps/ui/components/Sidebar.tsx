@@ -19,7 +19,8 @@ import {
   Server,
   Terminal,
   BookOpen,
-  Activity
+  Activity,
+  Workflow
 } from 'lucide-react';
 import { Workspace, User } from '../types';
 import { getUser } from '../services/authService';
@@ -197,6 +198,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           <SidebarItem icon={Bot} label="Agents" to={`/workspaces/${activeWorkspaceId}/agents`} active={isActive('agents')} onClick={onClose} />
           <SidebarItem icon={Activity} label="Jobs" to={`/workspaces/${activeWorkspaceId}/jobs`} active={isActive('jobs')} onClick={onClose} />
           <SidebarItem icon={BookOpen} label="Skills" to={`/workspaces/${activeWorkspaceId}/skills`} active={isActiveSection('skills')} onClick={onClose} />
+          <SidebarItem icon={Workflow} label="Workflows" to={`/workspaces/${activeWorkspaceId}/workflows`} active={isActive('workflows')} onClick={onClose} />
         </nav>
 
         <div className="p-4 border-t border-border">

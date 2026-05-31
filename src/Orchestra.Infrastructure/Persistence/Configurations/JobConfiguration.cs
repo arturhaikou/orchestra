@@ -48,5 +48,17 @@ public class JobConfiguration : IEntityTypeConfiguration<Job>
         builder.HasIndex(j => j.WorkspaceId)
             .HasFilter("\"Status\" IN (0, 1)")
             .HasDatabaseName("IX_Jobs_WorkspaceId_Running");
+
+        builder.Property(j => j.ParentJobId)
+            .IsRequired(false);
+
+        builder.HasOne<Job>()
+            .WithMany()
+            .HasForeignKey(j => j.ParentJobId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Property(j => j.WorkflowExecutionId)
+            .IsRequired(false);
     }
 }

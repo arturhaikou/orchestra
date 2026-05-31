@@ -72,7 +72,7 @@ public class AgentServiceTemplateImmutabilityTests
 
         var result = await sut.UpdateAgentAsync(userId, agent.Id, updateRequest);
 
-        Assert.Equal("code-review", result.TemplateIdentifier);
+        Assert.Equal("code-review", result.TemplateId);
         Assert.Equal(1, result.TemplateVersion);
         Assert.True(result.IsBuiltIn);
         Assert.Equal("Code Review Bot", result.Name);
@@ -100,7 +100,7 @@ public class AgentServiceTemplateImmutabilityTests
 
         var result = await sut.UpdateAgentAsync(userId, agent.Id, updateRequest);
 
-        Assert.Null(result.TemplateIdentifier);
+        Assert.Null(result.TemplateId);
         Assert.Null(result.TemplateVersion);
         Assert.False(result.IsBuiltIn);
     }

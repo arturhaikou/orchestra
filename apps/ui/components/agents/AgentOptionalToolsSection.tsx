@@ -1,4 +1,5 @@
 import React from 'react';
+import { GitBranch, GitMerge } from 'lucide-react';
 import { OptionalToolDto } from '../../types';
 
 interface Props {
@@ -7,6 +8,11 @@ interface Props {
   onChange: (methodNames: string[]) => void;
   readonly?: boolean;
 }
+
+const PROVIDER_ICONS: Record<string, React.ElementType> = {
+  GITHUB: GitBranch,
+  GITLAB: GitMerge,
+};
 
 const AgentOptionalToolsSection: React.FC<Props> = ({
   availableOptionalTools,
@@ -39,33 +45,55 @@ const AgentOptionalToolsSection: React.FC<Props> = ({
     provider.charAt(0) + provider.slice(1).toLowerCase();
 
   return (
-    <div className="space-y-3">
-      <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-        Optional Code Source Tools
-      </h3>
-      {Array.from(toolsByProvider.entries()).map(([provider, tools]) => (
-        <div key={provider} className="space-y-2">
-          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            {providerLabel(provider)}
-          </p>
-          {tools.map(tool => (
-            <label
-              key={tool.methodName}
-              className="flex items-center gap-2 cursor-pointer"
+    <section className="space-y-3">
+      <h2 className="text-lg font-semibold text-text">Tools</h2>
+      <div className="flex flex-wrap gap-2">
+        {Array.from(toolsByProvider.entries()).map(([provider, tools]) => {
+          const selectedCount = tools.filter(t => selectedMethodNames.includes(t.methodName)).length;
+          const ProviderIcon = PROVIDER_ICONS[provider] ?? GitBranch;
+
+          return (
+            <div
+              key={provider}
+              data-testid="optional-tool-provider-card"
+              className="flex flex-col gap-2 px-3 py-2 rounded-lg border border-border bg-surface min-w-[160px]"
             >
-              <input
-                type="checkbox"
-                checked={selectedMethodNames.includes(tool.methodName)}
-                onChange={() => toggle(tool.methodName)}
-                disabled={readonly}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
-              />
-              <span className="text-sm text-gray-700 dark:text-gray-300">{tool.label}</span>
-            </label>
-          ))}
-        </div>
-      ))}
-    </div>
+              <div className="flex items-center gap-2">
+                <ProviderIcon size={18} className="shrink-0 text-textMuted" aria-hidden="true" />
+                <span className="text-sm font-medium text-text">{providerLabel(provider)}</span>
+                <span
+                  data-testid="selection-count"
+                  className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 whitespace-nowrap"
+                >
+                  {selectedCount} / {tools.length}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {tools.map(tool => {
+                  const isSelected = selectedMethodNames.includes(tool.methodName);
+                  return (
+                    <button
+                      key={tool.methodName}
+                      type="button"
+                      disabled={readonly}
+                      onClick={() => toggle(tool.methodName)}
+                      aria-pressed={isSelected}
+                      className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors disabled:opacity-50 disabled:cursor-not-allowed
+                        ${isSelected
+                          ? 'bg-primary text-white border-primary hover:bg-primaryHover'
+                          : 'bg-background text-textMuted border-border hover:border-primary/50 hover:text-text'
+                        }`}
+                    >
+                      {tool.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 };
 

@@ -5,7 +5,9 @@ using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Integrations.DTOs;
 using Orchestra.Application.Jobs.DTOs;
 using Orchestra.Application.Jobs.Services;
+using Orchestra.Application.Tickets.Common;
 using Orchestra.Application.Tickets.DTOs;
+using Orchestra.Application.Workflows.Interfaces;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
 
@@ -23,6 +25,8 @@ public class AgentOrchestrationService : IAgentOrchestrationService
     private readonly IJobService _jobService;
     private readonly IAgentContextBuilder _agentContextBuilder;
     private readonly INotificationService _notificationService;
+    private readonly IWorkflowExecutionEngine _workflowExecutionEngine;
+    private readonly ITicketIdParsingService _ticketIdParsingService;
     private readonly ILogger<AgentOrchestrationService> _logger;
 
     // Status GUIDs from seeding
@@ -37,6 +41,8 @@ public class AgentOrchestrationService : IAgentOrchestrationService
         IJobService jobService,
         IAgentContextBuilder agentContextBuilder,
         INotificationService notificationService,
+        IWorkflowExecutionEngine workflowExecutionEngine,
+        ITicketIdParsingService ticketIdParsingService,
         ILogger<AgentOrchestrationService> logger)
     {
         _agentRuntimeService = agentRuntimeService;
@@ -45,6 +51,8 @@ public class AgentOrchestrationService : IAgentOrchestrationService
         _jobService = jobService;
         _agentContextBuilder = agentContextBuilder;
         _notificationService = notificationService;
+        _workflowExecutionEngine = workflowExecutionEngine;
+        _ticketIdParsingService = ticketIdParsingService;
         _logger = logger;
     }
 
@@ -105,10 +113,11 @@ public class AgentOrchestrationService : IAgentOrchestrationService
             ticket.UpdateStatus(InProgressStatusId);
             await _ticketDataAccess.UpdateTicketAsync(ticket, cancellationToken);
 
+            var ticketIdForNotification = BuildCompositeTicketId(ticket);
             await _notificationService.NotifyTicketStatusChangedAsync(
                 new TicketStatusChangedNotification(
                     ticket.WorkspaceId,
-                    ticket.Id,
+                    ticketIdForNotification,
                     "In Progress",
                     "To Do"),
                 cancellationToken);
@@ -173,13 +182,27 @@ public class AgentOrchestrationService : IAgentOrchestrationService
                 ticket.UpdateStatus(CompletedStatusId);
                 await _ticketDataAccess.UpdateTicketAsync(ticket, cancellationToken);
 
+                var completedTicketIdForNotification = BuildCompositeTicketId(ticket);
                 await _notificationService.NotifyTicketStatusChangedAsync(
                     new TicketStatusChangedNotification(
                         ticket.WorkspaceId,
-                        ticket.Id,
+                        completedTicketIdForNotification,
                         "Completed",
                         "In Progress"),
                     cancellationToken);
+            }
+
+            // Notify workflow engine of job outcome
+            if (jobId.HasValue)
+            {
+                if (!shouldMarkCompleted)
+                {
+                    await _workflowExecutionEngine.HandleJobWaitingForInputAsync(jobId.Value, cancellationToken);
+                }
+                else
+                {
+                    await _workflowExecutionEngine.HandleJobCompletedAsync(jobId.Value, responseText, cancellationToken);
+                }
             }
 
             // 8. Log completion
@@ -216,10 +239,11 @@ public class AgentOrchestrationService : IAgentOrchestrationService
                     ticket.UpdateStatus(ToDoStatusId);
                     await _ticketDataAccess.UpdateTicketAsync(ticket, cancellationToken);
 
+                    var ticketIdForNotification = BuildCompositeTicketId(ticket);
                     await _notificationService.NotifyTicketStatusChangedAsync(
                         new TicketStatusChangedNotification(
                             ticket.WorkspaceId,
-                            ticket.Id,
+                            ticketIdForNotification,
                             "To Do",
                             "In Progress"),
                         cancellationToken);
@@ -291,5 +315,12 @@ public class AgentOrchestrationService : IAgentOrchestrationService
                 "Failed to send execution completion notification for ticket {TicketId}",
                 ticket.Id);
         }
+    }
+
+    private string BuildCompositeTicketId(Ticket ticket)
+    {
+        return (ticket.IntegrationId.HasValue && !string.IsNullOrEmpty(ticket.ExternalTicketId))
+            ? _ticketIdParsingService.BuildCompositeId(ticket.IntegrationId.Value, ticket.ExternalTicketId)
+            : ticket.Id.ToString();
     }
 }

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Play, CheckCircle, XCircle, Wrench, MessageSquare, Zap, ChevronRight, ChevronDown } from 'lucide-react';
+import { ChevronLeft, Play, CheckCircle, XCircle, Wrench, MessageSquare, Zap, ChevronRight, ChevronDown, FileText } from 'lucide-react';
 import { marked } from 'marked';
 import { JobStep, JobStepType } from '../../types';
 import { useJobDetail } from '../../hooks/useJobDetail';
@@ -69,6 +69,33 @@ const MarkdownContent: React.FC<{ content: string; className?: string }> = ({ co
       className={`${PROSE_CLASSES} ${className ?? ''}`}
       dangerouslySetInnerHTML={{ __html: html }}
     />
+  );
+};
+
+const InitialContextSection: React.FC<{ initialPrompt: string }> = ({ initialPrompt }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  if (!initialPrompt) return null;
+
+  return (
+    <div className="mb-6 bg-surface border border-border rounded-xl overflow-hidden">
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="w-full flex items-center gap-3 p-4 hover:bg-opacity-50 transition-colors"
+      >
+        <FileText className="w-5 h-5 text-blue-400 flex-shrink-0" />
+        <span className="text-sm font-semibold text-textMuted uppercase tracking-wider flex-1">Initial Context</span>
+        {expanded
+          ? <ChevronDown className="w-4 h-4 text-textMuted flex-shrink-0" />
+          : <ChevronRight className="w-4 h-4 text-textMuted flex-shrink-0" />
+        }
+      </button>
+      {expanded && (
+        <div className="border-t border-border px-4 py-3 bg-black/20">
+          <MarkdownContent content={initialPrompt} className="text-text text-sm" />
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -158,6 +185,8 @@ const JobDetailPage: React.FC = () => {
         </div>
         <JobStatusBadge status={job.status} />
       </div>
+
+      <InitialContextSection initialPrompt={job.initialPrompt} />
 
       {job.steps.length > 0 && (
         <div className="space-y-1 mb-6">

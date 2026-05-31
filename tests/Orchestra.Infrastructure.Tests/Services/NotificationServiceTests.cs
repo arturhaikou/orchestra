@@ -163,7 +163,7 @@ public class NotificationServiceTests
         var (sut, hubContext, clientProxy) = BuildSut();
         var workspaceId = Guid.NewGuid();
         var notification = new TicketStatusChangedNotification(
-            workspaceId, Guid.NewGuid(), "In Progress", "To Do");
+            workspaceId, Guid.NewGuid().ToString(), "In Progress", "To Do");
 
         await sut.NotifyTicketStatusChangedAsync(notification);
 
@@ -179,7 +179,7 @@ public class NotificationServiceTests
     {
         var (sut, hubContext, clientProxy) = BuildSut();
         var notification = new TicketStatusChangedNotification(
-            Guid.NewGuid(), Guid.NewGuid(), "Completed", "In Progress");
+            Guid.NewGuid(), Guid.NewGuid().ToString(), "Completed", "In Progress");
 
         clientProxy.SendCoreAsync(
             Arg.Any<string>(),
@@ -207,7 +207,7 @@ public class NotificationServiceTests
     {
         var (sut, hubContext, clientProxy) = BuildSut();
         var notification = new TicketStatusChangedNotification(
-            Guid.NewGuid(), Guid.NewGuid(), "To Do", null);
+            Guid.NewGuid(), Guid.NewGuid().ToString(), "To Do", null);
 
         await sut.NotifyTicketStatusChangedAsync(notification);
 

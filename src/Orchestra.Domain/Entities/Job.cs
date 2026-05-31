@@ -18,6 +18,8 @@ public class Job
     public DateTime CreatedAt { get; private set; }
     public DateTime? StartedAt { get; private set; }
     public DateTime? CompletedAt { get; private set; }
+    public Guid? ParentJobId { get; private set; }
+    public Guid? WorkflowExecutionId { get; private set; }
 
     private Job() { }
 
@@ -63,5 +65,44 @@ public class Job
         Status = JobStatus.Failed;
         ErrorMessage = errorMessage;
         CompletedAt = DateTime.UtcNow;
+    }
+
+    public void MarkWaitingForInput()
+    {
+        Status = JobStatus.WaitingForInput;
+    }
+
+    public void SetParent(Guid parentJobId)
+    {
+        ParentJobId = parentJobId;
+    }
+
+    public void AssignWorkflowExecution(Guid workflowExecutionId)
+    {
+        WorkflowExecutionId = workflowExecutionId;
+    }
+
+    public static Job CreateWorkflowJob(
+        Guid workspaceId,
+        string workflowName,
+        Guid workflowExecutionId,
+        Guid? ticketId = null,
+        string? ticketTitle = null)
+    {
+        return new Job
+        {
+            Id = Guid.NewGuid(),
+            WorkspaceId = workspaceId,
+            AgentId = Guid.Empty,
+            AgentName = workflowName,
+            TriggerType = JobTriggerType.Ticket,
+            InitialPrompt = string.Empty,
+            TicketId = ticketId,
+            TicketTitle = ticketTitle,
+            WorkflowExecutionId = workflowExecutionId,
+            Status = JobStatus.Running,
+            CreatedAt = DateTime.UtcNow,
+            StartedAt = DateTime.UtcNow
+        };
     }
 }

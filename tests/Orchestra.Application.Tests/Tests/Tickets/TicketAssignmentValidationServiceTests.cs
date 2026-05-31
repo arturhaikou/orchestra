@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using NSubstitute;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Tickets.Services;
+using Orchestra.Application.Workflows.Interfaces;
 using Orchestra.Domain.Entities;
 using Xunit;
 
@@ -15,11 +16,12 @@ namespace Orchestra.Application.Tests.Tests.Tickets;
 public class TicketAssignmentValidationServiceTests
 {
     private readonly IAgentDataAccess _agentDataAccess = Substitute.For<IAgentDataAccess>();
+    private readonly IWorkflowDefinitionRepository _workflowRepository = Substitute.For<IWorkflowDefinitionRepository>();
     private readonly TicketAssignmentValidationService _sut;
 
     public TicketAssignmentValidationServiceTests()
     {
-        _sut = new TicketAssignmentValidationService(_agentDataAccess);
+        _sut = new TicketAssignmentValidationService(_agentDataAccess, _workflowRepository);
     }
 
     [Fact]

@@ -102,7 +102,7 @@ public class AgentServiceTemplateDataTests
 
         var result = await sut.GetAgentByIdAsync(userId, agent.Id);
 
-        Assert.Equal("code-review", result.TemplateIdentifier);
+        Assert.Equal("code-review", result.TemplateId);
         Assert.Equal(1, result.TemplateVersion);
         Assert.NotNull(result.Guide);
         Assert.Contains("Pull Request", result.Guide);
@@ -124,7 +124,7 @@ public class AgentServiceTemplateDataTests
 
         var result = await sut.GetAgentByIdAsync(userId, agent.Id);
 
-        Assert.Null(result.TemplateIdentifier);
+        Assert.Null(result.TemplateId);
         Assert.Null(result.TemplateVersion);
         Assert.Null(result.Guide);
     }
@@ -156,7 +156,7 @@ public class AgentServiceTemplateDataTests
 
         var result = await sut.GetAgentByIdAsync(userId, agent.Id);
 
-        Assert.Equal("code-review", result.TemplateIdentifier);
+        Assert.Equal("code-review", result.TemplateId);
         Assert.Equal(1, result.TemplateVersion);
         Assert.NotNull(result.Guide);
         Assert.Contains("Merge Request", result.Guide);
@@ -212,7 +212,7 @@ public class AgentServiceTemplateDataTests
 
         var result = await sut.GetAgentByIdAsync(userId, agent.Id);
 
-        Assert.Equal("unknown-template", result.TemplateIdentifier);
+        Assert.Equal("unknown-template", result.TemplateId);
         Assert.Equal(99, result.TemplateVersion);
         Assert.Null(result.Guide);
     }
@@ -250,13 +250,13 @@ public class AgentServiceTemplateDataTests
 
         Assert.Equal(2, results.Count);
 
-        var builtInDto = results.First(d => d.TemplateIdentifier != null);
-        Assert.Equal("code-review", builtInDto.TemplateIdentifier);
+        var builtInDto = results.First(d => d.TemplateId != null);
+        Assert.Equal("code-review", builtInDto.TemplateId);
         Assert.Equal(1, builtInDto.TemplateVersion);
         Assert.NotNull(builtInDto.Guide);
         Assert.Contains("Pull Request", builtInDto.Guide);
 
-        var customDto = results.First(d => d.TemplateIdentifier == null);
+        var customDto = results.First(d => d.TemplateId == null);
         Assert.Null(customDto.TemplateVersion);
         Assert.Null(customDto.Guide);
     }

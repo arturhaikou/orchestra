@@ -66,7 +66,7 @@ public class AgentServiceCreateTemplateFieldTests
 
         var result = await sut.CreateAgentAsync(userId, request);
 
-        Assert.Null(result.TemplateIdentifier);
+        Assert.Null(result.TemplateId);
         Assert.Null(result.TemplateVersion);
         Assert.False(result.IsBuiltIn);
     }

@@ -209,6 +209,8 @@ export interface JobSummary {
   createdAt: string;
   startedAt?: string;
   completedAt?: string;
+  parentJobId?: string | null;
+  workflowExecutionId?: string | null;
 }
 
 export interface JobStep {
@@ -242,17 +244,56 @@ export interface PagedJobsResult {
 
 export interface WorkflowStep {
   id: string;
-  name: string;
-  type: 'TRIGGER' | 'ACTION' | 'CONDITION';
-  config: Record<string, any>;
+  workflowDefinitionId: string;
+  order: number;
+  agentId: string;
+  agentName: string;
+  instructionOverride?: string | null;
+  passPreviousOutput: boolean;
 }
 
+export interface WorkflowDefinition {
+  id: string;
+  workspaceId: string;
+  name: string;
+  description?: string | null;
+  steps: WorkflowStep[];
+  createdAt: string;
+  updatedAt?: string | null;
+}
+
+export type WorkflowExecutionStatus = 'Pending' | 'Running' | 'WaitingForInput' | 'Completed' | 'Failed';
+
+export interface WorkflowStepExecution {
+  id: string;
+  workflowExecutionId: string;
+  stepIndex: number;
+  jobId?: string | null;
+  status: WorkflowExecutionStatus;
+  startedAt: string;
+  completedAt?: string | null;
+  output?: string | null;
+}
+
+export interface WorkflowExecution {
+  id: string;
+  workflowDefinitionId: string;
+  ticketId: string;
+  workspaceId: string;
+  status: WorkflowExecutionStatus;
+  currentStepIndex: number;
+  startedAt: string;
+  completedAt?: string | null;
+  stepExecutions: WorkflowStepExecution[];
+}
+
+/** @deprecated Use WorkflowDefinition instead */
 export interface Workflow {
   id: string;
   workspaceId: string;
   name: string;
-  nodes: any[]; // ReactFlow nodes
-  edges: any[]; // ReactFlow edges
+  nodes: any[];
+  edges: any[];
 }
 
 export interface Integration {

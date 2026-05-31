@@ -17,4 +17,6 @@ public record JobDetailDto(
     string InitialPrompt,
     string? FinalResponse,
     string? ErrorMessage,
-    IReadOnlyList<JobStepDto> Steps);
+    IReadOnlyList<JobStepDto> Steps,
+    Guid? ParentJobId = null,
+    Guid? WorkflowExecutionId = null);

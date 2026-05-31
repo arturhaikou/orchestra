@@ -22,7 +22,7 @@ public record AgentDto(
     string? CustomInstructions,
     string? ProjectPrinciples,
     string? Model,
-    string? TemplateIdentifier,
+    string? TemplateId,
     int? TemplateVersion,
     bool IsBuiltIn,
     string? Guide = null,

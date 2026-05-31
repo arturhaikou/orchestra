@@ -5,6 +5,7 @@ using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Jobs.DTOs;
 using Orchestra.Application.Jobs.Services;
+using Orchestra.Application.Workflows.Interfaces;
 using Orchestra.Domain.Enums;
 using Orchestra.Infrastructure.Agents;
 
@@ -30,6 +31,8 @@ public class AgentOrchestrationServiceNotificationTests
         var jobService = Substitute.For<IJobService>();
         var contextBuilder = Substitute.For<IAgentContextBuilder>();
         var notificationService = Substitute.For<INotificationService>();
+        var workflowEngine = Substitute.For<IWorkflowExecutionEngine>();
+        var ticketIdParsingService = Substitute.For<ITicketIdParsingService>();
         var logger = Substitute.For<ILogger<AgentOrchestrationService>>();
 
         var jobId = Guid.NewGuid();
@@ -76,6 +79,8 @@ public class AgentOrchestrationServiceNotificationTests
             jobService,
             contextBuilder,
             notificationService,
+            workflowEngine,
+            ticketIdParsingService,
             logger);
 
         return (sut, runtimeService, agentDataAccess, ticketDataAccess, jobService, contextBuilder, notificationService);

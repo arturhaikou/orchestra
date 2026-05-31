@@ -459,6 +459,9 @@ namespace Orchestra.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("ParentJobId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime?>("StartedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -475,10 +478,15 @@ namespace Orchestra.Infrastructure.Migrations
                     b.Property<int>("TriggerType")
                         .HasColumnType("integer");
 
+                    b.Property<Guid?>("WorkflowExecutionId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("WorkspaceId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ParentJobId");
 
                     b.HasIndex("WorkspaceId")
                         .HasDatabaseName("IX_Jobs_WorkspaceId_Running")
@@ -1057,6 +1065,152 @@ namespace Orchestra.Infrastructure.Migrations
                     b.ToTable("UserWorkspaces", (string)null);
                 });
 
+            modelBuilder.Entity("Orchestra.Domain.Entities.WorkflowDefinition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkspaceId")
+                        .HasDatabaseName("IX_WorkflowDefinitions_WorkspaceId");
+
+                    b.ToTable("WorkflowDefinitions", (string)null);
+                });
+
+            modelBuilder.Entity("Orchestra.Domain.Entities.WorkflowExecution", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("CurrentStepIndex")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TicketId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("WorkflowDefinitionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("WorkflowJobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TicketId")
+                        .HasDatabaseName("IX_WorkflowExecutions_TicketId");
+
+                    b.HasIndex("WorkflowDefinitionId");
+
+                    b.HasIndex("WorkspaceId")
+                        .HasDatabaseName("IX_WorkflowExecutions_WorkspaceId");
+
+                    b.ToTable("WorkflowExecutions", (string)null);
+                });
+
+            modelBuilder.Entity("Orchestra.Domain.Entities.WorkflowStep", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AgentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("InstructionOverride")
+                        .HasColumnType("text");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("PassPreviousOutput")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<Guid>("WorkflowDefinitionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AgentId");
+
+                    b.HasIndex("WorkflowDefinitionId")
+                        .HasDatabaseName("IX_WorkflowSteps_WorkflowDefinitionId");
+
+                    b.ToTable("WorkflowSteps", (string)null);
+                });
+
+            modelBuilder.Entity("Orchestra.Domain.Entities.WorkflowStepExecution", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("JobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Output")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("StepIndex")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("WorkflowExecutionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("JobId")
+                        .HasDatabaseName("IX_WorkflowStepExecutions_JobId");
+
+                    b.HasIndex("WorkflowExecutionId")
+                        .HasDatabaseName("IX_WorkflowStepExecutions_WorkflowExecutionId");
+
+                    b.ToTable("WorkflowStepExecutions", (string)null);
+                });
+
             modelBuilder.Entity("Orchestra.Domain.Entities.Workspace", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1233,6 +1387,11 @@ namespace Orchestra.Infrastructure.Migrations
 
             modelBuilder.Entity("Orchestra.Domain.Entities.Job", b =>
                 {
+                    b.HasOne("Orchestra.Domain.Entities.Job", null)
+                        .WithMany()
+                        .HasForeignKey("ParentJobId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Orchestra.Domain.Entities.Workspace", null)
                         .WithMany()
                         .HasForeignKey("WorkspaceId")
@@ -1343,6 +1502,59 @@ namespace Orchestra.Infrastructure.Migrations
                     b.HasOne("Orchestra.Domain.Entities.Workspace", null)
                         .WithMany()
                         .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Orchestra.Domain.Entities.WorkflowDefinition", b =>
+                {
+                    b.HasOne("Orchestra.Domain.Entities.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Orchestra.Domain.Entities.WorkflowExecution", b =>
+                {
+                    b.HasOne("Orchestra.Domain.Entities.Ticket", null)
+                        .WithMany()
+                        .HasForeignKey("TicketId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Orchestra.Domain.Entities.WorkflowDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("WorkflowDefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Orchestra.Domain.Entities.WorkflowStep", b =>
+                {
+                    b.HasOne("Orchestra.Domain.Entities.Agent", null)
+                        .WithMany()
+                        .HasForeignKey("AgentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Orchestra.Domain.Entities.WorkflowDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("WorkflowDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Orchestra.Domain.Entities.WorkflowStepExecution", b =>
+                {
+                    b.HasOne("Orchestra.Domain.Entities.Job", null)
+                        .WithMany()
+                        .HasForeignKey("JobId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Orchestra.Domain.Entities.WorkflowExecution", null)
+                        .WithMany()
+                        .HasForeignKey("WorkflowExecutionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

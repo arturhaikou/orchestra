@@ -565,10 +565,15 @@ public class TicketCommandService : ITicketCommandService
         var newStatusName = (await _ticketDataAccess.GetStatusByIdAsync(newStatusId, cancellationToken))?.Name
             ?? "Unknown";
 
+        // Build composite ID for external tickets, use simple ID for internal tickets
+        var ticketIdForNotification = (ticket.IntegrationId.HasValue && !string.IsNullOrEmpty(ticket.ExternalTicketId))
+            ? _ticketIdParsingService.BuildCompositeId(ticket.IntegrationId.Value, ticket.ExternalTicketId)
+            : ticket.Id.ToString();
+
         await _notificationService.NotifyTicketStatusChangedAsync(
             new TicketStatusChangedNotification(
                 ticket.WorkspaceId,
-                ticket.Id,
+                ticketIdForNotification,
                 newStatusName,
                 previousStatusName),
             cancellationToken);

@@ -13,4 +13,6 @@ public record JobSummaryDto(
     JobTriggerType TriggerType,
     DateTime CreatedAt,
     DateTime? StartedAt,
-    DateTime? CompletedAt);
+    DateTime? CompletedAt,
+    Guid? ParentJobId = null,
+    Guid? WorkflowExecutionId = null);

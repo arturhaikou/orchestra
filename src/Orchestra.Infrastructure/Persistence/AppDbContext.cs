@@ -56,6 +56,14 @@ namespace Orchestra.Infrastructure.Persistence
 
         public DbSet<AgentConversationSnapshot> AgentConversationSnapshots => Set<AgentConversationSnapshot>();
 
+        public DbSet<WorkflowDefinition> WorkflowDefinitions => Set<WorkflowDefinition>();
+
+        public DbSet<WorkflowStep> WorkflowSteps => Set<WorkflowStep>();
+
+        public DbSet<WorkflowExecution> WorkflowExecutions => Set<WorkflowExecution>();
+
+        public DbSet<WorkflowStepExecution> WorkflowStepExecutions => Set<WorkflowStepExecution>();
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -86,6 +94,10 @@ namespace Orchestra.Infrastructure.Persistence
             modelBuilder.ApplyConfiguration(new Configurations.JobStepConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.AgentQuestionConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.AgentConversationSnapshotConfiguration());
+            modelBuilder.ApplyConfiguration(new Configurations.WorkflowDefinitionConfiguration());
+            modelBuilder.ApplyConfiguration(new Configurations.WorkflowStepConfiguration());
+            modelBuilder.ApplyConfiguration(new Configurations.WorkflowExecutionConfiguration());
+            modelBuilder.ApplyConfiguration(new Configurations.WorkflowStepExecutionConfiguration());
         }
     }
 }

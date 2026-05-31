@@ -56,7 +56,7 @@ public class AgentServiceTemplateDtoMappingTests
 
         var result = await sut.GetAgentByIdAsync(userId, agent.Id);
 
-        Assert.Null(result.TemplateIdentifier);
+        Assert.Null(result.TemplateId);
         Assert.Null(result.TemplateVersion);
         Assert.False(result.IsBuiltIn);
     }
@@ -75,7 +75,7 @@ public class AgentServiceTemplateDtoMappingTests
 
         var result = await sut.GetAgentByIdAsync(userId, agent.Id);
 
-        Assert.Equal("code-review", result.TemplateIdentifier);
+        Assert.Equal("code-review", result.TemplateId);
         Assert.Equal(1, result.TemplateVersion);
         Assert.True(result.IsBuiltIn);
     }

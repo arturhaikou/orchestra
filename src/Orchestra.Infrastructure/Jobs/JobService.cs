@@ -1,6 +1,8 @@
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Jobs.DTOs;
 using Orchestra.Application.Jobs.Services;
+using Orchestra.Application.Tickets.Common;
+using Orchestra.Application.Tickets.DTOs;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
 
@@ -10,11 +12,23 @@ public class JobService : IJobService
 {
     private readonly IJobDataAccess _jobDataAccess;
     private readonly INotificationService _notificationService;
+    private readonly ITicketDataAccess _ticketDataAccess;
+    private readonly ITicketIdParsingService _ticketIdParsingService;
 
-    public JobService(IJobDataAccess jobDataAccess, INotificationService notificationService)
+    // Status GUIDs from seeding
+    private static readonly Guid ToDoStatusId = Guid.Parse("66666666-6666-6666-6666-666666666666");
+    private static readonly Guid CompletedStatusId = Guid.Parse("88888888-8888-8888-8888-888888888888");
+
+    public JobService(
+        IJobDataAccess jobDataAccess,
+        INotificationService notificationService,
+        ITicketDataAccess ticketDataAccess,
+        ITicketIdParsingService ticketIdParsingService)
     {
         _jobDataAccess = jobDataAccess;
         _notificationService = notificationService;
+        _ticketDataAccess = ticketDataAccess;
+        _ticketIdParsingService = ticketIdParsingService;
     }
 
     public async Task<Guid> CreateJobAsync(CreateJobRequest request, CancellationToken cancellationToken = default)
@@ -27,6 +41,12 @@ public class JobService : IJobService
             request.InitialPrompt,
             request.TicketId,
             request.TicketTitle);
+
+        if (request.ParentJobId.HasValue)
+            job.SetParent(request.ParentJobId.Value);
+
+        if (request.WorkflowExecutionId.HasValue)
+            job.AssignWorkflowExecution(request.WorkflowExecutionId.Value);
 
         var jobId = await _jobDataAccess.CreateAsync(job, cancellationToken);
         var summary = MapToSummaryDto(job);
@@ -49,6 +69,64 @@ public class JobService : IJobService
         ApplyStatusTransition(job, status, finalResponse, errorMessage);
         await _jobDataAccess.UpdateAsync(job, cancellationToken);
         await _notificationService.NotifyJobStatusChangedAsync(job.WorkspaceId, jobId, status, cancellationToken);
+
+        // Defensively update associated ticket status if TicketId is set.
+        // Workflow step jobs are excluded — the workflow engine owns the ticket lifecycle.
+        if (job.TicketId.HasValue)
+        {
+            await UpdateAssociatedTicketAsync(job, status, cancellationToken);
+        }
+    }
+
+    private async Task UpdateAssociatedTicketAsync(
+        Job job,
+        JobStatus jobStatus,
+        CancellationToken cancellationToken)
+    {
+        if (job.WorkflowExecutionId.HasValue)
+            return;
+
+        var ticketId = job.TicketId!.Value;
+        try
+        {
+            var ticket = await _ticketDataAccess.GetTicketByIdAsync(ticketId, cancellationToken);
+            if (ticket is null)
+                return;
+
+            switch (jobStatus)
+            {
+                case JobStatus.Completed:
+                    ticket.UpdateStatus(CompletedStatusId);
+                    await _ticketDataAccess.UpdateTicketAsync(ticket, cancellationToken);
+                    var ticketIdForNotification = BuildCompositeTicketId(ticket);
+                    await _notificationService.NotifyTicketStatusChangedAsync(
+                        new TicketStatusChangedNotification(
+                            ticket.WorkspaceId,
+                            ticketIdForNotification,
+                            "Completed",
+                            "In Progress"),
+                        cancellationToken);
+                    break;
+
+                case JobStatus.Failed:
+                    ticket.UpdateStatus(ToDoStatusId);
+                    await _ticketDataAccess.UpdateTicketAsync(ticket, cancellationToken);
+                    var retryTicketIdForNotification = BuildCompositeTicketId(ticket);
+                    await _notificationService.NotifyTicketStatusChangedAsync(
+                        new TicketStatusChangedNotification(
+                            ticket.WorkspaceId,
+                            retryTicketIdForNotification,
+                            "To Do",
+                            "In Progress"),
+                        cancellationToken);
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log but don't throw - ticket update failures shouldn't crash job status updates
+            System.Diagnostics.Debug.WriteLine($"Failed to update ticket {ticketId} for job status {jobStatus}: {ex.Message}");
+        }
     }
 
     public async Task<PagedJobsResult> GetJobsAsync(
@@ -96,10 +174,7 @@ public class JobService : IJobService
                 job.MarkFailed(errorMessage ?? "Unknown error");
                 break;
             case JobStatus.WaitingForInput:
-                // Status is set via reflection since there's no MarkSuspended method
-                var statusProperty = typeof(Job).GetProperty(nameof(Job.Status),
-                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                statusProperty?.GetSetMethod(nonPublic: true)?.Invoke(job, new object[] { status });
+                job.MarkWaitingForInput();
                 break;
         }
     }
@@ -116,7 +191,9 @@ public class JobService : IJobService
             job.TriggerType,
             job.CreatedAt,
             job.StartedAt,
-            job.CompletedAt);
+            job.CompletedAt,
+            job.ParentJobId,
+            job.WorkflowExecutionId);
 
     private static JobDetailDto MapToDetailDto(Job job, IReadOnlyList<JobStep> steps) =>
         new(
@@ -134,7 +211,9 @@ public class JobService : IJobService
             job.InitialPrompt,
             job.FinalResponse,
             job.ErrorMessage,
-            steps.Select(MapToStepDto).ToList());
+            steps.Select(MapToStepDto).ToList(),
+            job.ParentJobId,
+            job.WorkflowExecutionId);
 
     private static JobStepDto MapToStepDto(JobStep step) =>
         new(
@@ -157,5 +236,34 @@ public class JobService : IJobService
         CancellationToken cancellationToken = default)
     {
         await UpdateJobStatusAsync(jobId, JobStatus.WaitingForInput, cancellationToken: cancellationToken);
+    }
+
+    public async Task<Guid> CreateWorkflowJobAsync(
+        Guid workspaceId,
+        string workflowName,
+        Guid workflowExecutionId,
+        Guid? ticketId,
+        string? ticketTitle,
+        CancellationToken cancellationToken = default)
+    {
+        var job = Job.CreateWorkflowJob(
+            workspaceId,
+            workflowName,
+            workflowExecutionId,
+            ticketId,
+            ticketTitle);
+
+        var jobId = await _jobDataAccess.CreateAsync(job, cancellationToken);
+        var summary = MapToSummaryDto(job);
+        await _notificationService.NotifyJobCreatedAsync(workspaceId, summary, cancellationToken);
+
+        return jobId;
+    }
+
+    private string BuildCompositeTicketId(Ticket ticket)
+    {
+        return (ticket.IntegrationId.HasValue && !string.IsNullOrEmpty(ticket.ExternalTicketId))
+            ? _ticketIdParsingService.BuildCompositeId(ticket.IntegrationId.Value, ticket.ExternalTicketId)
+            : ticket.Id.ToString();
     }
 }

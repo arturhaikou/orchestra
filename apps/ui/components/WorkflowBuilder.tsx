@@ -1,588 +1,819 @@
-
-import React, { useCallback, useEffect, useState, useRef } from 'react';
-import { Play, Plus, ArrowLeft, Pencil, Trash2, Loader2, Settings, Save, Layout, AlertTriangle, Bot, GripVertical, FileText, Zap, PlayCircle, StopCircle, X, ChevronRight } from 'lucide-react';
-import ReactFlow, { 
-  Background, 
-  Controls, 
-  MiniMap,
-  useNodesState,
-  useEdgesState,
-  addEdge,
-  Connection,
+import React, { useCallback, useEffect, useState } from 'react';
+import ReactFlow, {
+  Background,
+  BackgroundVariant,
+  Controls,
   Edge,
-  ReactFlowInstance,
-  Node
+  Handle,
+  Node,
+  NodeProps,
+  Position,
+  useEdgesState,
+  useNodesState,
+  MarkerType,
 } from 'reactflow';
-import { Workflow, Agent } from '../types';
-import { getWorkspacesWorkflows, createWorkflow, updateWorkflow, deleteWorkflow } from '../services/workflowService';
+import 'reactflow/dist/style.css';
+import {
+  Plus, Trash2, Loader2, Save, ArrowLeft, AlertTriangle,
+  ToggleLeft, ToggleRight, Bot, X, Search, GitBranch,
+} from 'lucide-react';
+import { WorkflowDefinition, Agent } from '../types';
+import {
+  getWorkflowDefinitions,
+  createWorkflowDefinition,
+  updateWorkflowDefinition,
+  deleteWorkflowDefinition,
+  CreateWorkflowStepPayload,
+} from '../services/workflowService';
 import { getAgents } from '../services/agentService';
+
+// ── Interfaces ───────────────────────────────────────────────────────────────
 
 interface WorkflowBuilderProps {
   workspaceId: string;
-  isDarkMode?: boolean;
 }
 
-const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ workspaceId, isDarkMode = true }) => {
-  const [viewMode, setViewMode] = useState<'list' | 'editor'>('list');
-  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+interface StepDraft {
+  agentId: string;
+  instructionOverride: string;
+  passPreviousOutput: boolean;
+}
+
+interface AgentStepNodeData {
+  stepIndex: number;
+  agentName: string;
+  isSelected: boolean;
+  passPreviousOutput: boolean;
+  hasInstructionOverride: boolean;
+  onDelete: () => void;
+}
+
+interface AddStepNodeData {
+  onAdd: () => void;
+}
+
+// ── Constants ────────────────────────────────────────────────────────────────
+
+const NODE_WIDTH = 280;
+const NODE_Y_GAP = 130;
+const emptyStep = (): StepDraft => ({ agentId: '', instructionOverride: '', passPreviousOutput: false });
+
+// ── Custom Nodes (outside component — stable nodeTypes ref) ───────────────────
+
+const AgentStepNode: React.FC<NodeProps<AgentStepNodeData>> = ({ data, selected }) => {
+  const active = selected || data.isSelected;
+  return (
+    <div
+      style={{
+        width: NODE_WIDTH,
+        background: '#1e2030',
+        border: `2px solid ${active ? '#6366f1' : '#2d3148'}`,
+        borderRadius: 12,
+        padding: '12px 14px',
+        cursor: 'pointer',
+        boxShadow: active ? '0 0 0 3px rgba(99,102,241,0.2)' : '0 2px 8px rgba(0,0,0,0.4)',
+        transition: 'border-color 0.15s, box-shadow 0.15s',
+      }}
+    >
+      <Handle
+        type="target"
+        position={Position.Top}
+        style={{ width: 10, height: 10, background: '#4a4d6e', border: '2px solid #1e2030', top: -6 }}
+      />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 8,
+          background: active ? 'rgba(99,102,241,0.15)' : '#2d3148',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+        }}>
+          <Bot size={16} color={active ? '#6366f1' : '#8b8fa8'} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3, flexWrap: 'wrap' }}>
+            <span style={{
+              fontSize: 10, fontWeight: 700, color: '#6366f1',
+              background: 'rgba(99,102,241,0.12)', padding: '1px 6px', borderRadius: 20,
+            }}>
+              {data.stepIndex + 1}
+            </span>
+            {data.passPreviousOutput && (
+              <span style={{ fontSize: 10, color: '#a78bfa', background: 'rgba(167,139,250,0.1)', padding: '1px 6px', borderRadius: 20 }}>
+                ↻ chain
+              </span>
+            )}
+            {data.hasInstructionOverride && (
+              <span style={{ fontSize: 10, color: '#fbbf24', background: 'rgba(251,191,36,0.1)', padding: '1px 6px', borderRadius: 20 }}>
+                + notes
+              </span>
+            )}
+          </div>
+          <p style={{
+            margin: 0, fontSize: 13, fontWeight: 600,
+            color: active ? '#fff' : '#c0c4d8',
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>
+            {data.agentName
+              ? data.agentName
+              : <span style={{ color: '#5a5d7a', fontStyle: 'italic' }}>No agent selected</span>}
+          </p>
+        </div>
+        <button
+          onClick={e => { e.stopPropagation(); data.onDelete(); }}
+          style={{
+            padding: 4, borderRadius: 6, border: 'none', background: 'transparent',
+            cursor: 'pointer', color: '#4a4d6e', display: 'flex', flexShrink: 0,
+          }}
+          onMouseEnter={e => {
+            const b = e.currentTarget as HTMLButtonElement;
+            b.style.color = '#f87171'; b.style.background = 'rgba(248,113,113,0.1)';
+          }}
+          onMouseLeave={e => {
+            const b = e.currentTarget as HTMLButtonElement;
+            b.style.color = '#4a4d6e'; b.style.background = 'transparent';
+          }}
+          title="Remove step"
+        >
+          <X size={13} />
+        </button>
+      </div>
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        style={{ width: 10, height: 10, background: '#4a4d6e', border: '2px solid #1e2030', bottom: -6 }}
+      />
+    </div>
+  );
+};
+
+const AddStepNode: React.FC<NodeProps<AddStepNodeData>> = ({ data }) => (
+  <div
+    onClick={data.onAdd}
+    style={{
+      width: 40, height: 40, borderRadius: '50%',
+      background: '#13141f', border: '2px dashed #3a3d5a',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      cursor: 'pointer', transition: 'border-color 0.15s, background 0.15s',
+    }}
+    onMouseEnter={e => {
+      const el = e.currentTarget as HTMLDivElement;
+      el.style.borderColor = '#6366f1'; el.style.background = 'rgba(99,102,241,0.1)';
+    }}
+    onMouseLeave={e => {
+      const el = e.currentTarget as HTMLDivElement;
+      el.style.borderColor = '#3a3d5a'; el.style.background = '#13141f';
+    }}
+    title="Add step"
+  >
+    <Handle
+      type="target"
+      position={Position.Top}
+      style={{ width: 10, height: 10, background: '#4a4d6e', border: '2px solid #13141f', top: -6 }}
+    />
+    <Plus size={16} color="#5a5d7a" />
+  </div>
+);
+
+const nodeTypes = { agentStep: AgentStepNode, addStep: AddStepNode };
+
+// ── WorkflowBuilder ──────────────────────────────────────────────────────────
+
+const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ workspaceId }) => {
+  const [view, setView] = useState<'list' | 'editor'>('list');
+  const [workflows, setWorkflows] = useState<WorkflowDefinition[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
-  // Editor State
-  const [currentWorkflowId, setCurrentWorkflowId] = useState<string | null>(null);
-  const [workflowName, setWorkflowName] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-  const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
-  const [isPaletteOpen, setIsPaletteOpen] = useState(false);
-  const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  
-  // Delete State
-  const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
-  // Fetch workflows and agents
+  // Editor state
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [steps, setSteps] = useState<StepDraft[]>([emptyStep()]);
+  const [selectedStepIndex, setSelectedStepIndex] = useState<number | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [agentSearch, setAgentSearch] = useState('');
+
+  // Delete state
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // ReactFlow state
+  const [rfNodes, setRfNodes, onNodesChange] = useNodesState([]);
+  const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState([]);
+
+  // ── Data fetching ──────────────────────────────────────────────────────────
+
   useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      try {
-        const [wfData, agentData] = await Promise.all([
-            getWorkspacesWorkflows(workspaceId),
-            getAgents(workspaceId)
-        ]);
-        setWorkflows(wfData);
-        setAgents(agentData);
-      } catch (error) {
-        console.error("Failed to load data", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    if (workspaceId) {
-        fetchData();
-        setViewMode('list');
-    }
+    if (!workspaceId) return;
+    setIsLoading(true);
+    Promise.all([getWorkflowDefinitions(workspaceId), getAgents(workspaceId)])
+      .then(([wfs, ags]) => { setWorkflows(wfs); setAgents(ags); })
+      .catch(console.error)
+      .finally(() => setIsLoading(false));
+    setView('list');
   }, [workspaceId]);
 
-  const onConnect = useCallback((params: Edge | Connection) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
+  // ── ReactFlow sync ─────────────────────────────────────────────────────────
 
-  const handleCreateNew = () => {
-      setCurrentWorkflowId(null);
-      setWorkflowName('Untitled Workflow');
-      setNodes([
-        { 
-            id: 'start-default', 
-            type: 'input', 
-            data: { label: 'Start' }, 
-            position: { x: 250, y: 50 },
-            style: { 
-                background: '#1e293b', 
-                color: '#fff', 
-                border: '2px solid #10b981', 
-                width: 120, 
-                borderRadius: '20px', 
-                padding: '10px',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                fontWeight: 'bold'
-            }
-        }
-      ]);
-      setEdges([]);
-      setViewMode('editor');
-      setIsPaletteOpen(false);
+  useEffect(() => {
+    if (view !== 'editor') return;
+
+    const agentMap = new Map(agents.map(a => [a.id, a.name]));
+
+    const newNodes: Node[] = [
+      ...steps.map((step, i) => ({
+        id: `step-${i}`,
+        type: 'agentStep',
+        position: { x: 0, y: i * NODE_Y_GAP },
+        data: {
+          stepIndex: i,
+          agentName: agentMap.get(step.agentId) ?? '',
+          isSelected: selectedStepIndex === i,
+          passPreviousOutput: step.passPreviousOutput,
+          hasInstructionOverride: step.instructionOverride.trim().length > 0,
+          onDelete: () => {
+            setSteps(prev => prev.filter((_, idx) => idx !== i));
+            setSelectedStepIndex(null);
+          },
+        } as AgentStepNodeData,
+        draggable: false,
+        selectable: true,
+      })),
+      {
+        id: 'add-step',
+        type: 'addStep',
+        position: { x: (NODE_WIDTH - 40) / 2, y: steps.length * NODE_Y_GAP },
+        data: {
+          onAdd: () => {
+            setSteps(prev => [...prev, emptyStep()]);
+            setSelectedStepIndex(steps.length);
+          },
+        } as AddStepNodeData,
+        draggable: false,
+        selectable: false,
+      },
+    ];
+
+    const newEdges: Edge[] = steps.map((_, i) => ({
+      id: `e-${i}`,
+      source: `step-${i}`,
+      target: i === steps.length - 1 ? 'add-step' : `step-${i + 1}`,
+      type: 'smoothstep',
+      style: { stroke: '#3a3d5a', strokeWidth: 2 },
+      markerEnd: { type: MarkerType.ArrowClosed, color: '#3a3d5a', width: 14, height: 14 },
+    }));
+
+    setRfNodes(newNodes);
+    setRfEdges(newEdges);
+  }, [steps, selectedStepIndex, agents, view]);
+
+  // ── Handlers ───────────────────────────────────────────────────────────────
+
+  const openCreate = () => {
+    setEditingId(null);
+    setName('');
+    setDescription('');
+    setSteps([emptyStep()]);
+    setSelectedStepIndex(0);
+    setSaveError(null);
+    setAgentSearch('');
+    setView('editor');
   };
 
-  const handleEdit = (workflow: Workflow) => {
-      setCurrentWorkflowId(workflow.id);
-      setWorkflowName(workflow.name);
-      setNodes(workflow.nodes || []);
-      setEdges(workflow.edges || []);
-      setViewMode('editor');
-      setIsPaletteOpen(false);
-  };
-  
-  const handleDeleteClick = (id: string, e?: React.MouseEvent) => {
-      if (e) e.stopPropagation();
-      setDeleteConfirmationId(id);
+  const openEdit = (wf: WorkflowDefinition) => {
+    setEditingId(wf.id);
+    setName(wf.name);
+    setDescription(wf.description ?? '');
+    setSteps(
+      wf.steps.length > 0
+        ? wf.steps.map(s => ({
+            agentId: s.agentId,
+            instructionOverride: s.instructionOverride ?? '',
+            passPreviousOutput: s.passPreviousOutput,
+          }))
+        : [emptyStep()]
+    );
+    setSelectedStepIndex(null);
+    setSaveError(null);
+    setAgentSearch('');
+    setView('editor');
   };
 
-  const executeDelete = async () => {
-      if (!deleteConfirmationId) return;
-      setIsDeleting(true);
-      
-      try {
-          await deleteWorkflow(deleteConfirmationId);
-          setWorkflows(prev => prev.filter(w => w.id !== deleteConfirmationId));
-          
-          if (currentWorkflowId === deleteConfirmationId) {
-              setViewMode('list');
-              setCurrentWorkflowId(null);
-          }
-      } catch (error) {
-          console.error("Failed to delete workflow", error);
-      } finally {
-          setDeleteConfirmationId(null);
-          setIsDeleting(false);
-      }
+  const updateStep = useCallback((index: number, patch: Partial<StepDraft>) =>
+    setSteps(prev => prev.map((s, i) => i === index ? { ...s, ...patch } : s)),
+  []);
+
+  const addAgentStep = (agent: Agent) => {
+    const newIndex = steps.length;
+    setSteps([...steps, { agentId: agent.id, instructionOverride: '', passPreviousOutput: false }]);
+    setSelectedStepIndex(newIndex);
   };
 
   const handleSave = async () => {
-      if (!workflowName.trim()) return;
+    if (!name.trim()) { setSaveError('Workflow name is required.'); return; }
+    if (steps.some(s => !s.agentId)) { setSaveError('Each step must have an agent selected.'); return; }
 
-      setIsSaving(true);
-      try {
-          if (currentWorkflowId) {
-              const updatedWorkflow = await updateWorkflow(currentWorkflowId, {
-                  name: workflowName,
-                  nodes,
-                  edges
-              });
-              setWorkflows(prev => prev.map(w => w.id === currentWorkflowId ? updatedWorkflow : w));
-          } else {
-              const newWorkflow = await createWorkflow(workspaceId, {
-                  name: workflowName,
-                  nodes,
-                  edges
-              });
-              setWorkflows(prev => [...prev, newWorkflow]);
-              setCurrentWorkflowId(newWorkflow.id);
-          }
-      } catch (error) {
-          console.error("Failed to save workflow", error);
-      } finally {
-          setIsSaving(false);
+    setSaveError(null);
+    setIsSaving(true);
+    try {
+      const payload = {
+        name: name.trim(),
+        description: description.trim() || null,
+        steps: steps.map((s, i): CreateWorkflowStepPayload => ({
+          order: i,
+          agentId: s.agentId,
+          instructionOverride: s.instructionOverride.trim() || null,
+          passPreviousOutput: s.passPreviousOutput,
+        })),
+      };
+      if (editingId) {
+        const updated = await updateWorkflowDefinition(editingId, payload);
+        setWorkflows(prev => prev.map(w => w.id === editingId ? updated : w));
+      } else {
+        const created = await createWorkflowDefinition({ workspaceId, ...payload });
+        setWorkflows(prev => [...prev, created]);
       }
+      setView('list');
+    } catch (e: any) {
+      setSaveError(e?.message ?? 'Failed to save workflow.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleBack = () => {
-      setViewMode('list');
-      setCurrentWorkflowId(null);
-      setIsPaletteOpen(false);
+  const confirmDelete = async () => {
+    if (!deleteId) return;
+    setIsDeleting(true);
+    try {
+      await deleteWorkflowDefinition(deleteId);
+      setWorkflows(prev => prev.filter(w => w.id !== deleteId));
+      if (editingId === deleteId) setView('list');
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setDeleteId(null);
+      setIsDeleting(false);
+    }
   };
 
-  // Drag and Drop Handlers
-  const onDragStart = (event: React.DragEvent, nodeType: string, payload?: any) => {
-      event.dataTransfer.setData('application/reactflow', nodeType);
-      if (payload) {
-          event.dataTransfer.setData('application/payload', JSON.stringify(payload));
-      }
-      event.dataTransfer.effectAllowed = 'move';
-  };
-
-  const onDragOver = useCallback((event: React.DragEvent) => {
-      event.preventDefault();
-      event.dataTransfer.dropEffect = 'move';
-  }, []);
-
-  const onDrop = useCallback(
-      (event: React.DragEvent) => {
-        event.preventDefault();
-
-        if (!reactFlowWrapper.current || !reactFlowInstance) return;
-
-        const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect();
-        const type = event.dataTransfer.getData('application/reactflow');
-        const payloadStr = event.dataTransfer.getData('application/payload');
-
-        if (typeof type === 'undefined' || !type) {
-          return;
-        }
-
-        const position = reactFlowInstance.project({
-          x: event.clientX - reactFlowBounds.left,
-          y: event.clientY - reactFlowBounds.top,
-        });
-
-        let newNode: Node;
-
-        if (type === 'agent' && payloadStr) {
-            const agent = JSON.parse(payloadStr);
-            newNode = {
-                id: `agent-${agent.id}-${Date.now()}`,
-                type: 'default',
-                position,
-                data: { label: `${agent.name} (${agent.role})` },
-                style: { 
-                    background: '#1e293b', 
-                    color: '#fff', 
-                    border: '1px solid #6366f1', 
-                    width: 180, 
-                    borderRadius: '8px', 
-                    padding: '10px',
-                    fontSize: '12px',
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                }
-            };
-        } else if (type === 'start') {
-             newNode = {
-                id: `start-${Date.now()}`,
-                type: 'input',
-                position,
-                data: { label: 'Start' },
-                style: { 
-                    background: '#1e293b', 
-                    color: '#fff', 
-                    border: '2px solid #10b981', 
-                    width: 120, 
-                    borderRadius: '20px', 
-                    padding: '10px',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    fontWeight: 'bold'
-                }
-             };
-        } else if (type === 'end') {
-             newNode = {
-                id: `end-${Date.now()}`,
-                type: 'output',
-                position,
-                data: { label: 'End' },
-                style: { 
-                    background: '#1e293b', 
-                    color: '#fff', 
-                    border: '2px solid #ef4444', 
-                    width: 120, 
-                    borderRadius: '20px', 
-                    padding: '10px',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    fontWeight: 'bold'
-                }
-             };
-        } else if (type === 'trigger') {
-             newNode = {
-                id: `trigger-${Date.now()}`,
-                type: 'input',
-                position,
-                data: { label: 'Trigger' },
-                style: { background: '#1e293b', color: '#fff', border: '1px solid #475569', width: 150, borderRadius: '8px', padding: '10px' }
-             };
-        } else {
-            newNode = {
-                id: `node-${Date.now()}`,
-                type: 'default',
-                position,
-                data: { label: 'Action Node' },
-                style: { background: '#1e293b', color: '#fff', border: '1px solid #10b981', width: 150, borderRadius: '8px', padding: '10px' }
-            };
-        }
-
-        setNodes((nds) => nds.concat(newNode));
-        if (window.innerWidth < 1024) setIsPaletteOpen(false);
-      },
-      [reactFlowInstance, setNodes],
+  const filteredAgents = agents.filter(a =>
+    a.name.toLowerCase().includes(agentSearch.toLowerCase()) ||
+    a.role.toLowerCase().includes(agentSearch.toLowerCase())
   );
 
-  const flowColors = {
-      background: isDarkMode ? '#27272a' : '#e5e7eb',
-      minimapBg: isDarkMode ? '#18181b' : '#ffffff',
-      minimapBorder: isDarkMode ? '#27272a' : '#e5e7eb',
-  };
+  const selectedStep = selectedStepIndex !== null ? steps[selectedStepIndex] : null;
 
-  const renderDeleteModal = () => {
-      if (!deleteConfirmationId) return null;
-      const workflowToDelete = workflows.find(w => w.id === deleteConfirmationId) || { name: 'this workflow' };
-      
-      return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-surface border border-border w-full max-w-sm rounded-xl shadow-2xl overflow-hidden p-6 space-y-4 animate-scale-in">
-             <div className="flex items-center gap-3 text-red-500">
-                <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center shrink-0">
-                    <AlertTriangle className="w-5 h-5" />
-                </div>
-                <h3 className="text-lg font-bold text-text">Delete Workflow?</h3>
-             </div>
-             
-             <p className="text-sm text-textMuted leading-relaxed">
-                Are you sure you want to delete <span className="font-semibold text-text">{workflowToDelete.name}</span>? This action cannot be undone.
-             </p>
+  // ── Render: loading ────────────────────────────────────────────────────────
 
-             <div className="flex gap-3 pt-2">
-                <button 
-                  onClick={() => setDeleteConfirmationId(null)}
-                  className="flex-1 px-4 py-2 border border-border rounded-md text-sm font-medium text-text hover:bg-surfaceHighlight transition-colors"
-                  disabled={isDeleting}
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={executeDelete}
-                  className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 shadow-lg shadow-red-500/20"
-                  disabled={isDeleting}
-                >
-                  {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Confirm Delete'}
-                </button>
-             </div>
-          </div>
-        </div>
-      );
-  };
-
-  if (viewMode === 'list') {
-      return (
-          <div className="space-y-6 animate-fade-in h-full flex flex-col">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shrink-0">
-                <div>
-                    <h2 className="text-2xl font-bold text-text">Workflows</h2>
-                    <p className="text-textMuted text-sm mt-1">Automate processes with visual workflows.</p>
-                </div>
-                <button 
-                    onClick={handleCreateNew}
-                    className="w-full sm:w-auto bg-primary hover:bg-primaryHover text-white px-4 py-2 rounded-md flex items-center justify-center gap-2 text-sm transition-colors shadow-lg shadow-primary/20"
-                >
-                <Plus className="w-4 h-4" /> New Workflow
-                </button>
-            </div>
-
-            {isLoading ? (
-                 <div className="flex-1 flex items-center justify-center">
-                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                 </div>
-            ) : workflows.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-lg p-8 sm:p-12 text-center bg-surface/30">
-                    <div className="w-16 h-16 bg-surfaceHighlight rounded-full flex items-center justify-center mb-4">
-                        <Layout className="w-8 h-8 text-textMuted" />
-                    </div>
-                    <p className="text-lg font-medium text-text">No workflows found</p>
-                    <p className="text-textMuted mb-6 text-sm max-w-xs">Create your first workflow to start automating tasks in this workspace.</p>
-                    <button onClick={handleCreateNew} className="text-primary hover:underline font-medium text-sm">Create Workflow</button>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 overflow-y-auto pb-4">
-                    {workflows.map(wf => (
-                        <div 
-                            key={wf.id} 
-                            onClick={() => handleEdit(wf)}
-                            className="bg-surface border border-border p-6 rounded-lg cursor-pointer hover:border-primary/50 hover:shadow-lg transition-all group relative flex flex-col h-[200px]"
-                        >
-                            <div className="flex justify-between items-start mb-4">
-                                <div className="w-10 h-10 bg-gradient-to-br from-primary/20 to-purple-500/20 rounded-lg flex items-center justify-center text-primary border border-primary/10">
-                                    <Settings className="w-5 h-5" />
-                                </div>
-                                <button 
-                                    onClick={(e) => handleDeleteClick(wf.id, e)}
-                                    className="p-2 text-textMuted hover:text-red-500 hover:bg-red-500/10 rounded-md transition-all sm:opacity-0 group-hover:opacity-100"
-                                    title="Delete Workflow"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
-                            </div>
-                            <h3 className="font-semibold text-text mb-1 truncate" title={wf.name}>{wf.name}</h3>
-                            <p className="text-xs text-textMuted">{wf.nodes?.length || 0} nodes · {wf.edges?.length || 0} connections</p>
-                            
-                            <div className="mt-auto pt-4 border-t border-border flex items-center justify-between text-xs text-textMuted">
-                                <span>{wf.id}</span>
-                                <span className="flex items-center gap-1 text-primary font-medium group-hover:translate-x-1 transition-transform">
-                                    Edit <Pencil className="w-3 h-3" />
-                                </span>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
-            {renderDeleteModal()}
-          </div>
-      );
+  if (isLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
-  // Editor View
-  return (
-    <div className="h-full flex flex-col animate-fade-in relative pb-4">
-       <div className="flex flex-col lg:flex-row justify-between lg:items-center mb-4 gap-4 border-b border-border pb-4 shrink-0">
-         <div className="flex items-center gap-3 sm:gap-4 overflow-hidden">
-             <button 
-                onClick={handleBack}
-                className="p-2 hover:bg-surfaceHighlight rounded-full text-textMuted hover:text-text transition-colors shrink-0"
-                title="Back to List"
-             >
-                 <ArrowLeft className="w-5 h-5" />
-             </button>
-             <div className="flex flex-col min-w-0">
-                 <input 
-                    type="text" 
-                    value={workflowName}
-                    onChange={(e) => setWorkflowName(e.target.value)}
-                    className="bg-transparent text-base sm:text-lg font-bold text-text focus:outline-none focus:border-b border-primary w-full max-w-xs sm:w-64 placeholder:text-textMuted/50 truncate"
-                    placeholder="Workflow Name"
-                 />
-                 <p className="text-[10px] sm:text-xs text-textMuted uppercase font-bold tracking-wider">{currentWorkflowId ? 'Editing Workflow' : 'Defining New Workflow'}</p>
-             </div>
-         </div>
-         <div className="flex flex-wrap items-center gap-2">
-           <button 
-              onClick={() => setIsPaletteOpen(!isPaletteOpen)}
-              className="lg:hidden px-3 py-1.5 bg-surfaceHighlight border border-border text-text rounded text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-colors"
-           >
-             <Plus className="w-4 h-4 text-primary" /> Components
-           </button>
+  // ── Render: editor (full-screen overlay) ──────────────────────────────────
 
-           <div className="flex items-center gap-2 ml-auto lg:ml-0">
-                {currentWorkflowId && (
-                    <button
-                        onClick={() => handleDeleteClick(currentWorkflowId)}
-                        className="p-2 border border-red-500/30 text-red-500 hover:bg-red-500/10 rounded transition-colors"
-                        title="Delete Workflow"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                    </button>
-                )}
-                <button 
-                    onClick={handleSave}
-                    disabled={!workflowName.trim() || isSaving}
-                    className="bg-surface border border-border text-text hover:bg-surfaceHighlight px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-2 disabled:opacity-50"
-                >
-                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} <span className="hidden sm:inline">Save</span>
-                </button>
-                <button className="bg-primary hover:bg-primaryHover text-white px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-colors shadow-lg shadow-primary/20">
-                    <Play className="w-3 h-3" /> <span className="hidden sm:inline">Test Run</span><span className="sm:hidden">Run</span>
-                </button>
-           </div>
-         </div>
-       </div>
-       
-       <div className="flex-1 flex overflow-hidden border border-border rounded-xl bg-surfaceHighlight/10 backdrop-blur-sm relative transition-colors duration-300">
-          {/* Main Canvas Area */}
-          <div className="flex-1 h-full relative overflow-hidden" ref={reactFlowWrapper}>
-            <ReactFlow
-                nodes={nodes}
-                edges={edges}
-                onNodesChange={onNodesChange}
-                onEdgesChange={onEdgesChange}
-                onConnect={onConnect}
-                onInit={setReactFlowInstance}
-                onDrop={onDrop}
-                onDragOver={onDragOver}
-                fitView
-                proOptions={{ hideAttribution: true }}
-                minZoom={0.5}
-                maxZoom={1.5}
+  if (view === 'editor') {
+    return (
+      <div
+        style={{
+          position: 'fixed', inset: 0, zIndex: 50,
+          display: 'flex', flexDirection: 'column',
+          background: '#0d0e1a',
+        }}
+      >
+        {/* Top toolbar */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px',
+          background: '#13141f', borderBottom: '1px solid #2d3148', flexShrink: 0,
+          minHeight: 52,
+        }}>
+          <button
+            onClick={() => setView('list')}
+            title="Back to workflows"
+            style={{
+              padding: 6, borderRadius: 8, border: 'none', background: 'transparent',
+              cursor: 'pointer', color: '#8b8fa8', display: 'flex', flexShrink: 0,
+            }}
+            onMouseEnter={e => { const b = e.currentTarget as HTMLButtonElement; b.style.background = '#1e2030'; b.style.color = '#fff'; }}
+            onMouseLeave={e => { const b = e.currentTarget as HTMLButtonElement; b.style.background = 'transparent'; b.style.color = '#8b8fa8'; }}
+          >
+            <ArrowLeft size={18} />
+          </button>
+
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+            <input
+              type="text"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="Workflow name…"
+              style={{
+                background: 'transparent', border: 'none', outline: 'none',
+                fontSize: 15, fontWeight: 700, color: '#fff', width: '100%',
+              }}
+            />
+            {description && (
+              <span style={{ fontSize: 11, color: '#5a5d7a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {description}
+              </span>
+            )}
+          </div>
+
+          {saveError && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#f87171', fontSize: 12, flexShrink: 0 }}>
+              <AlertTriangle size={13} />
+              <span>{saveError}</span>
+            </div>
+          )}
+
+          {editingId && (
+            <button
+              onClick={() => setDeleteId(editingId)}
+              style={{
+                padding: '6px 12px', borderRadius: 8,
+                border: '1px solid rgba(239,68,68,0.3)', background: 'transparent',
+                cursor: 'pointer', color: '#f87171', fontSize: 12, flexShrink: 0,
+              }}
             >
-                <Background color={flowColors.background} gap={20} size={1} />
-                <Controls className="bg-surface border border-border fill-text text-text" />
-                <MiniMap style={{ background: flowColors.minimapBg, border: `1px solid ${flowColors.minimapBorder}` }} nodeColor="#6366f1" />
-            </ReactFlow>
+              Delete
+            </button>
+          )}
 
-            <div className="absolute top-4 left-4 bg-surface/90 backdrop-blur p-3 rounded-lg border border-border text-[10px] sm:text-xs space-y-2 pointer-events-none transition-colors duration-300 shadow-xl z-10 hidden sm:block">
-                <div className="font-bold text-textMuted mb-2 uppercase tracking-widest opacity-60">Canvas Key</div>
-                <div className="flex items-center gap-2 font-medium text-text"><div className="w-3 h-3 rounded-full border-2 border-emerald-500 bg-[#1e293b]"></div> Start Point</div>
-                <div className="flex items-center gap-2 font-medium text-text"><div className="w-3 h-3 rounded-full border-2 border-red-500 bg-[#1e293b]"></div> Exit Point</div>
-                <div className="flex items-center gap-2 font-medium text-text"><div className="w-3 h-3 rounded-sm border-2 border-indigo-500 bg-[#1e293b]"></div> Agent Action</div>
-                <div className="flex items-center gap-2 font-medium text-text"><div className="w-3 h-3 rounded-sm border-2 border-slate-500 bg-[#1e293b]"></div> System Event</div>
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '7px 16px', borderRadius: 8, border: 'none',
+              background: '#6366f1', color: '#fff',
+              cursor: isSaving ? 'not-allowed' : 'pointer',
+              fontSize: 13, fontWeight: 600, flexShrink: 0,
+              opacity: isSaving ? 0.7 : 1,
+            }}
+          >
+            {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            Save
+          </button>
+        </div>
+
+        {/* Main area */}
+        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+
+          {/* Left panel: agent library */}
+          <div style={{
+            width: 220, background: '#13141f', borderRight: '1px solid #2d3148',
+            display: 'flex', flexDirection: 'column', overflow: 'hidden', flexShrink: 0,
+          }}>
+            <div style={{ padding: '12px 14px', borderBottom: '1px solid #2d3148' }}>
+              <p style={{
+                margin: '0 0 8px', fontSize: 10, fontWeight: 700, color: '#8b8fa8',
+                textTransform: 'uppercase', letterSpacing: '0.08em',
+              }}>
+                Agents
+              </p>
+              <div style={{ position: 'relative' }}>
+                <Search size={13} style={{ position: 'absolute', left: 9, top: 8, color: '#5a5d7a', pointerEvents: 'none' }} />
+                <input
+                  type="text"
+                  value={agentSearch}
+                  onChange={e => setAgentSearch(e.target.value)}
+                  placeholder="Search…"
+                  style={{
+                    width: '100%', padding: '6px 10px 6px 28px', borderRadius: 8,
+                    border: '1px solid #2d3148', background: '#1e2030',
+                    color: '#fff', fontSize: 12, outline: 'none', boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '8px 6px' }}>
+              {filteredAgents.length === 0 && (
+                <p style={{ fontSize: 12, color: '#5a5d7a', textAlign: 'center', padding: 16, fontStyle: 'italic' }}>
+                  {agentSearch ? 'No matches' : 'No agents'}
+                </p>
+              )}
+              {filteredAgents.map(agent => (
+                <button
+                  key={agent.id}
+                  onClick={() => addAgentStep(agent)}
+                  title={`Add ${agent.name} as next step`}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: 9,
+                    padding: '7px 8px', borderRadius: 8, border: 'none', background: 'transparent',
+                    cursor: 'pointer', textAlign: 'left', marginBottom: 2,
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#1e2030'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                >
+                  <div style={{
+                    width: 28, height: 28, borderRadius: 7,
+                    background: 'rgba(99,102,241,0.1)', flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <Bot size={14} color="#6366f1" />
+                  </div>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#c0c4d8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {agent.name}
+                    </p>
+                    <p style={{ margin: 0, fontSize: 10, color: '#5a5d7a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {agent.role}
+                    </p>
+                  </div>
+                  <Plus size={12} color="#3a3d5a" style={{ flexShrink: 0 }} />
+                </button>
+              ))}
+            </div>
+            {/* Description field at bottom */}
+            <div style={{ padding: '10px 14px', borderTop: '1px solid #2d3148' }}>
+              <p style={{ margin: '0 0 5px', fontSize: 10, fontWeight: 700, color: '#8b8fa8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                Description
+              </p>
+              <textarea
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                rows={2}
+                placeholder="Optional description…"
+                style={{
+                  width: '100%', padding: '6px 8px', borderRadius: 6,
+                  border: '1px solid #2d3148', background: '#1e2030',
+                  color: '#c0c4d8', fontSize: 11, resize: 'none', outline: 'none',
+                  boxSizing: 'border-box', fontFamily: 'inherit',
+                }}
+              />
             </div>
           </div>
 
-          {/* Sidebar Palette / Overlay Panel */}
-          {isPaletteOpen && window.innerWidth < 1024 && (
-             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 lg:hidden" onClick={() => setIsPaletteOpen(false)} />
-          )}
-
-          <div className={`
-              fixed lg:relative inset-y-0 right-0 w-72 bg-surface border-l border-border flex flex-col z-40 transform transition-transform duration-300 ease-in-out
-              ${isPaletteOpen || window.innerWidth >= 1024 ? 'translate-x-0' : 'translate-x-full'}
-          `}>
-             <div className="p-4 sm:p-5 border-b border-border bg-surfaceHighlight/30 flex justify-between items-center shrink-0">
-                 <h3 className="font-bold text-text text-xs uppercase tracking-widest flex items-center gap-2">
-                     <Layout className="w-4 h-4 text-primary" /> Components
-                 </h3>
-                 <button onClick={() => setIsPaletteOpen(false)} className="lg:hidden p-1 hover:bg-surfaceHighlight rounded text-textMuted">
-                    <X className="w-4 h-4" />
-                 </button>
-             </div>
-             
-             <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-8 custom-scrollbar">
-                 {/* Agents Section */}
-                 <div>
-                    <h4 className="text-[10px] font-bold text-textMuted uppercase mb-3 tracking-widest flex items-center justify-between">
-                        <span>Deployable Agents</span>
-                        <span className="bg-surfaceHighlight px-1.5 py-0.5 rounded text-[9px]">{agents.length}</span>
-                    </h4>
-                    <div className="space-y-3">
-                        {agents.length === 0 ? (
-                            <div className="text-[10px] text-textMuted italic p-4 border-2 border-dashed border-border rounded-lg text-center bg-surfaceHighlight/10">No agents available</div>
-                        ) : (
-                            agents.map(agent => (
-                                <div 
-                                    key={agent.id}
-                                    className="p-3 bg-surface border border-border rounded-lg cursor-grab hover:border-primary hover:shadow-lg transition-all shadow-sm group flex items-start gap-3 select-none active:cursor-grabbing hover:bg-primary/5"
-                                    draggable
-                                    onDragStart={(event) => onDragStart(event, 'agent', agent)}
-                                >
-                                    <div className="mt-0.5 p-1.5 bg-primary/10 rounded-md group-hover:bg-primary group-hover:text-white transition-colors">
-                                        <Bot className="w-4 h-4 text-primary group-hover:text-white" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="font-bold text-xs text-text truncate group-hover:text-primary transition-colors">{agent.name}</div>
-                                        <div className="text-[9px] text-textMuted font-mono truncate uppercase mt-0.5">{agent.role}</div>
-                                    </div>
-                                    <GripVertical className="w-4 h-4 text-textMuted opacity-20 group-hover:opacity-100 mt-1" />
-                                </div>
-                            ))
-                        )}
-                    </div>
-                 </div>
-
-                 {/* Basic Blocks Section */}
-                 <div className="pt-4 border-t border-border/50">
-                    <h4 className="text-[10px] font-bold text-textMuted uppercase mb-3 tracking-widest">Control Logic</h4>
-                    <div className="space-y-2">
-                        <div 
-                            className="p-3 bg-surface border border-border rounded-lg cursor-grab hover:border-emerald-500 hover:bg-emerald-500/5 transition-all shadow-sm flex items-center gap-3 select-none group"
-                            draggable
-                            onDragStart={(event) => onDragStart(event, 'start')}
-                        >
-                            <div className="p-1.5 bg-emerald-500/10 rounded-md group-hover:bg-emerald-500 transition-colors">
-                                <PlayCircle className="w-4 h-4 text-emerald-500 group-hover:text-white" />
-                            </div>
-                            <span className="text-xs font-bold text-text uppercase tracking-wider">Start Entry</span>
-                        </div>
-                         <div 
-                            className="p-3 bg-surface border border-border rounded-lg cursor-grab hover:border-red-500 hover:bg-red-500/5 transition-all shadow-sm flex items-center gap-3 select-none group"
-                            draggable
-                            onDragStart={(event) => onDragStart(event, 'end')}
-                        >
-                             <div className="p-1.5 bg-red-500/10 rounded-md group-hover:bg-red-500 transition-colors">
-                                <StopCircle className="w-4 h-4 text-red-500 group-hover:text-white" />
-                             </div>
-                            <span className="text-xs font-bold text-text uppercase tracking-wider">End Result</span>
-                        </div>
-
-                        <div 
-                            className="p-3 bg-surface border border-border rounded-lg cursor-grab hover:border-slate-500 hover:bg-slate-500/5 transition-all shadow-sm flex items-center gap-3 select-none group"
-                            draggable
-                            onDragStart={(event) => onDragStart(event, 'trigger')}
-                        >
-                             <div className="p-1.5 bg-slate-500/10 rounded-md group-hover:bg-slate-500 transition-colors">
-                                <Zap className="w-4 h-4 text-slate-500 group-hover:text-white" />
-                             </div>
-                            <span className="text-xs font-bold text-text uppercase tracking-wider">Event Listen</span>
-                        </div>
-                        <div 
-                            className="p-3 bg-surface border border-border rounded-lg cursor-grab hover:border-primary hover:bg-primary/5 transition-all shadow-sm flex items-center gap-3 select-none group"
-                            draggable
-                            onDragStart={(event) => onDragStart(event, 'action')}
-                        >
-                            <div className="p-1.5 bg-primary/10 rounded-md group-hover:bg-primary transition-colors">
-                                <FileText className="w-4 h-4 text-primary group-hover:text-white" />
-                            </div>
-                            <span className="text-xs font-bold text-text uppercase tracking-wider">System Task</span>
-                        </div>
-                    </div>
-                 </div>
-             </div>
-             
-             <div className="p-4 bg-surfaceHighlight/50 border-t border-border mt-auto">
-                 <p className="text-[9px] text-textMuted italic text-center">Drag components onto the canvas to architect your workflow.</p>
-             </div>
+          {/* Canvas */}
+          <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: '#0d0e1a' }}>
+            {steps.length === 0 ? (
+              <div style={{
+                position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+                alignItems: 'center', justifyContent: 'center', gap: 10,
+              }}>
+                <GitBranch size={36} color="#2d3148" />
+                <p style={{ color: '#5a5d7a', fontSize: 13, margin: 0, textAlign: 'center' }}>
+                  Click an agent on the left to add the first step
+                </p>
+              </div>
+            ) : (
+              <ReactFlow
+                nodes={rfNodes}
+                edges={rfEdges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onNodeClick={(_, node) => {
+                  if (node.type === 'agentStep') {
+                    setSelectedStepIndex((node.data as AgentStepNodeData).stepIndex);
+                  }
+                }}
+                onPaneClick={() => setSelectedStepIndex(null)}
+                nodeTypes={nodeTypes}
+                nodesDraggable={false}
+                nodesConnectable={false}
+                elementsSelectable={true}
+                fitView
+                fitViewOptions={{ padding: 0.5, maxZoom: 1 }}
+                proOptions={{ hideAttribution: true }}
+                minZoom={0.3}
+                maxZoom={2}
+              >
+                <Background variant={BackgroundVariant.Dots} gap={24} size={1.5} color="#1e2030" />
+                <Controls
+                  style={{
+                    background: '#1e2030', border: '1px solid #2d3148',
+                    borderRadius: 8, overflow: 'hidden',
+                  }}
+                />
+              </ReactFlow>
+            )}
           </div>
-       </div>
-       {renderDeleteModal()}
+
+          {/* Right panel: step config */}
+          {selectedStep && (
+            <div style={{
+              width: 288, background: '#13141f', borderLeft: '1px solid #2d3148',
+              display: 'flex', flexDirection: 'column', overflow: 'hidden', flexShrink: 0,
+            }}>
+              {/* Header */}
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '12px 16px', borderBottom: '1px solid #2d3148',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, color: '#6366f1',
+                    background: 'rgba(99,102,241,0.12)', padding: '2px 8px', borderRadius: 20,
+                  }}>
+                    Step {selectedStepIndex! + 1}
+                  </span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#8b8fa8' }}>Config</span>
+                </div>
+                <button
+                  onClick={() => setSelectedStepIndex(null)}
+                  style={{ padding: 4, borderRadius: 6, border: 'none', background: 'transparent', cursor: 'pointer', color: '#5a5d7a', display: 'flex' }}
+                  onMouseEnter={e => { const b = e.currentTarget as HTMLButtonElement; b.style.color = '#fff'; b.style.background = '#1e2030'; }}
+                  onMouseLeave={e => { const b = e.currentTarget as HTMLButtonElement; b.style.color = '#5a5d7a'; b.style.background = 'transparent'; }}
+                >
+                  <X size={15} />
+                </button>
+              </div>
+
+              {/* Fields */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+                {/* Agent */}
+                <div>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#8b8fa8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+                    Agent *
+                  </label>
+                  <select
+                    value={selectedStep.agentId}
+                    onChange={e => updateStep(selectedStepIndex!, { agentId: e.target.value })}
+                    style={{
+                      width: '100%', padding: '8px 10px', borderRadius: 8,
+                      border: '1px solid #2d3148', background: '#1e2030',
+                      color: selectedStep.agentId ? '#fff' : '#5a5d7a',
+                      fontSize: 13, outline: 'none',
+                    }}
+                  >
+                    <option value="">— Select agent —</option>
+                    {agents.map(a => (
+                      <option key={a.id} value={a.id}>{a.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Instructions */}
+                <div>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#8b8fa8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+                    Additional Instructions
+                  </label>
+                  <textarea
+                    value={selectedStep.instructionOverride}
+                    onChange={e => updateStep(selectedStepIndex!, { instructionOverride: e.target.value })}
+                    rows={5}
+                    placeholder="Extra instructions appended to this agent's context for this step…"
+                    style={{
+                      width: '100%', padding: '8px 10px', borderRadius: 8,
+                      border: '1px solid #2d3148', background: '#1e2030',
+                      color: '#fff', fontSize: 12, resize: 'vertical', outline: 'none',
+                      boxSizing: 'border-box', fontFamily: 'inherit',
+                    }}
+                  />
+                </div>
+
+                {/* Pass previous output — only show for step index > 0 */}
+                {selectedStepIndex! > 0 && (
+                  <div style={{ padding: '12px 14px', borderRadius: 10, background: '#1e2030', border: '1px solid #2d3148' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+                      <div style={{ flex: 1 }}>
+                        <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#c0c4d8' }}>Pass previous output</p>
+                        <p style={{ margin: '4px 0 0', fontSize: 11, color: '#5a5d7a', lineHeight: 1.5 }}>
+                          Inject the previous step's response as context for this agent
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => updateStep(selectedStepIndex!, { passPreviousOutput: !selectedStep.passPreviousOutput })}
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0,
+                          color: selectedStep.passPreviousOutput ? '#6366f1' : '#3a3d5a',
+                          display: 'flex', marginTop: 2, transition: 'color 0.15s',
+                        }}
+                      >
+                        {selectedStep.passPreviousOutput
+                          ? <ToggleRight size={26} />
+                          : <ToggleLeft size={26} />}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Remove step */}
+                {steps.length > 1 && (
+                  <button
+                    onClick={() => {
+                      setSteps(prev => prev.filter((_, i) => i !== selectedStepIndex!));
+                      setSelectedStepIndex(null);
+                    }}
+                    style={{
+                      width: '100%', padding: '8px 16px', borderRadius: 8,
+                      border: '1px solid rgba(239,68,68,0.25)', background: 'transparent',
+                      color: '#f87171', fontSize: 13, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(248,113,113,0.08)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                  >
+                    <Trash2 size={14} /> Remove Step
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Render: list ───────────────────────────────────────────────────────────
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-text">Workflows</h2>
+          <p className="text-textMuted text-sm mt-1">Define sequential agent pipelines and assign them to tickets.</p>
+        </div>
+        <button
+          onClick={openCreate}
+          className="bg-primary hover:bg-primaryHover text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
+        >
+          <Plus className="w-4 h-4" /> New Workflow
+        </button>
+      </div>
+
+      {workflows.length === 0 ? (
+        <div className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-lg p-12 text-center">
+          <p className="text-lg font-medium text-text mb-2">No workflows yet</p>
+          <p className="text-sm text-textMuted mb-6">Create a sequential agent pipeline to automate multi-step work on tickets.</p>
+          <button onClick={openCreate} className="text-primary hover:underline text-sm font-medium">
+            Create your first workflow
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {workflows.map(wf => (
+            <div
+              key={wf.id}
+              onClick={() => openEdit(wf)}
+              className="bg-surface border border-border rounded-lg p-5 cursor-pointer hover:border-primary/50 hover:shadow-md transition-all group"
+            >
+              <div className="flex items-start justify-between mb-3">
+                <h3 className="font-semibold text-text group-hover:text-primary transition-colors truncate pr-2">{wf.name}</h3>
+                <button
+                  onClick={e => { e.stopPropagation(); setDeleteId(wf.id); }}
+                  className="p-1.5 text-textMuted hover:text-red-400 rounded opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              {wf.description && (
+                <p className="text-xs text-textMuted mb-3 line-clamp-2">{wf.description}</p>
+              )}
+              <p className="text-xs text-textMuted">{wf.steps.length} step{wf.steps.length !== 1 ? 's' : ''}</p>
+              {wf.steps.length > 0 && (
+                <div className="mt-3 space-y-1">
+                  {wf.steps.slice(0, 3).map((s, i) => (
+                    <div key={s.id} className="flex items-center gap-2 text-xs text-textMuted">
+                      <span className="text-primary font-mono">{i + 1}.</span>
+                      <span className="truncate">{s.agentName}</span>
+                      {s.passPreviousOutput && <span className="text-primary/60 shrink-0">↻</span>}
+                    </div>
+                  ))}
+                  {wf.steps.length > 3 && (
+                    <p className="text-xs text-textMuted pl-4">+{wf.steps.length - 3} more</p>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {deleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-surface border border-border w-full max-w-sm rounded-xl p-6 space-y-4">
+            <div className="flex items-center gap-3 text-red-400">
+              <AlertTriangle className="w-5 h-5" />
+              <h3 className="text-lg font-bold text-text">Delete Workflow?</h3>
+            </div>
+            <p className="text-sm text-textMuted">
+              This will permanently delete{' '}
+              <span className="font-semibold text-text">{workflows.find(w => w.id === deleteId)?.name ?? 'this workflow'}</span>.
+            </p>
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setDeleteId(null)}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2 border border-border rounded-lg text-sm text-text hover:bg-surfaceHighlight transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2"
+              >
+                {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

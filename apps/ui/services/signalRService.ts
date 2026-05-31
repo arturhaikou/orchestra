@@ -218,3 +218,40 @@ export const onAgentQuestionResolved = (handler: (data: { workspaceId: string; q
   activeConnection.on('AgentQuestionResolved', handler);
   return () => activeConnection?.off('AgentQuestionResolved', handler);
 };
+
+export interface WorkflowStepStartedEvent {
+  workflowExecutionId: string;
+  ticketId: string;
+  stepIndex: number;
+}
+
+export interface WorkflowStepCompletedEvent {
+  workflowExecutionId: string;
+  ticketId: string;
+  stepIndex: number;
+  status: string;
+}
+
+export interface WorkflowExecutionStatusChangedEvent {
+  workflowExecutionId: string;
+  ticketId: string;
+  status: string;
+}
+
+export const onWorkflowStepStarted = (handler: (event: WorkflowStepStartedEvent) => void): (() => void) => {
+  if (!activeConnection) return () => {};
+  activeConnection.on('WorkflowStepStarted', handler);
+  return () => activeConnection?.off('WorkflowStepStarted', handler);
+};
+
+export const onWorkflowStepCompleted = (handler: (event: WorkflowStepCompletedEvent) => void): (() => void) => {
+  if (!activeConnection) return () => {};
+  activeConnection.on('WorkflowStepCompleted', handler);
+  return () => activeConnection?.off('WorkflowStepCompleted', handler);
+};
+
+export const onWorkflowExecutionStatusChanged = (handler: (event: WorkflowExecutionStatusChangedEvent) => void): (() => void) => {
+  if (!activeConnection) return () => {};
+  activeConnection.on('WorkflowExecutionStatusChanged', handler);
+  return () => activeConnection?.off('WorkflowExecutionStatusChanged', handler);
+};

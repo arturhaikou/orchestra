@@ -12,6 +12,8 @@ using Orchestra.Application.Jobs.Services;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Agents.Templates;
 using Orchestra.Application.Tools.Services;
+using Orchestra.Application.Workflows.Interfaces;
+using Orchestra.Application.Workflows.Services;
 using Orchestra.Domain.Interfaces;
 using Orchestra.Infrastructure.CodeReview;
 using Orchestra.Infrastructure.Integrations;
@@ -26,6 +28,7 @@ using Orchestra.Infrastructure.Integrations.Providers.GitHub;
 using Orchestra.Infrastructure.Integrations.Providers.GitLab;
 using Orchestra.Infrastructure.Integrations.Services;
 using Orchestra.Infrastructure.Hubs;
+using Orchestra.Infrastructure.Workflows;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Options;
 using Orchestra.Infrastructure.Services;
@@ -229,6 +232,13 @@ public static class Extensions
         builder.Services.AddScoped<IAgentContextBuilder, AgentContextBuilder>();
         builder.Services.AddScoped<ITicketAgentExecutionDataAccess, TicketAgentExecutionDataAccess>();
         builder.Services.AddScoped<INotificationService, NotificationService>();
+
+        // Workflow Services
+        builder.Services.AddScoped<IWorkflowDefinitionRepository, WorkflowDefinitionRepository>();
+        builder.Services.AddScoped<IWorkflowExecutionRepository, WorkflowExecutionRepository>();
+        builder.Services.AddScoped<IWorkflowDefinitionService, WorkflowDefinitionService>();
+        builder.Services.AddScoped<IWorkflowExecutionService, WorkflowExecutionService>();
+        builder.Services.AddScoped<IWorkflowExecutionEngine, WorkflowExecutionEngine>();
 
         // AG-UI streaming endpoint services
         builder.Services.AddHttpContextAccessor();

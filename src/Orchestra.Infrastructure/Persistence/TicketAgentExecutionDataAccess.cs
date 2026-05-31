@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Domain.Entities;
+using Orchestra.Domain.Enums;
 
 namespace Orchestra.Infrastructure.Persistence;
 
@@ -24,8 +25,12 @@ public class TicketAgentExecutionDataAccess : ITicketAgentExecutionDataAccess
     {
         return await _context.Set<Ticket>()
             .Where(t => t.IsInternal
-                     && t.AssignedAgentId != null
-                     && t.StatusId == ToDoStatusId)
+                     && (t.AssignedAgentId != null || t.AssignedWorkflowId != null)
+                     && t.StatusId == ToDoStatusId
+                     && !_context.Set<WorkflowExecution>()
+                            .Any(e => e.TicketId == t.Id
+                                   && (e.Status == WorkflowExecutionStatus.Running
+                                    || e.Status == WorkflowExecutionStatus.WaitingForInput)))
             .ToListAsync(cancellationToken);
     }
 
@@ -34,9 +39,13 @@ public class TicketAgentExecutionDataAccess : ITicketAgentExecutionDataAccess
     {
         return await _context.Set<Ticket>()
             .Where(t => !t.IsInternal
-                     && t.AssignedAgentId != null
+                     && (t.AssignedAgentId != null || t.AssignedWorkflowId != null)
                      && t.IntegrationId != null
-                     && (t.StatusId == ToDoStatusId || t.StatusId == null)) // Include null for legacy tickets
+                     && (t.StatusId == ToDoStatusId || t.StatusId == null) // Include null for legacy tickets
+                     && !_context.Set<WorkflowExecution>()
+                            .Any(e => e.TicketId == t.Id
+                                   && (e.Status == WorkflowExecutionStatus.Running
+                                    || e.Status == WorkflowExecutionStatus.WaitingForInput)))
             .ToListAsync(cancellationToken);
     }
 }

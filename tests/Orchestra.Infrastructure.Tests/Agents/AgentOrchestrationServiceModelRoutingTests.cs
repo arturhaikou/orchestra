@@ -4,6 +4,7 @@ using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Jobs.DTOs;
 using Orchestra.Application.Jobs.Services;
+using Orchestra.Application.Workflows.Interfaces;
 using Orchestra.Domain.Enums;
 using Orchestra.Infrastructure.Agents;
 
@@ -37,6 +38,8 @@ public class AgentOrchestrationServiceModelRoutingTests
         var jobService = Substitute.For<IJobService>();
         var contextBuilder = Substitute.For<IAgentContextBuilder>();
         var notificationService = Substitute.For<INotificationService>();
+        var workflowEngine = Substitute.For<IWorkflowExecutionEngine>();
+        var ticketIdParsingService = Substitute.For<ITicketIdParsingService>();
         var logger = Substitute.For<ILogger<AgentOrchestrationService>>();
 
         // Default stub: runtime service returns a successful response text and job ID
@@ -85,6 +88,8 @@ public class AgentOrchestrationServiceModelRoutingTests
             jobService,
             contextBuilder,
             notificationService,
+            workflowEngine,
+            ticketIdParsingService,
             logger);
 
         return (sut, runtimeService, agentDataAccess, ticketDataAccess, jobService, contextBuilder);

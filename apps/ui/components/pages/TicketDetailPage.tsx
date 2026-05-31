@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useTicketDetail } from '../../hooks/useTicketDetail';
 import type { Comment } from '../../types';
+import WorkflowExecutionView from '../workflows/WorkflowExecutionView';
 
 const satisfactionColor = (score: number): string => {
   if (score >= 70) return 'text-green-400';
@@ -184,10 +185,14 @@ const TicketDetailPage: React.FC = () => {
               <span className="text-xs text-textMuted">Agent</span>
               <span className="text-xs text-text">{ticket.assignedAgentId || '\u2014'}</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-textMuted">Workflow</span>
-              <span className="text-xs text-text">{ticket.assignedWorkflowId || '\u2014'}</span>
-            </div>
+            {ticket.assignedWorkflowId ? (
+              <WorkflowExecutionView ticketId={ticket.id} workflowDefinitionId={ticket.assignedWorkflowId} />
+            ) : (
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-textMuted">Workflow</span>
+                <span className="text-xs text-text">&mdash;</span>
+              </div>
+            )}
           </div>
 
           <div className="bg-surface border border-border rounded-lg p-4 space-y-3">

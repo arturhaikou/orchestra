@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { JobStatus, JobStep, JobStepType } from '../../types';
+import { JobStatus, JobStep, JobStepType, JobSummary } from '../../types';
 import { useJobs } from '../../hooks/useJobs';
 import { useSignalRReady } from '../../hooks/useSignalRReady';
 import JobCard from '../jobs/JobCard';
+import WorkflowJobCard from '../jobs/WorkflowJobCard';
 import JobStatusFilter from '../jobs/JobStatusFilter';
 import { Activity } from 'lucide-react';
 import { onJobCreated, onJobStatusChanged, onJobStepAdded, onReconnected } from '../../services/signalRService';
@@ -78,18 +79,41 @@ const JobsPage: React.FC = () => {
         </div>
       )}
 
-      {!isLoading && !error && items.length > 0 && (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          {items.map(job => (
-            <JobCard
-              key={job.id}
-              job={job}
-              workspaceId={workspaceId}
-              liveSteps={liveStepsMap.get(job.id) ?? []}
-            />
-          ))}
-        </div>
-      )}
+      {!isLoading && !error && items.length > 0 && (() => {
+        const childrenByParent = new Map<string, JobSummary[]>();
+        for (const job of items) {
+          if (job.parentJobId) {
+            const existing = childrenByParent.get(job.parentJobId) ?? [];
+            childrenByParent.set(job.parentJobId, [...existing, job]);
+          }
+        }
+        const displayItems = items.filter(j => !j.parentJobId);
+
+        return (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            {displayItems.map(job => {
+              if (job.workflowExecutionId) {
+                return (
+                  <WorkflowJobCard
+                    key={job.id}
+                    job={job}
+                    stepJobs={childrenByParent.get(job.id) ?? []}
+                    workspaceId={workspaceId}
+                  />
+                );
+              }
+              return (
+                <JobCard
+                  key={job.id}
+                  job={job}
+                  workspaceId={workspaceId}
+                  liveSteps={liveStepsMap.get(job.id) ?? []}
+                />
+              );
+            })}
+          </div>
+        );
+      })()}
     </div>
   );
 };

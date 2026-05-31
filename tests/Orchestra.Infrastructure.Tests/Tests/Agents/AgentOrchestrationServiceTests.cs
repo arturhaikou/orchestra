@@ -6,6 +6,7 @@ using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Jobs.DTOs;
 using Orchestra.Application.Jobs.Services;
 using Orchestra.Application.Tickets.DTOs;
+using Orchestra.Application.Workflows.Interfaces;
 using Orchestra.Domain.Enums;
 using Orchestra.Infrastructure.Agents;
 
@@ -23,6 +24,8 @@ public class AgentOrchestrationServiceTests
     private readonly IJobService _jobService = Substitute.For<IJobService>();
     private readonly IAgentContextBuilder _agentContextBuilder = Substitute.For<IAgentContextBuilder>();
     private readonly INotificationService _notificationService = Substitute.For<INotificationService>();
+    private readonly IWorkflowExecutionEngine _workflowExecutionEngine = Substitute.For<IWorkflowExecutionEngine>();
+    private readonly ITicketIdParsingService _ticketIdParsingService = Substitute.For<ITicketIdParsingService>();
     private readonly ILogger<AgentOrchestrationService> _logger = Substitute.For<ILogger<AgentOrchestrationService>>();
     private readonly AgentOrchestrationService _sut;
 
@@ -35,6 +38,8 @@ public class AgentOrchestrationServiceTests
             _jobService,
             _agentContextBuilder,
             _notificationService,
+            _workflowExecutionEngine,
+            _ticketIdParsingService,
             _logger);
     }
 
@@ -98,7 +103,7 @@ public class AgentOrchestrationServiceTests
         await _notificationService.Received().NotifyTicketStatusChangedAsync(
             Arg.Is<TicketStatusChangedNotification>(n =>
                 n.WorkspaceId == workspaceId &&
-                n.TicketId == ticketId &&
+                n.TicketId == ticketId.ToString() &&
                 n.NewStatus == "In Progress" &&
                 n.PreviousStatus == "To Do"),
             Arg.Any<CancellationToken>());
@@ -114,7 +119,7 @@ public class AgentOrchestrationServiceTests
         await _notificationService.Received().NotifyTicketStatusChangedAsync(
             Arg.Is<TicketStatusChangedNotification>(n =>
                 n.WorkspaceId == workspaceId &&
-                n.TicketId == ticketId &&
+                n.TicketId == ticketId.ToString() &&
                 n.NewStatus == "Completed" &&
                 n.PreviousStatus == "In Progress"),
             Arg.Any<CancellationToken>());
@@ -152,7 +157,7 @@ public class AgentOrchestrationServiceTests
         await _notificationService.Received().NotifyTicketStatusChangedAsync(
             Arg.Is<TicketStatusChangedNotification>(n =>
                 n.WorkspaceId == workspaceId &&
-                n.TicketId == ticketId &&
+                n.TicketId == ticketId.ToString() &&
                 n.NewStatus == "To Do" &&
                 n.PreviousStatus == "In Progress"),
             Arg.Any<CancellationToken>());

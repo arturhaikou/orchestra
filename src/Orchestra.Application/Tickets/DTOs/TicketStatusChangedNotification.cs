@@ -2,6 +2,6 @@ namespace Orchestra.Application.Tickets.DTOs;
 
 public record TicketStatusChangedNotification(
     Guid WorkspaceId,
-    Guid TicketId,
+    string TicketId,
     string NewStatus,
     string? PreviousStatus);

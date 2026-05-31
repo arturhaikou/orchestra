@@ -462,7 +462,7 @@ public class AgentService : IAgentService
         }
         else if (request.SelectedOptionalToolMethodNames is { Count: > 0 })
         {
-            await AssignOptionalToolActionsAsync(agent.Id, template, request.SelectedOptionalToolMethodNames, cancellationToken);
+            await AssignOptionalToolActionsAsync(agent.Id, request.WorkspaceId, template, request.SelectedOptionalToolMethodNames, cancellationToken);
         }
 
         return await MapToDtoAsync(agent, cancellationToken);
@@ -534,6 +534,7 @@ public class AgentService : IAgentService
 
     private async Task AssignOptionalToolActionsAsync(
         Guid agentId,
+        Guid workspaceId,
         BuiltInAgentTemplate template,
         IReadOnlyList<string> selectedMethodNames,
         CancellationToken cancellationToken)
@@ -548,10 +549,20 @@ public class AgentService : IAgentService
             throw new ArgumentException($"Unknown optional tool method names: {string.Join(", ", unknown)}.");
 
         var toolActions = await _toolActionDataAccess.GetByNamesAsync(selectedMethodNames.ToList(), cancellationToken);
-        var toolActionIds = toolActions.Select(ta => ta.Id).ToList();
+        var workspaceIntegrationIds = await GetWorkspaceIntegrationIdsAsync(workspaceId, cancellationToken);
+        var toolActionIds = toolActions
+            .Where(ta => ta.IntegrationId == null || workspaceIntegrationIds.Contains(ta.IntegrationId.Value))
+            .Select(ta => ta.Id)
+            .ToList();
 
         if (toolActionIds.Count > 0)
             await _agentToolActionDataAccess.AssignToolActionsAsync(agentId, toolActionIds, cancellationToken);
+    }
+
+    private async Task<HashSet<Guid>> GetWorkspaceIntegrationIdsAsync(Guid workspaceId, CancellationToken cancellationToken)
+    {
+        var integrations = await _integrationDataAccess.GetByWorkspaceIdAsync(workspaceId, cancellationToken);
+        return integrations.Select(i => i.Id).ToHashSet();
     }
 
     private static Agent CreateAgentFromTemplate(CreateAgentFromTemplateRequest request, BuiltInAgentTemplate template)
@@ -630,7 +641,7 @@ public class AgentService : IAgentService
             CustomInstructions: agent.CustomInstructions,
             ProjectPrinciples: agent.ProjectPrinciples,
             Model: agent.Model,
-            TemplateIdentifier: agent.TemplateIdentifier,
+            TemplateId: agent.TemplateIdentifier,
             TemplateVersion: agent.TemplateVersion,
             IsBuiltIn: agent.TemplateIdentifier != null,
             Guide: guide,

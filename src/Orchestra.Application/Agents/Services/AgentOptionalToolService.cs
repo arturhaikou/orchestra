@@ -11,19 +11,22 @@ public class AgentOptionalToolService : IAgentOptionalToolService
     private readonly IBuiltInAgentTemplateRegistry _templateRegistry;
     private readonly IAgentToolActionDataAccess _agentToolActionDataAccess;
     private readonly IToolActionDataAccess _toolActionDataAccess;
+    private readonly IIntegrationDataAccess _integrationDataAccess;
 
     public AgentOptionalToolService(
         IWorkspaceAuthorizationService workspaceAuthorizationService,
         IAgentDataAccess agentDataAccess,
         IBuiltInAgentTemplateRegistry templateRegistry,
         IAgentToolActionDataAccess agentToolActionDataAccess,
-        IToolActionDataAccess toolActionDataAccess)
+        IToolActionDataAccess toolActionDataAccess,
+        IIntegrationDataAccess integrationDataAccess)
     {
         _workspaceAuthorizationService = workspaceAuthorizationService;
         _agentDataAccess = agentDataAccess;
         _templateRegistry = templateRegistry;
         _agentToolActionDataAccess = agentToolActionDataAccess;
         _toolActionDataAccess = toolActionDataAccess;
+        _integrationDataAccess = integrationDataAccess;
     }
 
     public async Task<List<string>> GetCurrentSelectionsAsync(Guid userId, Guid agentId, CancellationToken cancellationToken = default)
@@ -73,7 +76,11 @@ public class AgentOptionalToolService : IAgentOptionalToolService
             .ToHashSet();
 
         var targetActions = await _toolActionDataAccess.GetByNamesAsync(methodNames.ToList(), cancellationToken);
-        var targetIds = targetActions.Select(ta => ta.Id).ToHashSet();
+        var workspaceIntegrationIds = await GetWorkspaceIntegrationIdsAsync(agent.WorkspaceId, cancellationToken);
+        var targetIds = targetActions
+            .Where(ta => ta.IntegrationId == null || workspaceIntegrationIds.Contains(ta.IntegrationId.Value))
+            .Select(ta => ta.Id)
+            .ToHashSet();
 
         var toRemove = currentOptionalIds.Except(targetIds).ToList();
         var toAdd = targetIds.Except(currentOptionalIds).ToList();
@@ -103,5 +110,11 @@ public class AgentOptionalToolService : IAgentOptionalToolService
             .Values
             .SelectMany(v => v)
             .ToHashSet();
+    }
+
+    private async Task<HashSet<Guid>> GetWorkspaceIntegrationIdsAsync(Guid workspaceId, CancellationToken cancellationToken)
+    {
+        var integrations = await _integrationDataAccess.GetByWorkspaceIdAsync(workspaceId, cancellationToken);
+        return integrations.Select(i => i.Id).ToHashSet();
     }
 }

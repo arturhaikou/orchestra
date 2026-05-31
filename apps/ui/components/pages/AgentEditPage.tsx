@@ -461,6 +461,14 @@ const AgentEditPage: React.FC = () => {
             />
           )}
 
+          {isBuiltIn && availableOptionalTools.length > 0 && (
+            <AgentOptionalToolsSection
+              availableOptionalTools={availableOptionalTools}
+              selectedMethodNames={selectedOptionalTools}
+              onChange={setSelectedOptionalTools}
+            />
+          )}
+
           {/* Sub-Agents Section */}
           {(!isBuiltIn || selectedSubAgentIds.length > 0) && (
           <section className="space-y-3">
@@ -601,12 +609,6 @@ const AgentEditPage: React.FC = () => {
             alreadySelectedIds={selectedSkillIds}
             onCommit={ids => { setSelectedSkillIds(ids); setIsSkillsModalOpen(false); }}
             onDiscard={() => setIsSkillsModalOpen(false)}
-          />
-
-          <AgentOptionalToolsSection
-            availableOptionalTools={availableOptionalTools}
-            selectedMethodNames={selectedOptionalTools}
-            onChange={setSelectedOptionalTools}
           />
 
           <div className="flex justify-end gap-3 pt-4 border-t border-border">

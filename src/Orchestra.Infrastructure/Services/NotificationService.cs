@@ -4,6 +4,7 @@ using Orchestra.Application.Agents.DTOs;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Jobs.DTOs;
 using Orchestra.Application.Tickets.DTOs;
+using Orchestra.Application.Workflows.DTOs;
 using Orchestra.Domain.Enums;
 using Orchestra.Infrastructure.Hubs;
 
@@ -247,6 +248,110 @@ public class NotificationService : INotificationService
                 "Failed to dispatch AgentQuestionAsked notification. WorkspaceId={WorkspaceId} QuestionId={QuestionId}",
                 workspaceId,
                 questionId);
+        }
+    }
+
+    public async Task NotifyWorkflowStepStartedAsync(
+        WorkflowStepStartedNotification notification,
+        CancellationToken cancellationToken = default)
+    {
+        var groupName = $"workspace-{notification.WorkspaceId}";
+
+        var payload = new
+        {
+            workflowExecutionId = notification.WorkflowExecutionId,
+            ticketId = notification.TicketId,
+            stepIndex = notification.StepIndex
+        };
+
+        try
+        {
+            await _hubContext.Clients.Group(groupName)
+                .SendAsync("WorkflowStepStarted", payload, cancellationToken);
+
+            _logger.LogDebug(
+                "Dispatched WorkflowStepStarted. WorkspaceId={WorkspaceId} ExecutionId={ExecutionId} StepIndex={StepIndex}",
+                notification.WorkspaceId,
+                notification.WorkflowExecutionId,
+                notification.StepIndex);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Failed to dispatch WorkflowStepStarted. WorkspaceId={WorkspaceId} ExecutionId={ExecutionId}",
+                notification.WorkspaceId,
+                notification.WorkflowExecutionId);
+        }
+    }
+
+    public async Task NotifyWorkflowStepCompletedAsync(
+        WorkflowStepCompletedNotification notification,
+        CancellationToken cancellationToken = default)
+    {
+        var groupName = $"workspace-{notification.WorkspaceId}";
+
+        var payload = new
+        {
+            workflowExecutionId = notification.WorkflowExecutionId,
+            ticketId = notification.TicketId,
+            stepIndex = notification.StepIndex,
+            status = notification.Status
+        };
+
+        try
+        {
+            await _hubContext.Clients.Group(groupName)
+                .SendAsync("WorkflowStepCompleted", payload, cancellationToken);
+
+            _logger.LogDebug(
+                "Dispatched WorkflowStepCompleted. WorkspaceId={WorkspaceId} ExecutionId={ExecutionId} StepIndex={StepIndex} Status={Status}",
+                notification.WorkspaceId,
+                notification.WorkflowExecutionId,
+                notification.StepIndex,
+                notification.Status);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Failed to dispatch WorkflowStepCompleted. WorkspaceId={WorkspaceId} ExecutionId={ExecutionId}",
+                notification.WorkspaceId,
+                notification.WorkflowExecutionId);
+        }
+    }
+
+    public async Task NotifyWorkflowExecutionStatusChangedAsync(
+        WorkflowExecutionStatusChangedNotification notification,
+        CancellationToken cancellationToken = default)
+    {
+        var groupName = $"workspace-{notification.WorkspaceId}";
+
+        var payload = new
+        {
+            workflowExecutionId = notification.WorkflowExecutionId,
+            ticketId = notification.TicketId,
+            status = notification.Status
+        };
+
+        try
+        {
+            await _hubContext.Clients.Group(groupName)
+                .SendAsync("WorkflowExecutionStatusChanged", payload, cancellationToken);
+
+            _logger.LogDebug(
+                "Dispatched WorkflowExecutionStatusChanged. WorkspaceId={WorkspaceId} ExecutionId={ExecutionId} Status={Status}",
+                notification.WorkspaceId,
+                notification.WorkflowExecutionId,
+                notification.Status);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Failed to dispatch WorkflowExecutionStatusChanged. WorkspaceId={WorkspaceId} ExecutionId={ExecutionId}",
+                notification.WorkspaceId,
+                notification.WorkflowExecutionId);
         }
     }
 }

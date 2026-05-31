@@ -73,7 +73,7 @@ vi.mock('../../services/agentService', () => ({
 }));
 
 vi.mock('../../services/workflowService', () => ({
-  getWorkspacesWorkflows: vi.fn().mockResolvedValue([]),
+  getWorkflowDefinitions: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('../../services/authService', () => ({

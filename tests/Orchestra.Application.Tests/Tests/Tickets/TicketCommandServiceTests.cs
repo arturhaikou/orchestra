@@ -532,7 +532,7 @@ public class TicketCommandServiceTests : ServiceTestFixture<TicketCommandService
 
         await _notificationService.Received(1).NotifyTicketStatusChangedAsync(
             Arg.Is<TicketStatusChangedNotification>(n =>
-                n.TicketId == ticketId &&
+                n.TicketId == ticketId.ToString() &&
                 n.NewStatus == "In Progress" &&
                 n.PreviousStatus == "To Do" &&
                 n.WorkspaceId == ticket.WorkspaceId),
