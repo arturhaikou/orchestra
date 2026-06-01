@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Loader2, AlertTriangle, Plus, X } from 'lucide-react';
-import { Agent, Skill, Tool } from '../../types';
+import { Agent, Skill, SkillFolder, Tool } from '../../types';
 import { createAgent, getAgents } from '../../services/agentService';
 import { getTools } from '../../services/toolService';
 import { fetchWorkspaceModels } from '../../services/workspaceService';
 import { getSkills } from '../../services/skillService';
+import { getSkillFolders } from '../../services/skillFolderService';
 import AgentFormCapabilities from '../agents/AgentFormCapabilities';
 import AgentToolSummarySection from '../agents/AgentToolSummarySection';
 import AddToolsModal from '../agents/AddToolsModal';
@@ -59,6 +60,8 @@ const AgentCreatePage: React.FC = () => {
   const [availableSkills, setAvailableSkills] = useState<Skill[]>([]);
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
   const [isSkillsModalOpen, setIsSkillsModalOpen] = useState(false);
+  const [availableSkillFolders, setAvailableSkillFolders] = useState<SkillFolder[]>([]);
+  const [selectedSkillFolderIds, setSelectedSkillFolderIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -67,6 +70,7 @@ const AgentCreatePage: React.FC = () => {
     getMcpServers(workspaceId).then(setMcpServers).catch(() => setMcpServers([]));
     getAgents(workspaceId).then(setAllAgents).catch(() => setAllAgents([]));
     getSkills(workspaceId).then(setAvailableSkills).catch(() => setAvailableSkills([]));
+    getSkillFolders(workspaceId).then(setAvailableSkillFolders).catch(() => setAvailableSkillFolders([]));
   }, [workspaceId]);
 
   const toolCatalogue = useMemo<ToolCatalogueEntry[]>(
@@ -125,6 +129,7 @@ const AgentCreatePage: React.FC = () => {
         model: formState.selectedModel === 'Default' ? null : formState.selectedModel,
         subAgentIds: selectedSubAgentIds,
         skillIds: selectedSkillIds,
+        skillFolderIds: selectedSkillFolderIds,
       });
       navigate(`/workspaces/${workspaceId}/agents`);
     } catch (error: any) {
@@ -338,6 +343,56 @@ const AgentCreatePage: React.FC = () => {
               <Plus className="w-4 h-4" />
               Add Skill
             </button>
+          </section>
+
+          {/* Skill Folders Section */}
+          <section className="space-y-3">
+            <h2 className="text-lg font-semibold text-text">Skill Folders</h2>
+            {selectedSkillFolderIds.length > 0 && (
+              <div className="space-y-2">
+                {selectedSkillFolderIds.map(id => {
+                  const folder = availableSkillFolders.find(f => f.id === id);
+                  if (!folder) return null;
+                  return (
+                    <div key={id} className="flex items-center gap-3 px-3 py-2 bg-surfaceHighlight border border-border rounded-lg">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-text truncate">{folder.name}</p>
+                        <p className="text-xs text-textMuted font-mono truncate">{folder.folderPath}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedSkillFolderIds(prev => prev.filter(i => i !== id))}
+                        className="text-textMuted hover:text-red-400 transition-colors p-1 rounded hover:bg-red-500/10 flex-shrink-0"
+                        aria-label={`Remove ${folder.name}`}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {availableSkillFolders.length > 0 && (
+              <div className="space-y-1">
+                {availableSkillFolders
+                  .filter(f => !selectedSkillFolderIds.includes(f.id))
+                  .map(folder => (
+                    <button
+                      key={folder.id}
+                      type="button"
+                      onClick={() => setSelectedSkillFolderIds(prev => [...prev, folder.id])}
+                      className="flex items-center gap-2 w-full px-3 py-2 border border-dashed border-border rounded-lg text-sm text-textMuted hover:text-primary hover:border-primary/50 transition-colors text-left"
+                    >
+                      <Plus className="w-4 h-4 shrink-0" />
+                      <span className="truncate">{folder.name}</span>
+                    </button>
+                  ))
+                }
+              </div>
+            )}
+            {availableSkillFolders.length === 0 && (
+              <p className="text-xs text-textMuted italic">No skill folders registered yet. <a href={`/workspaces/${workspaceId}/skill-folders/new`} className="text-primary hover:underline">Register one</a>.</p>
+            )}
           </section>
 
           {/* Instructions Section */}

@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { AiCliProviderType } from '../../types';
 import { useCliIntegrationForm } from '../../hooks/useCliIntegrationForm';
+import { FolderPickerInput } from '../../components/cli/FolderPickerInput';
 
 const providerLabel: Record<AiCliProviderType, string> = {
   [AiCliProviderType.GITHUB_COPILOT]: 'GitHub Copilot',
@@ -115,10 +116,9 @@ const EditCliIntegrationPage: React.FC = () => {
           {/* Working Directory */}
           <div className="space-y-2">
             <label className="text-[10px] font-bold text-textMuted uppercase tracking-widest">Working Directory</label>
-            <input
-              type="text"
+            <FolderPickerInput
               value={formState.workingDirectory}
-              onChange={e => setField('workingDirectory', e.target.value)}
+              onChange={value => setField('workingDirectory', value)}
               placeholder="/home/user/projects or C:\projects"
               className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-text placeholder:text-textMuted focus:outline-none focus:border-primary font-mono"
             />

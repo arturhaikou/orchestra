@@ -50,4 +50,5 @@ public sealed record AgentAGUIContext(
     string? CliModel = null,
     string? CliReasoningEffort = null,
     bool IsReadOnlyCli = true,
-    IReadOnlyList<SkillDto>? Skills = null);
+    IReadOnlyList<SkillDto>? Skills = null,
+    IReadOnlyList<string>? SkillFolderPaths = null);

@@ -16,6 +16,7 @@ public class AgentAGUIBuildService : IAgentAGUIBuildService
     private readonly IToolRetrieverService _toolRetrieverService;
     private readonly IBuiltInAgentTemplateRegistry _templateRegistry;
     private readonly IAgentSkillDataAccess _agentSkillDataAccess;
+    private readonly IAgentSkillFolderDataAccess _agentSkillFolderDataAccess;
 
     public AgentAGUIBuildService(
         IWorkspaceAuthorizationService authorizationService,
@@ -23,7 +24,8 @@ public class AgentAGUIBuildService : IAgentAGUIBuildService
         IChatClientResolver chatClientResolver,
         IToolRetrieverService toolRetrieverService,
         IBuiltInAgentTemplateRegistry templateRegistry,
-        IAgentSkillDataAccess agentSkillDataAccess)
+        IAgentSkillDataAccess agentSkillDataAccess,
+        IAgentSkillFolderDataAccess agentSkillFolderDataAccess)
     {
         _authorizationService = authorizationService;
         _agentDataAccess = agentDataAccess;
@@ -31,6 +33,7 @@ public class AgentAGUIBuildService : IAgentAGUIBuildService
         _toolRetrieverService = toolRetrieverService;
         _templateRegistry = templateRegistry;
         _agentSkillDataAccess = agentSkillDataAccess;
+        _agentSkillFolderDataAccess = agentSkillFolderDataAccess;
     }
 
     /// <inheritdoc/>
@@ -105,12 +108,16 @@ public class AgentAGUIBuildService : IAgentAGUIBuildService
             .Select(s => new SkillDto(s.Id.ToString(), s.WorkspaceId.ToString(), s.Name, s.Description, s.Instructions, s.CreatedAt, s.UpdatedAt))
             .ToList();
 
+        var skillFolderEntities = await _agentSkillFolderDataAccess.GetFoldersByAgentIdAsync(agentId, cancellationToken);
+        var skillFolderPaths = skillFolderEntities.Select(sf => sf.FolderPath).ToList();
+
         return new AgentAGUIContext(
             AgentName: agent.Name,
             Instructions: agent.CustomInstructions ?? agent.ProjectPrinciples,
             IsCliAgent: false,
             ChatClient: chatClient,
             Tools: tools,
-            Skills: skills);
+            Skills: skills,
+            SkillFolderPaths: skillFolderPaths);
     }
 }

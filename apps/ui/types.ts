@@ -109,6 +109,20 @@ export interface Skill {
   updatedAt: string;
 }
 
+export interface SkillFolder {
+  id: string;
+  workspaceId: string;
+  name: string;
+  folderPath: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface DiscoveredSkill {
+  name: string;
+  description: string;
+}
+
 export interface ModelMetadataDto {
   id: string;
   supportedReasoningEfforts?: string[] | null;
@@ -128,6 +142,7 @@ export interface Agent {
   subAgentIds: string[]; // IDs of agents assigned as sub-agents
   skillIds?: string[]; // IDs of skills assigned to this agent
   skills?: Skill[]; // Populated skill objects (read-only, from server)
+  skillFolderIds?: string[]; // IDs of skill folders assigned to this agent
   avatarUrl: string;
   customInstructions?: string;
   projectPrinciples?: string; // Non-null only for agents with a review tool assigned

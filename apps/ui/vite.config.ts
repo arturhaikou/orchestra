@@ -23,6 +23,12 @@ export default defineConfig(({ mode }) => {
       server: {
         port: process.env.PORT ? parseInt(process.env.PORT) : 3000,
         host: '0.0.0.0',
+        proxy: {
+          '/v1': {
+            target: apiUrl,
+            changeOrigin: true,
+          },
+        },
       },
       plugins: [react()],
       define: {

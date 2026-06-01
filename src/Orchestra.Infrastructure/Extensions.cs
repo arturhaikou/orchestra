@@ -249,6 +249,10 @@ public static class Extensions
         builder.Services.AddScoped<ISkillDataAccess, Orchestra.Infrastructure.Skills.SkillDataAccess>();
         builder.Services.AddScoped<IAgentSkillDataAccess, Orchestra.Infrastructure.Skills.AgentSkillDataAccess>();
         builder.Services.AddScoped<Orchestra.Application.Skills.Services.ISkillService, Orchestra.Application.Skills.Services.SkillService>();
+        builder.Services.AddScoped<ISkillFolderDataAccess, Orchestra.Infrastructure.Skills.SkillFolderDataAccess>();
+        builder.Services.AddScoped<IAgentSkillFolderDataAccess, Orchestra.Infrastructure.Skills.AgentSkillFolderDataAccess>();
+        builder.Services.AddScoped<ISkillFolderDiscoveryService, Orchestra.Infrastructure.Skills.SkillFolderDiscoveryService>();
+        builder.Services.AddScoped<Orchestra.Application.Skills.Services.ISkillFolderService, Orchestra.Application.Skills.Services.SkillFolderService>();
 
         return builder;
     }

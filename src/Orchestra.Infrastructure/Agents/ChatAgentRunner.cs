@@ -6,6 +6,7 @@ using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Jobs.DTOs;
 using Orchestra.Domain.Entities;
 using Orchestra.Infrastructure.Agents.Middleware;
+using System.IO;
 
 namespace Orchestra.Infrastructure.Agents;
 
@@ -17,15 +18,18 @@ namespace Orchestra.Infrastructure.Agents;
 public class ChatAgentRunner : IChatAgentRunner
 {
     private readonly IAgentSkillDataAccess _agentSkillDataAccess;
+    private readonly IAgentSkillFolderDataAccess _agentSkillFolderDataAccess;
     private readonly IConversationSnapshotRepository _snapshotRepository;
     private readonly ILogger<ChatAgentRunner> _logger;
 
     public ChatAgentRunner(
         IAgentSkillDataAccess agentSkillDataAccess,
+        IAgentSkillFolderDataAccess agentSkillFolderDataAccess,
         IConversationSnapshotRepository snapshotRepository,
         ILogger<ChatAgentRunner> logger)
     {
         _agentSkillDataAccess = agentSkillDataAccess;
+        _agentSkillFolderDataAccess = agentSkillFolderDataAccess;
         _snapshotRepository = snapshotRepository;
         _logger = logger;
     }
@@ -41,6 +45,7 @@ public class ChatAgentRunner : IChatAgentRunner
     {
         // Step 1: Load skills and build ChatClientAgentOptions
         var skills = await _agentSkillDataAccess.GetSkillsByAgentIdAsync(agentEntity.Id, cancellationToken);
+        var skillFolders = await _agentSkillFolderDataAccess.GetFoldersByAgentIdAsync(agentEntity.Id, cancellationToken);
 
         var chatOptions = new ChatOptions
         {
@@ -55,7 +60,7 @@ public class ChatAgentRunner : IChatAgentRunner
         };
 
         // Step 2: Attach skills as context providers if any exist
-        if (skills.Count > 0)
+        if (skills.Count > 0 || skillFolders.Count > 0)
         {
 #pragma warning disable MAAI001
             var inlineSkills = skills
@@ -64,14 +69,22 @@ public class ChatAgentRunner : IChatAgentRunner
                     s.Instructions))
                 .ToArray();
 
-            var skillsProvider = new AgentSkillsProvider(inlineSkills);
+            var builder = new AgentSkillsProviderBuilder().UseSkills(inlineSkills);
+
+            foreach (var folder in skillFolders)
+            {
+                if (Directory.Exists(folder.FolderPath))
+                    builder.UseFileSkill(folder.FolderPath);
+                else
+                    _logger.LogWarning("Skill folder path '{FolderPath}' not found for agent {AgentId}; skipping.", folder.FolderPath, agentEntity.Id);
+            }
+
+            agentOptions.AIContextProviders = [builder.Build()];
 #pragma warning restore MAAI001
 
-            agentOptions.AIContextProviders = [skillsProvider];
-
             _logger.LogDebug(
-                "Attached {SkillCount} skills to agent {AgentName} ({AgentId})",
-                skills.Count, agentEntity.Name, agentEntity.Id);
+                "Attached {SkillCount} inline skills and {FolderCount} skill folders to agent {AgentName} ({AgentId})",
+                skills.Count, skillFolders.Count, agentEntity.Name, agentEntity.Id);
         }
 
         // Step 3: Wrap chat client with tracking middleware if job tracking is enabled

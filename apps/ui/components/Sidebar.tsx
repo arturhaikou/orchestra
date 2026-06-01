@@ -20,7 +20,8 @@ import {
   Terminal,
   BookOpen,
   Activity,
-  Workflow
+  Workflow,
+  Folder
 } from 'lucide-react';
 import { Workspace, User } from '../types';
 import { getUser } from '../services/authService';
@@ -117,11 +118,8 @@ const Sidebar: React.FC<SidebarProps> = ({
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-surfaceHighlight transition-colors text-left"
           >
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shrink-0 shadow-lg shadow-primary/20">
-              <Cpu className="w-5 h-5 text-white" />
-            </div>
+            <img src="/orchestra_logo.png" alt="Orchestra" className="w-8 h-8 object-contain shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] text-textMuted uppercase font-bold tracking-wider opacity-60">Orchestra</p>
               <div className="flex items-center gap-1">
                  <h1 className="text-sm font-bold tracking-tight truncate text-text">{activeWorkspace?.name}</h1>
                  <ChevronDown className={`w-3 h-3 text-textMuted transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
@@ -197,7 +195,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           <SidebarItem icon={TicketIcon} label="Tickets" to={`/workspaces/${activeWorkspaceId}/tickets`} active={isActive('tickets')} onClick={onClose} />
           <SidebarItem icon={Bot} label="Agents" to={`/workspaces/${activeWorkspaceId}/agents`} active={isActive('agents')} onClick={onClose} />
           <SidebarItem icon={Activity} label="Jobs" to={`/workspaces/${activeWorkspaceId}/jobs`} active={isActive('jobs')} onClick={onClose} />
-          <SidebarItem icon={BookOpen} label="Skills" to={`/workspaces/${activeWorkspaceId}/skills`} active={isActiveSection('skills')} onClick={onClose} />
+          <SidebarItem icon={BookOpen} label="Skills" to={`/workspaces/${activeWorkspaceId}/skills`} active={isActiveSection('skills') || isActiveSection('skill-folders')} onClick={onClose} />
           <SidebarItem icon={Workflow} label="Workflows" to={`/workspaces/${activeWorkspaceId}/workflows`} active={isActive('workflows')} onClick={onClose} />
         </nav>
 

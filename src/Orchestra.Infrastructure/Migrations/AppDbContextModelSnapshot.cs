@@ -268,6 +268,22 @@ namespace Orchestra.Infrastructure.Migrations
                     b.ToTable("AgentSkills", (string)null);
                 });
 
+            modelBuilder.Entity("Orchestra.Domain.Entities.AgentSkillFolder", b =>
+                {
+                    b.Property<Guid>("AgentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SkillFolderId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("AgentId", "SkillFolderId");
+
+                    b.HasIndex("SkillFolderId")
+                        .HasDatabaseName("IX_AgentSkillFolders_SkillFolderId");
+
+                    b.ToTable("AgentSkillFolders", (string)null);
+                });
+
             modelBuilder.Entity("Orchestra.Domain.Entities.AgentSubAgent", b =>
                 {
                     b.Property<Guid>("ParentAgentId")
@@ -656,6 +672,38 @@ namespace Orchestra.Infrastructure.Migrations
                         .HasDatabaseName("IX_Skills_WorkspaceId");
 
                     b.ToTable("Skills", (string)null);
+                });
+
+            modelBuilder.Entity("Orchestra.Domain.Entities.SkillFolder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FolderPath")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkspaceId")
+                        .HasDatabaseName("IX_SkillFolders_WorkspaceId");
+
+                    b.ToTable("SkillFolders", (string)null);
                 });
 
             modelBuilder.Entity("Orchestra.Domain.Entities.Ticket", b =>
@@ -1337,6 +1385,21 @@ namespace Orchestra.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Orchestra.Domain.Entities.AgentSkillFolder", b =>
+                {
+                    b.HasOne("Orchestra.Domain.Entities.Agent", null)
+                        .WithMany()
+                        .HasForeignKey("AgentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Orchestra.Domain.Entities.SkillFolder", null)
+                        .WithMany()
+                        .HasForeignKey("SkillFolderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Orchestra.Domain.Entities.AgentSubAgent", b =>
                 {
                     b.HasOne("Orchestra.Domain.Entities.Agent", null)
@@ -1418,6 +1481,15 @@ namespace Orchestra.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("Orchestra.Domain.Entities.Skill", b =>
+                {
+                    b.HasOne("Orchestra.Domain.Entities.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Orchestra.Domain.Entities.SkillFolder", b =>
                 {
                     b.HasOne("Orchestra.Domain.Entities.Workspace", null)
                         .WithMany()

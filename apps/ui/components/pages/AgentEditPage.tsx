@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Loader2, AlertTriangle, Info, Plus, X, RefreshCw } from 'lucide-react';
-import { Agent, Skill, Tool, ModelMetadataDto, OptionalToolDto } from '../../types';
+import { Agent, Skill, SkillFolder, Tool, ModelMetadataDto, OptionalToolDto } from '../../types';
 import { getAgent, updateAgent, saveAgentToolAssignments, getAgents, getAgentTemplates, getAgentOptionalTools, saveAgentOptionalTools } from '../../services/agentService';
 import { getTools } from '../../services/toolService';
 import { fetchWorkspaceModels } from '../../services/workspaceService';
 import { getSkills } from '../../services/skillService';
+import { getSkillFolders } from '../../services/skillFolderService';
 import { discoverModelsForIntegration, discoverModelsMetadataForIntegration } from '../../services/cliIntegrationService';
 import { REASONING_EFFORT_OPTIONS } from '../../utils/reasoningModels';
 import Toast from '../Toast';
@@ -62,6 +63,8 @@ const AgentEditPage: React.FC = () => {
   const [availableSkills, setAvailableSkills] = useState<Skill[]>([]);
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
   const [isSkillsModalOpen, setIsSkillsModalOpen] = useState(false);
+  const [availableSkillFolders, setAvailableSkillFolders] = useState<SkillFolder[]>([]);
+  const [selectedSkillFolderIds, setSelectedSkillFolderIds] = useState<string[]>([]);
   const [availableOptionalTools, setAvailableOptionalTools] = useState<OptionalToolDto[]>([]);
   const [selectedOptionalTools, setSelectedOptionalTools] = useState<string[]>([]);
 
@@ -74,6 +77,7 @@ const AgentEditPage: React.FC = () => {
     getMcpServers(workspaceId).then(setMcpServers).catch(() => setMcpServers([]));
     getAgents(workspaceId).then(setAllAgents).catch(() => setAllAgents([]));
     getSkills(workspaceId).then(setAvailableSkills).catch(() => setAvailableSkills([]));
+    getSkillFolders(workspaceId).then(setAvailableSkillFolders).catch(() => setAvailableSkillFolders([]));
   }, [workspaceId, agentId]);
 
   useEffect(() => {
@@ -93,6 +97,7 @@ const AgentEditPage: React.FC = () => {
       setAgent(loaded);
       setSelectedSubAgentIds(loaded.subAgentIds ?? []);
       setSelectedSkillIds((loaded.skills ?? []).map((s: Skill) => s.id));
+      setSelectedSkillFolderIds(loaded.skillFolderIds ?? []);
       setFormState({
         name: loaded.name,
         role: loaded.role,
@@ -250,6 +255,12 @@ const AgentEditPage: React.FC = () => {
     const originalSkillIds = (agent?.skills ?? []).map(s => s.id).sort();
     if (!isBuiltIn && JSON.stringify([...selectedSkillIds].sort()) !== JSON.stringify(originalSkillIds)) {
       payload.skillIds = selectedSkillIds;
+    }
+
+    // Skill Folders
+    const originalSkillFolderIds = (agent?.skillFolderIds ?? []).slice().sort();
+    if (!isBuiltIn && JSON.stringify([...selectedSkillFolderIds].sort()) !== JSON.stringify(originalSkillFolderIds)) {
+      payload.skillFolderIds = selectedSkillFolderIds;
     }
 
     // Instructions
@@ -552,6 +563,60 @@ const AgentEditPage: React.FC = () => {
                 <Plus className="w-4 h-4" />
                 Add Skill
               </button>
+            )}
+          </section>
+          )}
+
+          {/* Skill Folders Section */}
+          {(!isBuiltIn || selectedSkillFolderIds.length > 0) && (
+          <section className="space-y-3">
+            <h2 className="text-lg font-semibold text-text">Skill Folders</h2>
+            {selectedSkillFolderIds.length > 0 && (
+              <div className="space-y-2">
+                {selectedSkillFolderIds.map(id => {
+                  const folder = availableSkillFolders.find(f => f.id === id);
+                  if (!folder) return null;
+                  return (
+                    <div key={id} className="flex items-center gap-3 px-3 py-2 bg-surfaceHighlight border border-border rounded-lg">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-text truncate">{folder.name}</p>
+                        <p className="text-xs text-textMuted font-mono truncate">{folder.folderPath}</p>
+                      </div>
+                      {!isBuiltIn && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedSkillFolderIds(prev => prev.filter(i => i !== id))}
+                          className="text-textMuted hover:text-red-400 transition-colors p-1 rounded hover:bg-red-500/10 flex-shrink-0"
+                          aria-label={`Remove ${folder.name}`}
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {!isBuiltIn && availableSkillFolders.length > 0 && (
+              <div className="space-y-1">
+                {availableSkillFolders
+                  .filter(f => !selectedSkillFolderIds.includes(f.id))
+                  .map(folder => (
+                    <button
+                      key={folder.id}
+                      type="button"
+                      onClick={() => setSelectedSkillFolderIds(prev => [...prev, folder.id])}
+                      className="flex items-center gap-2 w-full px-3 py-2 border border-dashed border-border rounded-lg text-sm text-textMuted hover:text-primary hover:border-primary/50 transition-colors text-left"
+                    >
+                      <Plus className="w-4 h-4 shrink-0" />
+                      <span className="truncate">{folder.name}</span>
+                    </button>
+                  ))
+                }
+              </div>
+            )}
+            {!isBuiltIn && availableSkillFolders.length === 0 && (
+              <p className="text-xs text-textMuted italic">No skill folders registered yet. <a href={`/workspaces/${workspaceId}/skill-folders/new`} className="text-primary hover:underline">Register one</a>.</p>
             )}
           </section>
           )}

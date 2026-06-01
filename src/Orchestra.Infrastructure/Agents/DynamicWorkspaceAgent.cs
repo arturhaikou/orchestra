@@ -137,17 +137,23 @@ public sealed class DynamicWorkspaceAgent : AIAgent
             ChatOptions = chatOptions
         };
 
-        if (context.Skills?.Count > 0 )
+        if (context.Skills?.Count > 0 || context.SkillFolderPaths?.Count > 0)
         {
 #pragma warning disable MAAI001
-            var inlineSkills = context.Skills
+            var inlineSkills = (context.Skills ?? [])
                 .Select(s => new AgentInlineSkill(new AgentSkillFrontmatter(s.Name, s.Description), s.Instructions))
                 .ToArray();
 
-            var skillsProvider = new AgentSkillsProvider(inlineSkills);
-#pragma warning restore MAAI001
+            var builder = new AgentSkillsProviderBuilder().UseSkills(inlineSkills);
 
-            agentOptions.AIContextProviders = [skillsProvider];
+            foreach (var folderPath in context.SkillFolderPaths ?? [])
+            {
+                if (Directory.Exists(folderPath))
+                    builder.UseFileSkill(folderPath);
+            }
+
+            agentOptions.AIContextProviders = [builder.Build()];
+#pragma warning restore MAAI001
         }
 
         return context.ChatClient!.AsAIAgent(agentOptions);

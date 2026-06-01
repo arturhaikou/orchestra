@@ -12,6 +12,7 @@
         theme: {
           extend: {
             colors: {
+              // Legacy colors (kept for backward compatibility during migration)
               background: 'rgb(var(--background) / <alpha-value>)',
               surface: 'rgb(var(--surface) / <alpha-value>)',
               surfaceHighlight: 'rgb(var(--surface-highlight) / <alpha-value>)',
@@ -20,6 +21,24 @@
               border: 'rgb(var(--border) / <alpha-value>)',
               text: 'rgb(var(--text) / <alpha-value>)',
               textMuted: 'rgb(var(--text-muted) / <alpha-value>)',
+              
+              // Dark Factory semantic colors (new system)
+              'surface-alt': 'rgb(var(--surface-alt) / <alpha-value>)',
+              'border-base': 'rgb(var(--border-base) / <alpha-value>)',
+              'border-elevated': 'rgb(var(--border-elevated) / <alpha-value>)',
+              'text-primary': 'rgb(var(--text-primary) / <alpha-value>)',
+              'text-secondary': 'rgb(var(--text-secondary) / <alpha-value>)',
+              'text-tertiary': 'rgb(var(--text-tertiary) / <alpha-value>)',
+              'accent-purple': 'rgb(var(--accent-purple) / <alpha-value>)',
+              'accent-cyan': 'rgb(var(--accent-cyan) / <alpha-value>)',
+              'accent-yellow': 'rgb(var(--accent-yellow) / <alpha-value>)',
+              'accent-emerald': 'rgb(var(--accent-emerald) / <alpha-value>)',
+              'accent-red': 'rgb(var(--accent-red) / <alpha-value>)',
+              'accent-purple-light': 'rgb(var(--accent-purple-light) / <alpha-value>)',
+              'accent-cyan-light': 'rgb(var(--accent-cyan-light) / <alpha-value>)',
+              'accent-yellow-light': 'rgb(var(--accent-yellow-light) / <alpha-value>)',
+              'accent-emerald-light': 'rgb(var(--accent-emerald-light) / <alpha-value>)',
+              'accent-red-light': 'rgb(var(--accent-red-light) / <alpha-value>)',
             },
             fontFamily: {
               mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', "Liberation Mono", "Courier New", 'monospace'],
@@ -31,25 +50,59 @@
     <link href="https://cdn.jsdelivr.net/npm/reactflow/dist/style.css" rel="stylesheet" />
     <style>
       :root {
-        --background: 249 250 251;
+        --background: 248 250 252;
         --surface: 255 255 255;
-        --surface-highlight: 243 244 246;
+        --surface-highlight: 241 245 249;
         --primary: 99 102 241;
         --primary-hover: 79 70 229;
-        --border: 229 231 235;
-        --text: 24 24 27;
-        --text-muted: 113 113 122;
+        --border: 226 232 240;
+        --text: 15 23 42;
+        --text-muted: 100 116 139;
+
+        --surface-alt: 241 245 249;
+        --border-base: 226 232 240;
+        --border-elevated: 203 213 225;
+        --text-primary: 15 23 42;
+        --text-secondary: 71 85 105;
+        --text-tertiary: 100 116 139;
+        --accent-purple: 168 85 247;
+        --accent-cyan: 34 211 238;
+        --accent-yellow: 234 179 8;
+        --accent-emerald: 16 185 129;
+        --accent-red: 239 68 68;
+        --accent-purple-light: 216 180 254;
+        --accent-cyan-light: 165 243 252;
+        --accent-yellow-light: 254 243 62;
+        --accent-emerald-light: 167 243 208;
+        --accent-red-light: 254 202 202;
       }
-      
+
       .dark {
-        --background: 9 9 11;
+        --background: 2 6 23;
         --surface: 24 24 27;
         --surface-highlight: 39 39 42;
         --primary: 99 102 241;
         --primary-hover: 79 70 229;
-        --border: 39 39 42;
-        --text: 228 228 231;
-        --text-muted: 161 161 170;
+        --border: 30 41 59;
+        --text: 255 255 255;
+        --text-muted: 148 163 184;
+
+        --surface-alt: 15 23 42;
+        --border-base: 30 41 59;
+        --border-elevated: 51 65 85;
+        --text-primary: 255 255 255;
+        --text-secondary: 148 163 184;
+        --text-tertiary: 100 116 139;
+        --accent-purple: 168 85 247;
+        --accent-cyan: 34 211 238;
+        --accent-yellow: 234 179 8;
+        --accent-emerald: 16 185 129;
+        --accent-red: 239 68 68;
+        --accent-purple-light: 216 180 254;
+        --accent-cyan-light: 165 243 252;
+        --accent-yellow-light: 254 243 62;
+        --accent-emerald-light: 167 243 208;
+        --accent-red-light: 254 202 202;
       }
 
       body {

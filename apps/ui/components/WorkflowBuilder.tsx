@@ -17,6 +17,7 @@ import {
   Plus, Trash2, Loader2, Save, ArrowLeft, AlertTriangle,
   ToggleLeft, ToggleRight, Bot, X, Search, GitBranch,
 } from 'lucide-react';
+import { colorTokensHex } from '../src/tokens';
 import { WorkflowDefinition, Agent } from '../types';
 import {
   getWorkflowDefinitions,
@@ -66,70 +67,70 @@ const AgentStepNode: React.FC<NodeProps<AgentStepNodeData>> = ({ data, selected 
     <div
       style={{
         width: NODE_WIDTH,
-        background: '#1e2030',
-        border: `2px solid ${active ? '#6366f1' : '#2d3148'}`,
+        background: colorTokensHex.uiBg2,
+        border: `2px solid ${active ? colorTokensHex.uiAccent : colorTokensHex.uiBorder1}`,
         borderRadius: 12,
         padding: '12px 14px',
         cursor: 'pointer',
-        boxShadow: active ? '0 0 0 3px rgba(99,102,241,0.2)' : '0 2px 8px rgba(0,0,0,0.4)',
+        boxShadow: active ? `0 0 0 3px rgba(99,102,241,0.2)` : '0 2px 8px rgba(0,0,0,0.4)',
         transition: 'border-color 0.15s, box-shadow 0.15s',
       }}
     >
       <Handle
         type="target"
         position={Position.Top}
-        style={{ width: 10, height: 10, background: '#4a4d6e', border: '2px solid #1e2030', top: -6 }}
+        style={{ width: 10, height: 10, background: colorTokensHex.uiBorder2, border: `2px solid ${colorTokensHex.uiBg2}`, top: -6 }}
       />
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{
           width: 36, height: 36, borderRadius: 8,
-          background: active ? 'rgba(99,102,241,0.15)' : '#2d3148',
+          background: active ? 'rgba(99,102,241,0.15)' : colorTokensHex.uiBorder1,
           display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
         }}>
-          <Bot size={16} color={active ? '#6366f1' : '#8b8fa8'} />
+          <Bot size={16} color={active ? colorTokensHex.uiAccent : colorTokensHex.uiText2} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3, flexWrap: 'wrap' }}>
             <span style={{
-              fontSize: 10, fontWeight: 700, color: '#6366f1',
+              fontSize: 10, fontWeight: 700, color: colorTokensHex.uiAccent,
               background: 'rgba(99,102,241,0.12)', padding: '1px 6px', borderRadius: 20,
             }}>
               {data.stepIndex + 1}
             </span>
             {data.passPreviousOutput && (
-              <span style={{ fontSize: 10, color: '#a78bfa', background: 'rgba(167,139,250,0.1)', padding: '1px 6px', borderRadius: 20 }}>
+              <span style={{ fontSize: 10, color: colorTokensHex.uiAccentPurple, background: 'rgba(167,139,250,0.1)', padding: '1px 6px', borderRadius: 20 }}>
                 ↻ chain
               </span>
             )}
             {data.hasInstructionOverride && (
-              <span style={{ fontSize: 10, color: '#fbbf24', background: 'rgba(251,191,36,0.1)', padding: '1px 6px', borderRadius: 20 }}>
+              <span style={{ fontSize: 10, color: colorTokensHex.uiWarning, background: 'rgba(251,191,36,0.1)', padding: '1px 6px', borderRadius: 20 }}>
                 + notes
               </span>
             )}
           </div>
           <p style={{
             margin: 0, fontSize: 13, fontWeight: 600,
-            color: active ? '#fff' : '#c0c4d8',
+            color: active ? colorTokensHex.textPrimary : colorTokensHex.uiText1,
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           }}>
             {data.agentName
               ? data.agentName
-              : <span style={{ color: '#5a5d7a', fontStyle: 'italic' }}>No agent selected</span>}
+              : <span style={{ color: colorTokensHex.uiText3, fontStyle: 'italic' }}>No agent selected</span>}
           </p>
         </div>
         <button
           onClick={e => { e.stopPropagation(); data.onDelete(); }}
           style={{
             padding: 4, borderRadius: 6, border: 'none', background: 'transparent',
-            cursor: 'pointer', color: '#4a4d6e', display: 'flex', flexShrink: 0,
+            cursor: 'pointer', color: colorTokensHex.uiBorder2, display: 'flex', flexShrink: 0,
           }}
           onMouseEnter={e => {
             const b = e.currentTarget as HTMLButtonElement;
-            b.style.color = '#f87171'; b.style.background = 'rgba(248,113,113,0.1)';
+            b.style.color = colorTokensHex.uiError; b.style.background = 'rgba(248,113,113,0.1)';
           }}
           onMouseLeave={e => {
             const b = e.currentTarget as HTMLButtonElement;
-            b.style.color = '#4a4d6e'; b.style.background = 'transparent';
+            b.style.color = colorTokensHex.uiBorder2; b.style.background = 'transparent';
           }}
           title="Remove step"
         >
@@ -139,7 +140,7 @@ const AgentStepNode: React.FC<NodeProps<AgentStepNodeData>> = ({ data, selected 
       <Handle
         type="source"
         position={Position.Bottom}
-        style={{ width: 10, height: 10, background: '#4a4d6e', border: '2px solid #1e2030', bottom: -6 }}
+        style={{ width: 10, height: 10, background: colorTokensHex.uiBorder2, border: `2px solid ${colorTokensHex.uiBg2}`, bottom: -6 }}
       />
     </div>
   );
@@ -150,26 +151,26 @@ const AddStepNode: React.FC<NodeProps<AddStepNodeData>> = ({ data }) => (
     onClick={data.onAdd}
     style={{
       width: 40, height: 40, borderRadius: '50%',
-      background: '#13141f', border: '2px dashed #3a3d5a',
+      background: colorTokensHex.uiBg1, border: `2px dashed ${colorTokensHex.uiBorder2}`,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       cursor: 'pointer', transition: 'border-color 0.15s, background 0.15s',
     }}
     onMouseEnter={e => {
       const el = e.currentTarget as HTMLDivElement;
-      el.style.borderColor = '#6366f1'; el.style.background = 'rgba(99,102,241,0.1)';
+      el.style.borderColor = colorTokensHex.uiAccent; el.style.background = 'rgba(99,102,241,0.1)';
     }}
     onMouseLeave={e => {
       const el = e.currentTarget as HTMLDivElement;
-      el.style.borderColor = '#3a3d5a'; el.style.background = '#13141f';
+      el.style.borderColor = colorTokensHex.uiBorder2; el.style.background = colorTokensHex.uiBg1;
     }}
     title="Add step"
   >
     <Handle
       type="target"
       position={Position.Top}
-      style={{ width: 10, height: 10, background: '#4a4d6e', border: '2px solid #13141f', top: -6 }}
+      style={{ width: 10, height: 10, background: colorTokensHex.uiBorder2, border: `2px solid ${colorTokensHex.uiBg1}`, top: -6 }}
     />
-    <Plus size={16} color="#5a5d7a" />
+    <Plus size={16} color={colorTokensHex.uiText3} />
   </div>
 );
 
@@ -259,8 +260,8 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ workspaceId }) => {
       source: `step-${i}`,
       target: i === steps.length - 1 ? 'add-step' : `step-${i + 1}`,
       type: 'smoothstep',
-      style: { stroke: '#3a3d5a', strokeWidth: 2 },
-      markerEnd: { type: MarkerType.ArrowClosed, color: '#3a3d5a', width: 14, height: 14 },
+      style: { stroke: colorTokensHex.uiBorder2, strokeWidth: 2 },
+      markerEnd: { type: MarkerType.ArrowClosed, color: colorTokensHex.uiBorder2, width: 14, height: 14 },
     }));
 
     setRfNodes(newNodes);
@@ -381,13 +382,13 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ workspaceId }) => {
         style={{
           position: 'fixed', inset: 0, zIndex: 50,
           display: 'flex', flexDirection: 'column',
-          background: '#0d0e1a',
+          background: colorTokensHex.bgApp,
         }}
       >
         {/* Top toolbar */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px',
-          background: '#13141f', borderBottom: '1px solid #2d3148', flexShrink: 0,
+          background: colorTokensHex.uiBg1, borderBottom: `1px solid ${colorTokensHex.uiBorder1}`, flexShrink: 0,
           minHeight: 52,
         }}>
           <button
@@ -395,10 +396,10 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ workspaceId }) => {
             title="Back to workflows"
             style={{
               padding: 6, borderRadius: 8, border: 'none', background: 'transparent',
-              cursor: 'pointer', color: '#8b8fa8', display: 'flex', flexShrink: 0,
+              cursor: 'pointer', color: colorTokensHex.uiText2, display: 'flex', flexShrink: 0,
             }}
-            onMouseEnter={e => { const b = e.currentTarget as HTMLButtonElement; b.style.background = '#1e2030'; b.style.color = '#fff'; }}
-            onMouseLeave={e => { const b = e.currentTarget as HTMLButtonElement; b.style.background = 'transparent'; b.style.color = '#8b8fa8'; }}
+            onMouseEnter={e => { const b = e.currentTarget as HTMLButtonElement; b.style.background = colorTokensHex.uiBg2; b.style.color = colorTokensHex.textPrimary; }}
+            onMouseLeave={e => { const b = e.currentTarget as HTMLButtonElement; b.style.background = 'transparent'; b.style.color = colorTokensHex.uiText2; }}
           >
             <ArrowLeft size={18} />
           </button>
@@ -411,18 +412,18 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ workspaceId }) => {
               placeholder="Workflow name…"
               style={{
                 background: 'transparent', border: 'none', outline: 'none',
-                fontSize: 15, fontWeight: 700, color: '#fff', width: '100%',
+                fontSize: 15, fontWeight: 700, color: colorTokensHex.textPrimary, width: '100%',
               }}
             />
             {description && (
-              <span style={{ fontSize: 11, color: '#5a5d7a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <span style={{ fontSize: 11, color: colorTokensHex.uiText3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {description}
               </span>
             )}
           </div>
 
           {saveError && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#f87171', fontSize: 12, flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: colorTokensHex.uiError, fontSize: 12, flexShrink: 0 }}>
               <AlertTriangle size={13} />
               <span>{saveError}</span>
             </div>
@@ -433,8 +434,8 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ workspaceId }) => {
               onClick={() => setDeleteId(editingId)}
               style={{
                 padding: '6px 12px', borderRadius: 8,
-                border: '1px solid rgba(239,68,68,0.3)', background: 'transparent',
-                cursor: 'pointer', color: '#f87171', fontSize: 12, flexShrink: 0,
+                border: `1px solid rgba(239,68,68,0.3)`, background: 'transparent',
+                cursor: 'pointer', color: colorTokensHex.uiError, fontSize: 12, flexShrink: 0,
               }}
             >
               Delete
@@ -447,7 +448,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ workspaceId }) => {
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '7px 16px', borderRadius: 8, border: 'none',
-              background: '#6366f1', color: '#fff',
+              background: colorTokensHex.uiAccent, color: colorTokensHex.textPrimary,
               cursor: isSaving ? 'not-allowed' : 'pointer',
               fontSize: 13, fontWeight: 600, flexShrink: 0,
               opacity: isSaving ? 0.7 : 1,
@@ -463,18 +464,18 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ workspaceId }) => {
 
           {/* Left panel: agent library */}
           <div style={{
-            width: 220, background: '#13141f', borderRight: '1px solid #2d3148',
+            width: 220, background: colorTokensHex.uiBg1, borderRight: `1px solid ${colorTokensHex.uiBorder1}`,
             display: 'flex', flexDirection: 'column', overflow: 'hidden', flexShrink: 0,
           }}>
-            <div style={{ padding: '12px 14px', borderBottom: '1px solid #2d3148' }}>
+            <div style={{ padding: '12px 14px', borderBottom: `1px solid ${colorTokensHex.uiBorder1}` }}>
               <p style={{
-                margin: '0 0 8px', fontSize: 10, fontWeight: 700, color: '#8b8fa8',
+                margin: '0 0 8px', fontSize: 10, fontWeight: 700, color: colorTokensHex.uiText2,
                 textTransform: 'uppercase', letterSpacing: '0.08em',
               }}>
                 Agents
               </p>
               <div style={{ position: 'relative' }}>
-                <Search size={13} style={{ position: 'absolute', left: 9, top: 8, color: '#5a5d7a', pointerEvents: 'none' }} />
+                <Search size={13} style={{ position: 'absolute', left: 9, top: 8, color: colorTokensHex.uiText3, pointerEvents: 'none' }} />
                 <input
                   type="text"
                   value={agentSearch}
@@ -482,15 +483,15 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ workspaceId }) => {
                   placeholder="Search…"
                   style={{
                     width: '100%', padding: '6px 10px 6px 28px', borderRadius: 8,
-                    border: '1px solid #2d3148', background: '#1e2030',
-                    color: '#fff', fontSize: 12, outline: 'none', boxSizing: 'border-box',
+                    border: `1px solid ${colorTokensHex.uiBorder1}`, background: colorTokensHex.uiBg2,
+                    color: colorTokensHex.textPrimary, fontSize: 12, outline: 'none', boxSizing: 'border-box',
                   }}
                 />
               </div>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '8px 6px' }}>
               {filteredAgents.length === 0 && (
-                <p style={{ fontSize: 12, color: '#5a5d7a', textAlign: 'center', padding: 16, fontStyle: 'italic' }}>
+                <p style={{ fontSize: 12, color: colorTokensHex.uiText3, textAlign: 'center', padding: 16, fontStyle: 'italic' }}>
                   {agentSearch ? 'No matches' : 'No agents'}
                 </p>
               )}
@@ -504,7 +505,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ workspaceId }) => {
                     padding: '7px 8px', borderRadius: 8, border: 'none', background: 'transparent',
                     cursor: 'pointer', textAlign: 'left', marginBottom: 2,
                   }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#1e2030'; }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = colorTokensHex.uiBg2; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
                 >
                   <div style={{
@@ -512,23 +513,23 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ workspaceId }) => {
                     background: 'rgba(99,102,241,0.1)', flexShrink: 0,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
-                    <Bot size={14} color="#6366f1" />
+                    <Bot size={14} color={colorTokensHex.uiAccent} />
                   </div>
                   <div style={{ minWidth: 0, flex: 1 }}>
-                    <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#c0c4d8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: colorTokensHex.uiText1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {agent.name}
                     </p>
-                    <p style={{ margin: 0, fontSize: 10, color: '#5a5d7a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <p style={{ margin: 0, fontSize: 10, color: colorTokensHex.uiText3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {agent.role}
                     </p>
                   </div>
-                  <Plus size={12} color="#3a3d5a" style={{ flexShrink: 0 }} />
+                  <Plus size={12} color={colorTokensHex.uiBorder2} style={{ flexShrink: 0 }} />
                 </button>
               ))}
             </div>
             {/* Description field at bottom */}
-            <div style={{ padding: '10px 14px', borderTop: '1px solid #2d3148' }}>
-              <p style={{ margin: '0 0 5px', fontSize: 10, fontWeight: 700, color: '#8b8fa8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            <div style={{ padding: '10px 14px', borderTop: `1px solid ${colorTokensHex.uiBorder1}` }}>
+              <p style={{ margin: '0 0 5px', fontSize: 10, fontWeight: 700, color: colorTokensHex.uiText2, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                 Description
               </p>
               <textarea
@@ -538,8 +539,8 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ workspaceId }) => {
                 placeholder="Optional description…"
                 style={{
                   width: '100%', padding: '6px 8px', borderRadius: 6,
-                  border: '1px solid #2d3148', background: '#1e2030',
-                  color: '#c0c4d8', fontSize: 11, resize: 'none', outline: 'none',
+                  border: `1px solid ${colorTokensHex.uiBorder1}`, background: colorTokensHex.uiBg2,
+                  color: colorTokensHex.uiText1, fontSize: 11, resize: 'none', outline: 'none',
                   boxSizing: 'border-box', fontFamily: 'inherit',
                 }}
               />
@@ -547,14 +548,14 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ workspaceId }) => {
           </div>
 
           {/* Canvas */}
-          <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: '#0d0e1a' }}>
+          <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: colorTokensHex.bgApp }}>
             {steps.length === 0 ? (
               <div style={{
                 position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
                 alignItems: 'center', justifyContent: 'center', gap: 10,
               }}>
-                <GitBranch size={36} color="#2d3148" />
-                <p style={{ color: '#5a5d7a', fontSize: 13, margin: 0, textAlign: 'center' }}>
+                <GitBranch size={36} color={colorTokensHex.uiBorder1} />
+                <p style={{ color: colorTokensHex.uiText3, fontSize: 13, margin: 0, textAlign: 'center' }}>
                   Click an agent on the left to add the first step
                 </p>
               </div>
@@ -580,10 +581,10 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ workspaceId }) => {
                 minZoom={0.3}
                 maxZoom={2}
               >
-                <Background variant={BackgroundVariant.Dots} gap={24} size={1.5} color="#1e2030" />
+                <Background variant={BackgroundVariant.Dots} gap={24} size={1.5} color={colorTokensHex.uiBg2} />
                 <Controls
                   style={{
-                    background: '#1e2030', border: '1px solid #2d3148',
+                    background: colorTokensHex.uiBg2, border: `1px solid ${colorTokensHex.uiBorder1}`,
                     borderRadius: 8, overflow: 'hidden',
                   }}
                 />
@@ -594,28 +595,28 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ workspaceId }) => {
           {/* Right panel: step config */}
           {selectedStep && (
             <div style={{
-              width: 288, background: '#13141f', borderLeft: '1px solid #2d3148',
+              width: 288, background: colorTokensHex.uiBg1, borderLeft: `1px solid ${colorTokensHex.uiBorder1}`,
               display: 'flex', flexDirection: 'column', overflow: 'hidden', flexShrink: 0,
             }}>
               {/* Header */}
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '12px 16px', borderBottom: '1px solid #2d3148',
+                padding: '12px 16px', borderBottom: `1px solid ${colorTokensHex.uiBorder1}`,
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{
-                    fontSize: 10, fontWeight: 700, color: '#6366f1',
+                    fontSize: 10, fontWeight: 700, color: colorTokensHex.uiAccent,
                     background: 'rgba(99,102,241,0.12)', padding: '2px 8px', borderRadius: 20,
                   }}>
                     Step {selectedStepIndex! + 1}
                   </span>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: '#8b8fa8' }}>Config</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: colorTokensHex.uiText2 }}>Config</span>
                 </div>
                 <button
                   onClick={() => setSelectedStepIndex(null)}
-                  style={{ padding: 4, borderRadius: 6, border: 'none', background: 'transparent', cursor: 'pointer', color: '#5a5d7a', display: 'flex' }}
-                  onMouseEnter={e => { const b = e.currentTarget as HTMLButtonElement; b.style.color = '#fff'; b.style.background = '#1e2030'; }}
-                  onMouseLeave={e => { const b = e.currentTarget as HTMLButtonElement; b.style.color = '#5a5d7a'; b.style.background = 'transparent'; }}
+                  style={{ padding: 4, borderRadius: 6, border: 'none', background: 'transparent', cursor: 'pointer', color: colorTokensHex.uiText3, display: 'flex' }}
+                  onMouseEnter={e => { const b = e.currentTarget as HTMLButtonElement; b.style.color = colorTokensHex.textPrimary; b.style.background = colorTokensHex.uiBg2; }}
+                  onMouseLeave={e => { const b = e.currentTarget as HTMLButtonElement; b.style.color = colorTokensHex.uiText3; b.style.background = 'transparent'; }}
                 >
                   <X size={15} />
                 </button>
@@ -626,7 +627,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ workspaceId }) => {
 
                 {/* Agent */}
                 <div>
-                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#8b8fa8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: colorTokensHex.uiText2, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
                     Agent *
                   </label>
                   <select
@@ -634,8 +635,8 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ workspaceId }) => {
                     onChange={e => updateStep(selectedStepIndex!, { agentId: e.target.value })}
                     style={{
                       width: '100%', padding: '8px 10px', borderRadius: 8,
-                      border: '1px solid #2d3148', background: '#1e2030',
-                      color: selectedStep.agentId ? '#fff' : '#5a5d7a',
+                      border: `1px solid ${colorTokensHex.uiBorder1}`, background: colorTokensHex.uiBg2,
+                      color: selectedStep.agentId ? colorTokensHex.textPrimary : colorTokensHex.uiText3,
                       fontSize: 13, outline: 'none',
                     }}
                   >
@@ -648,7 +649,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ workspaceId }) => {
 
                 {/* Instructions */}
                 <div>
-                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#8b8fa8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: colorTokensHex.uiText2, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
                     Additional Instructions
                   </label>
                   <textarea
@@ -658,8 +659,8 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ workspaceId }) => {
                     placeholder="Extra instructions appended to this agent's context for this step…"
                     style={{
                       width: '100%', padding: '8px 10px', borderRadius: 8,
-                      border: '1px solid #2d3148', background: '#1e2030',
-                      color: '#fff', fontSize: 12, resize: 'vertical', outline: 'none',
+                      border: `1px solid ${colorTokensHex.uiBorder1}`, background: colorTokensHex.uiBg2,
+                      color: colorTokensHex.textPrimary, fontSize: 12, resize: 'vertical', outline: 'none',
                       boxSizing: 'border-box', fontFamily: 'inherit',
                     }}
                   />
@@ -667,11 +668,11 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ workspaceId }) => {
 
                 {/* Pass previous output — only show for step index > 0 */}
                 {selectedStepIndex! > 0 && (
-                  <div style={{ padding: '12px 14px', borderRadius: 10, background: '#1e2030', border: '1px solid #2d3148' }}>
+                  <div style={{ padding: '12px 14px', borderRadius: 10, background: colorTokensHex.uiBg2, border: `1px solid ${colorTokensHex.uiBorder1}` }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
                       <div style={{ flex: 1 }}>
-                        <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#c0c4d8' }}>Pass previous output</p>
-                        <p style={{ margin: '4px 0 0', fontSize: 11, color: '#5a5d7a', lineHeight: 1.5 }}>
+                        <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: colorTokensHex.uiText1 }}>Pass previous output</p>
+                        <p style={{ margin: '4px 0 0', fontSize: 11, color: colorTokensHex.uiText3, lineHeight: 1.5 }}>
                           Inject the previous step's response as context for this agent
                         </p>
                       </div>
@@ -680,7 +681,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ workspaceId }) => {
                         onClick={() => updateStep(selectedStepIndex!, { passPreviousOutput: !selectedStep.passPreviousOutput })}
                         style={{
                           background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0,
-                          color: selectedStep.passPreviousOutput ? '#6366f1' : '#3a3d5a',
+                          color: selectedStep.passPreviousOutput ? colorTokensHex.uiAccent : colorTokensHex.uiBorder2,
                           display: 'flex', marginTop: 2, transition: 'color 0.15s',
                         }}
                       >
@@ -701,8 +702,8 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ workspaceId }) => {
                     }}
                     style={{
                       width: '100%', padding: '8px 16px', borderRadius: 8,
-                      border: '1px solid rgba(239,68,68,0.25)', background: 'transparent',
-                      color: '#f87171', fontSize: 13, cursor: 'pointer',
+                      border: `1px solid rgba(239,68,68,0.25)`, background: 'transparent',
+                      color: colorTokensHex.uiError, fontSize: 13, cursor: 'pointer',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                     }}
                     onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(248,113,113,0.08)'; }}

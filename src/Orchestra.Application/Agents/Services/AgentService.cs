@@ -16,7 +16,9 @@ public class AgentService : IAgentService
     private readonly IAgentMcpToolDataAccess _agentMcpToolDataAccess;
     private readonly IAgentSubAgentDataAccess _agentSubAgentDataAccess;
     private readonly IAgentSkillDataAccess _agentSkillDataAccess;
+    private readonly IAgentSkillFolderDataAccess _agentSkillFolderDataAccess;
     private readonly ISkillDataAccess _skillDataAccess;
+    private readonly ISkillFolderDataAccess _skillFolderDataAccess;
     private readonly IWorkspaceAuthorizationService _workspaceAuthorizationService;
     private readonly IToolValidationService _toolValidationService;
     private readonly IBuiltInAgentTemplateRegistry _templateRegistry;
@@ -31,7 +33,9 @@ public class AgentService : IAgentService
         IAgentMcpToolDataAccess agentMcpToolDataAccess,
         IAgentSubAgentDataAccess agentSubAgentDataAccess,
         IAgentSkillDataAccess agentSkillDataAccess,
+        IAgentSkillFolderDataAccess agentSkillFolderDataAccess,
         ISkillDataAccess skillDataAccess,
+        ISkillFolderDataAccess skillFolderDataAccess,
         IWorkspaceAuthorizationService workspaceAuthorizationService,
         IToolValidationService toolValidationService,
         IBuiltInAgentTemplateRegistry templateRegistry,
@@ -45,7 +49,9 @@ public class AgentService : IAgentService
         _agentMcpToolDataAccess = agentMcpToolDataAccess ?? throw new ArgumentNullException(nameof(agentMcpToolDataAccess));
         _agentSubAgentDataAccess = agentSubAgentDataAccess ?? throw new ArgumentNullException(nameof(agentSubAgentDataAccess));
         _agentSkillDataAccess = agentSkillDataAccess ?? throw new ArgumentNullException(nameof(agentSkillDataAccess));
+        _agentSkillFolderDataAccess = agentSkillFolderDataAccess ?? throw new ArgumentNullException(nameof(agentSkillFolderDataAccess));
         _skillDataAccess = skillDataAccess ?? throw new ArgumentNullException(nameof(skillDataAccess));
+        _skillFolderDataAccess = skillFolderDataAccess ?? throw new ArgumentNullException(nameof(skillFolderDataAccess));
         _workspaceAuthorizationService = workspaceAuthorizationService ?? throw new ArgumentNullException(nameof(workspaceAuthorizationService));
         _toolValidationService = toolValidationService ?? throw new ArgumentNullException(nameof(toolValidationService));
         _templateRegistry = templateRegistry ?? throw new ArgumentNullException(nameof(templateRegistry));
@@ -176,6 +182,21 @@ public class AgentService : IAgentService
             {
                 await ValidateSkillsBelongToWorkspaceAsync(skillGuids, request.WorkspaceId, cancellationToken);
                 await _agentSkillDataAccess.AssignSkillsAsync(agent.Id, skillGuids, cancellationToken);
+            }
+        }
+
+        // 6.8. Assign skill folders if provided
+        if (request.SkillFolderIds != null && request.SkillFolderIds.Length > 0)
+        {
+            var folderGuids = request.SkillFolderIds
+                .Select(id => Guid.TryParse(id, out var guid) ? guid : Guid.Empty)
+                .Where(guid => guid != Guid.Empty)
+                .ToList();
+
+            if (folderGuids.Count > 0)
+            {
+                await ValidateSkillFoldersBelongToWorkspaceAsync(folderGuids, request.WorkspaceId, cancellationToken);
+                await _agentSkillFolderDataAccess.AssignFoldersAsync(agent.Id, folderGuids, cancellationToken);
             }
         }
 
@@ -405,6 +426,20 @@ public class AgentService : IAgentService
             await _agentSkillDataAccess.ReplaceSkillsAsync(agentId, skillGuids, cancellationToken);
         }
 
+        // 8d. Update skill folder assignments if provided (null = no-op, empty = remove all)
+        if (request.SkillFolderIds != null)
+        {
+            var folderGuids = request.SkillFolderIds
+                .Select(id => Guid.TryParse(id, out var guid) ? guid : Guid.Empty)
+                .Where(guid => guid != Guid.Empty)
+                .ToList();
+
+            if (folderGuids.Count > 0)
+                await ValidateSkillFoldersBelongToWorkspaceAsync(folderGuids, agent.WorkspaceId, cancellationToken);
+
+            await _agentSkillFolderDataAccess.ReplaceFoldersAsync(agentId, folderGuids, cancellationToken);
+        }
+
         // 9. Map to DTO and return
         return await MapToDtoAsync(agent, cancellationToken);
     }
@@ -494,6 +529,9 @@ public class AgentService : IAgentService
 
         if (request.SkillIds is not null)
             lockedViolations.Add("skills");
+
+        if (request.SkillFolderIds is not null)
+            lockedViolations.Add("skill-folders");
 
         if (request.SubAgentIds is not null)
             lockedViolations.Add("sub-agents");
@@ -618,6 +656,9 @@ public class AgentService : IAgentService
             UpdatedAt: s.UpdatedAt
         )).ToList();
 
+        var skillFolders = await _agentSkillFolderDataAccess.GetFoldersByAgentIdAsync(agent.Id, cancellationToken) ?? [];
+        var skillFolderIds = skillFolders.Select(sf => sf.Id.ToString()).ToArray();
+
         var guide = await ResolveGuideAsync(agent, cancellationToken, preResolvedLabel);
 
         return new AgentDto(
@@ -647,7 +688,8 @@ public class AgentService : IAgentService
             Guide: guide,
             AiCliIntegrationId: agent.AiCliIntegrationId?.ToString(),
             ReasoningEffort: agent.ReasoningEffort,
-            Skills: skillDtos
+            Skills: skillDtos,
+            SkillFolderIds: skillFolderIds
         );
     }
 
@@ -754,6 +796,19 @@ public class AgentService : IAgentService
             var exists = await _skillDataAccess.ExistsInWorkspaceAsync(skillId, workspaceId, cancellationToken);
             if (!exists)
                 throw new ArgumentException($"Skill '{skillId}' does not exist in workspace '{workspaceId}'.");
+        }
+    }
+
+    private async Task ValidateSkillFoldersBelongToWorkspaceAsync(
+        IReadOnlyList<Guid> skillFolderIds,
+        Guid workspaceId,
+        CancellationToken cancellationToken)
+    {
+        foreach (var skillFolderId in skillFolderIds)
+        {
+            var exists = await _skillFolderDataAccess.ExistsInWorkspaceAsync(skillFolderId, workspaceId, cancellationToken);
+            if (!exists)
+                throw new ArgumentException($"Skill folder '{skillFolderId}' does not exist in workspace '{workspaceId}'.");
         }
     }
 }

@@ -21,5 +21,6 @@ public record CreateAgentRequest(
     string? ReasoningEffort = null,
     IReadOnlyList<McpToolSelectionDto>? McpSelections = null,
     string[]? SubAgentIds = null,
-    string[]? SkillIds = null
+    string[]? SkillIds = null,
+    string[]? SkillFolderIds = null
 );

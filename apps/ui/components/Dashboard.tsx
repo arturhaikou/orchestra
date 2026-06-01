@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
   CartesianGrid
 } from 'recharts';
+import { colorTokensHex } from '../src/tokens';
 import { getTickets } from '../services/ticketService';
 import { getAgents } from '../services/agentService';
 import { getJobs } from '../services/jobService';
@@ -68,11 +69,11 @@ const Dashboard: React.FC<DashboardProps> = ({ workspaceId, isDarkMode = true })
   ];
 
   const chartColors = {
-      grid: isDarkMode ? '#27272a' : '#e5e7eb',
-      text: isDarkMode ? '#a1a1aa' : '#71717a',
-      tooltipBg: isDarkMode ? '#18181b' : '#ffffff',
-      tooltipBorder: isDarkMode ? '#27272a' : '#e5e7eb',
-      tooltipText: isDarkMode ? '#e4e4e7' : '#18181b',
+      grid: isDarkMode ? colorTokensHex.uiBorder1 : '#e5e7eb',
+      text: isDarkMode ? colorTokensHex.uiText2 : '#71717a',
+      tooltipBg: isDarkMode ? colorTokensHex.uiBg1 : '#ffffff',
+      tooltipBorder: isDarkMode ? colorTokensHex.uiBorder1 : '#e5e7eb',
+      tooltipText: isDarkMode ? colorTokensHex.uiText1 : '#18181b',
   };
 
   if (isLoading && tickets.length === 0) {
@@ -125,8 +126,8 @@ const Dashboard: React.FC<DashboardProps> = ({ workspaceId, isDarkMode = true })
                         color: chartColors.tooltipText 
                     }} 
                 />
-                <Bar dataKey="tickets" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="jobs" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="tickets" fill={colorTokensHex.uiAccent} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="jobs" fill={colorTokensHex.emerald} radius={[4, 4, 0, 0]} />
                 </BarChart>
             </ResponsiveContainer>
           </div>

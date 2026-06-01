@@ -1,8 +1,9 @@
 
 import React, { useState } from 'react';
-import { Cpu, Loader2, Lock, Mail, User, Sun, Moon } from 'lucide-react';
+import { Loader2, Lock, Mail, User } from 'lucide-react';
 import { login, register } from '../services/authService';
 import { validatePassword } from '../utils/passwordValidator';
+import PublicHeader from './PublicHeader';
 
 interface LoginProps {
   onLogin: () => void;
@@ -63,28 +64,19 @@ const Login: React.FC<LoginProps> = ({ onLogin, isDarkMode, toggleTheme }) => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden transition-colors duration-300">
-      {/* Theme Toggle */}
-      <div className="absolute top-6 right-6 z-20 animate-fade-in">
-        <button 
-          onClick={toggleTheme} 
-          className="p-2 rounded-full text-textMuted hover:text-text bg-surface/50 hover:bg-surface border border-transparent hover:border-border backdrop-blur-sm transition-all shadow-sm"
-          title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-        >
-          {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-        </button>
-      </div>
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-background transition-colors duration-300">
+      <PublicHeader isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
 
-      {/* Background decoration */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
+      <div className="relative flex flex-1 items-center justify-center p-4">
+        <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[100px]" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/10 rounded-full blur-[100px]" />
       </div>
 
-      <div className="w-full max-w-md bg-surface border border-border rounded-xl shadow-2xl relative z-10 animate-fade-in">
+      <div className="relative z-10 w-full max-w-md animate-fade-in rounded-xl border border-border bg-surface shadow-2xl">
         <div className="p-8 pb-6 text-center">
-          <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-primary/20">
-            <Cpu className="w-8 h-8 text-white" />
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-border bg-background shadow-lg shadow-primary/20">
+            <img src="/orchestra_logo.png" alt="Orchestra logo" className="h-full w-full object-contain" />
           </div>
           <h1 className="text-2xl font-bold text-text mb-2">
             {isRegistering ? 'Create Account' : 'Welcome Back'}
@@ -162,6 +154,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, isDarkMode, toggleTheme }) => {
             </button>
           </p>
         </div>
+      </div>
       </div>
     </div>
   );

@@ -28,5 +28,6 @@ public record AgentDto(
     string? Guide = null,
     string? AiCliIntegrationId = null,
     string? ReasoningEffort = null,
-    IReadOnlyList<SkillDto>? Skills = null
+    IReadOnlyList<SkillDto>? Skills = null,
+    string[]? SkillFolderIds = null
 );

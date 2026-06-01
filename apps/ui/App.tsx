@@ -18,9 +18,11 @@ import TicketCreatePage from './components/pages/TicketCreatePage';
 import TicketDetailPage from './components/pages/TicketDetailPage';
 import TicketEditPage from './components/pages/TicketEditPage';
 import ProfileEditPage from './components/pages/ProfileEditPage';
-import SkillsList from './components/pages/SkillsList';
+import SkillsAndFoldersListPage from './components/pages/SkillsAndFoldersListPage';
 import SkillCreatePage from './components/pages/SkillCreatePage';
 import SkillEditPage from './components/pages/SkillEditPage';
+import SkillFolderCreatePage from './components/pages/SkillFolderCreatePage';
+import SkillFolderEditPage from './components/pages/SkillFolderEditPage';
 import JobsPage from './components/pages/JobsPage';
 import JobDetailPage from './components/pages/JobDetailPage';
 import WorkflowsPage from './components/pages/WorkflowsPage';
@@ -28,6 +30,7 @@ import Integrations from './components/Integrations';
 import TicketList from './components/TicketList';
 import AgentsList from './components/AgentsList';
 import Login from './components/Login';
+import { WelcomePage } from './components/pages/WelcomePage';
 import WorkspaceModals from './components/WorkspaceModals/WorkspaceModals';
 import Toast from './components/Toast';
 import { Workspace } from './types';
@@ -147,7 +150,10 @@ const App: React.FC = () => {
           <Route path="agents" element={<AgentsList />} />
           <Route path="skills/new" element={<SkillCreatePage />} />
           <Route path="skills/:skillId/edit" element={<SkillEditPage />} />
-          <Route path="skills" element={<SkillsList />} />
+          <Route path="skills" element={<SkillsAndFoldersListPage />} />
+          <Route path="skill-folders/new" element={<SkillFolderCreatePage />} />
+          <Route path="skill-folders/:skillFolderId/edit" element={<SkillFolderEditPage />} />
+          <Route path="skill-folders" element={<Navigate to="../skills" replace />} />
           <Route path="jobs" element={<JobsPage />} />
           <Route path="jobs/:jobId" element={<JobDetailPage />} />
           <Route path="workflows" element={<WorkflowsPage />} />
@@ -174,7 +180,7 @@ const App: React.FC = () => {
           isAuthenticated ? (
             <AuthGuard><PostLoginRedirect /></AuthGuard>
           ) : (
-            <Navigate to="/login" replace />
+            <WelcomePage isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
           )
         } />
 
