@@ -1,5 +1,6 @@
 using Orchestra.Application.Agents.DTOs;
 using Orchestra.Application.Agents.Templates;
+using Orchestra.Application.AiCliIntegrations.Interfaces;
 using Orchestra.Application.Common.Exceptions;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.McpServers.Interfaces;
@@ -17,6 +18,7 @@ public class AgentService : IAgentService
     private readonly IAgentSubAgentDataAccess _agentSubAgentDataAccess;
     private readonly IAgentSkillDataAccess _agentSkillDataAccess;
     private readonly IAgentSkillFolderDataAccess _agentSkillFolderDataAccess;
+    private readonly IAgentCliSkillDataAccess _agentCliSkillDataAccess;
     private readonly ISkillDataAccess _skillDataAccess;
     private readonly ISkillFolderDataAccess _skillFolderDataAccess;
     private readonly IWorkspaceAuthorizationService _workspaceAuthorizationService;
@@ -26,6 +28,7 @@ public class AgentService : IAgentService
     private readonly IToolActionDataAccess _toolActionDataAccess;
     private readonly IIntegrationDataAccess _integrationDataAccess;
     private readonly IAgentSubAgentAssignmentService _subAgentAssignmentService;
+    private readonly IAiCliIntegrationDataAccess _aiCliIntegrationDataAccess;
 
     public AgentService(
         IAgentDataAccess agentDataAccess,
@@ -34,6 +37,7 @@ public class AgentService : IAgentService
         IAgentSubAgentDataAccess agentSubAgentDataAccess,
         IAgentSkillDataAccess agentSkillDataAccess,
         IAgentSkillFolderDataAccess agentSkillFolderDataAccess,
+        IAgentCliSkillDataAccess agentCliSkillDataAccess,
         ISkillDataAccess skillDataAccess,
         ISkillFolderDataAccess skillFolderDataAccess,
         IWorkspaceAuthorizationService workspaceAuthorizationService,
@@ -42,7 +46,8 @@ public class AgentService : IAgentService
         ITemplateAvailabilityResolver availabilityResolver,
         IToolActionDataAccess toolActionDataAccess,
         IIntegrationDataAccess integrationDataAccess,
-        IAgentSubAgentAssignmentService subAgentAssignmentService)
+        IAgentSubAgentAssignmentService subAgentAssignmentService,
+        IAiCliIntegrationDataAccess aiCliIntegrationDataAccess)
     {
         _agentDataAccess = agentDataAccess ?? throw new ArgumentNullException(nameof(agentDataAccess));
         _agentToolActionDataAccess = agentToolActionDataAccess ?? throw new ArgumentNullException(nameof(agentToolActionDataAccess));
@@ -50,6 +55,7 @@ public class AgentService : IAgentService
         _agentSubAgentDataAccess = agentSubAgentDataAccess ?? throw new ArgumentNullException(nameof(agentSubAgentDataAccess));
         _agentSkillDataAccess = agentSkillDataAccess ?? throw new ArgumentNullException(nameof(agentSkillDataAccess));
         _agentSkillFolderDataAccess = agentSkillFolderDataAccess ?? throw new ArgumentNullException(nameof(agentSkillFolderDataAccess));
+        _agentCliSkillDataAccess = agentCliSkillDataAccess ?? throw new ArgumentNullException(nameof(agentCliSkillDataAccess));
         _skillDataAccess = skillDataAccess ?? throw new ArgumentNullException(nameof(skillDataAccess));
         _skillFolderDataAccess = skillFolderDataAccess ?? throw new ArgumentNullException(nameof(skillFolderDataAccess));
         _workspaceAuthorizationService = workspaceAuthorizationService ?? throw new ArgumentNullException(nameof(workspaceAuthorizationService));
@@ -59,6 +65,7 @@ public class AgentService : IAgentService
         _toolActionDataAccess = toolActionDataAccess ?? throw new ArgumentNullException(nameof(toolActionDataAccess));
         _integrationDataAccess = integrationDataAccess ?? throw new ArgumentNullException(nameof(integrationDataAccess));
         _subAgentAssignmentService = subAgentAssignmentService ?? throw new ArgumentNullException(nameof(subAgentAssignmentService));
+        _aiCliIntegrationDataAccess = aiCliIntegrationDataAccess ?? throw new ArgumentNullException(nameof(aiCliIntegrationDataAccess));
     }
 
     public async Task<AgentDto> CreateAgentAsync(Guid userId, CreateAgentRequest request, CancellationToken cancellationToken = default)
@@ -199,6 +206,20 @@ public class AgentService : IAgentService
                 await _agentSkillFolderDataAccess.AssignFoldersAsync(agent.Id, folderGuids, cancellationToken);
             }
         }
+
+        // 6.9. Bind CLI integration if provided
+        if (request.AiCliIntegrationId.HasValue)
+        {
+            var integration = await _aiCliIntegrationDataAccess.GetByIdAsync(request.AiCliIntegrationId.Value, cancellationToken);
+            if (integration is null || integration.WorkspaceId != request.WorkspaceId)
+                throw new ArgumentException($"CLI integration '{request.AiCliIntegrationId.Value}' not found in workspace.");
+            agent.SetAiCliIntegrationId(request.AiCliIntegrationId.Value);
+            await _agentDataAccess.UpdateAsync(agent, cancellationToken);
+        }
+
+        // 6.10. Assign CLI skill names if provided
+        if (request.CliSkillNames != null && request.CliSkillNames.Length > 0)
+            await _agentCliSkillDataAccess.AssignSkillsAsync(agent.Id, request.CliSkillNames, cancellationToken);
 
         // 7. Map to DTO and return
         return await MapToDtoAsync(agent, cancellationToken);
@@ -440,6 +461,10 @@ public class AgentService : IAgentService
             await _agentSkillFolderDataAccess.ReplaceFoldersAsync(agentId, folderGuids, cancellationToken);
         }
 
+        // 8e. Update CLI skill names if provided (null = no-op, empty = remove all)
+        if (request.CliSkillNames != null)
+            await _agentCliSkillDataAccess.ReplaceSkillsAsync(agentId, request.CliSkillNames, cancellationToken);
+
         // 9. Map to DTO and return
         return await MapToDtoAsync(agent, cancellationToken);
     }
@@ -659,6 +684,8 @@ public class AgentService : IAgentService
         var skillFolders = await _agentSkillFolderDataAccess.GetFoldersByAgentIdAsync(agent.Id, cancellationToken) ?? [];
         var skillFolderIds = skillFolders.Select(sf => sf.Id.ToString()).ToArray();
 
+        var cliSkillNames = await _agentCliSkillDataAccess.GetSkillNamesAsync(agent.Id, cancellationToken);
+
         var guide = await ResolveGuideAsync(agent, cancellationToken, preResolvedLabel);
 
         return new AgentDto(
@@ -689,7 +716,8 @@ public class AgentService : IAgentService
             AiCliIntegrationId: agent.AiCliIntegrationId?.ToString(),
             ReasoningEffort: agent.ReasoningEffort,
             Skills: skillDtos,
-            SkillFolderIds: skillFolderIds
+            SkillFolderIds: skillFolderIds,
+            CliSkillNames: cliSkillNames.Count > 0 ? cliSkillNames.ToArray() : null
         );
     }
 

@@ -248,6 +248,7 @@ public static class Extensions
         // Skills
         builder.Services.AddScoped<ISkillDataAccess, Orchestra.Infrastructure.Skills.SkillDataAccess>();
         builder.Services.AddScoped<IAgentSkillDataAccess, Orchestra.Infrastructure.Skills.AgentSkillDataAccess>();
+        builder.Services.AddScoped<IAgentCliSkillDataAccess, Orchestra.Infrastructure.Skills.AgentCliSkillDataAccess>();
         builder.Services.AddScoped<Orchestra.Application.Skills.Services.ISkillService, Orchestra.Application.Skills.Services.SkillService>();
         builder.Services.AddScoped<ISkillFolderDataAccess, Orchestra.Infrastructure.Skills.SkillFolderDataAccess>();
         builder.Services.AddScoped<IAgentSkillFolderDataAccess, Orchestra.Infrastructure.Skills.AgentSkillFolderDataAccess>();

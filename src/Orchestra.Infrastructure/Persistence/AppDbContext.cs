@@ -46,6 +46,8 @@ namespace Orchestra.Infrastructure.Persistence
 
         public DbSet<AgentSkill> AgentSkills { get; set; } = null!;
 
+        public DbSet<AgentCliSkill> AgentCliSkills { get; set; } = null!;
+
         public DbSet<SkillFolder> SkillFolders { get; set; } = null!;
 
         public DbSet<AgentSkillFolder> AgentSkillFolders { get; set; } = null!;
@@ -94,6 +96,7 @@ namespace Orchestra.Infrastructure.Persistence
             modelBuilder.ApplyConfiguration(new Configurations.AiCliIntegrationConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.SkillConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.AgentSkillConfiguration());
+            modelBuilder.ApplyConfiguration(new Configurations.AgentCliSkillConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.SkillFolderConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.AgentSkillFolderConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.JobConfiguration());

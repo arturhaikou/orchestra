@@ -3,6 +3,7 @@ using NSubstitute.ExceptionExtensions;
 using Orchestra.Application.Agents.DTOs;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Agents.Templates;
+using Orchestra.Application.AiCliIntegrations.Interfaces;
 using Orchestra.Application.Common.Exceptions;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.McpServers.Interfaces;
@@ -42,6 +43,7 @@ public class AgentServiceCreateFromTemplateTests
             Substitute.For<IAgentSubAgentDataAccess>(),
             Substitute.For<IAgentSkillDataAccess>(),
             Substitute.For<IAgentSkillFolderDataAccess>(),
+            Substitute.For<IAgentCliSkillDataAccess>(),
             Substitute.For<ISkillDataAccess>(),
             Substitute.For<ISkillFolderDataAccess>(),
             _workspaceAuthorizationService,
@@ -50,7 +52,8 @@ public class AgentServiceCreateFromTemplateTests
             _availabilityResolver,
             _toolActionDataAccess,
             _integrationDataAccess,
-            Substitute.For<IAgentSubAgentAssignmentService>());
+            Substitute.For<IAgentSubAgentAssignmentService>(),
+            Substitute.For<IAiCliIntegrationDataAccess>());
     }
 
     private static BuiltInAgentTemplate CreateCodeReviewTemplate()

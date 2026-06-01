@@ -59,6 +59,8 @@ public class ToolRetrieverServiceMcpTests
             Substitute.For<IChatAgentRunner>(),
             _templateRegistry,
             _cliClientFactory,
+            Substitute.For<IAgentSkillDataAccess>(),
+            Substitute.For<IAgentSkillFolderDataAccess>(),
             Substitute.For<IAgentQuestionRepository>(),
             Substitute.For<INotificationService>(),
             _logger);

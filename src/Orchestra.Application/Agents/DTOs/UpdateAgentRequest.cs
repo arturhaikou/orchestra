@@ -23,5 +23,6 @@ public record UpdateAgentRequest(
     Optional<string?> ReasoningEffort = default,
     string[]? SubAgentIds = null,
     string[]? SkillIds = null,
-    string[]? SkillFolderIds = null
+    string[]? SkillFolderIds = null,
+    string[]? CliSkillNames = null
 );

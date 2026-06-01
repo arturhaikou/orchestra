@@ -841,6 +841,10 @@ const AgentsList: React.FC<AgentsListProps> = () => {
           setIsDeployDialogOpen(false);
           setShowCatalogue(true);
         }}
+        onSelectCli={() => {
+          setIsDeployDialogOpen(false);
+          navigate('new-cli');
+        }}
       />
     </div>
   );

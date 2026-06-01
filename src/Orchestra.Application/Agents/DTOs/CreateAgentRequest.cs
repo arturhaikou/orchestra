@@ -22,5 +22,7 @@ public record CreateAgentRequest(
     IReadOnlyList<McpToolSelectionDto>? McpSelections = null,
     string[]? SubAgentIds = null,
     string[]? SkillIds = null,
-    string[]? SkillFolderIds = null
+    string[]? SkillFolderIds = null,
+    Guid? AiCliIntegrationId = null,
+    string[]? CliSkillNames = null
 );

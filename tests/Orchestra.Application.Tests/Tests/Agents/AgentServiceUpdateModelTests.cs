@@ -1,6 +1,7 @@
 using NSubstitute;
 using Orchestra.Application.Agents.DTOs;
 using Orchestra.Application.Agents.Services;
+using Orchestra.Application.AiCliIntegrations.Interfaces;
 using Orchestra.Application.Common;
 using Orchestra.Application.Common.Exceptions;
 using Orchestra.Application.Common.Interfaces;
@@ -44,6 +45,7 @@ public class AgentServiceUpdateModelTests
             Substitute.For<IAgentSubAgentDataAccess>(),
             Substitute.For<IAgentSkillDataAccess>(),
             Substitute.For<IAgentSkillFolderDataAccess>(),
+            Substitute.For<IAgentCliSkillDataAccess>(),
             Substitute.For<ISkillDataAccess>(),
             Substitute.For<ISkillFolderDataAccess>(),
             authService,
@@ -52,7 +54,8 @@ public class AgentServiceUpdateModelTests
             Substitute.For<ITemplateAvailabilityResolver>(),
             Substitute.For<IToolActionDataAccess>(),
             Substitute.For<IIntegrationDataAccess>(),
-            Substitute.For<IAgentSubAgentAssignmentService>());
+            Substitute.For<IAgentSubAgentAssignmentService>(),
+            Substitute.For<IAiCliIntegrationDataAccess>());
 
         return (service, agentDataAccess, authService, toolActionDataAccess, toolValidationService);
     }

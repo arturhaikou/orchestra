@@ -5,6 +5,7 @@ import CreateWorkspacePage from './components/pages/CreateWorkspacePage';
 import EditWorkspacePage from './components/pages/EditWorkspacePage';
 import AgentCreatePage from './components/pages/AgentCreatePage';
 import AgentEditPage from './components/pages/AgentEditPage';
+import CliAgentCreatePage from './components/pages/CliAgentCreatePage';
 import DeployBuiltInAgentPage from './components/pages/DeployBuiltInAgentPage';
 import IntegrationCreatePage from './components/pages/IntegrationCreatePage';
 import IntegrationEditPage from './components/pages/IntegrationEditPage';
@@ -145,6 +146,7 @@ const App: React.FC = () => {
           <Route path="tickets/:ticketId" element={<TicketDetailPage />} />
           <Route path="tickets/:ticketId/edit" element={<TicketEditPage />} />
           <Route path="agents/new" element={<AgentCreatePage />} />
+          <Route path="agents/new-cli" element={<CliAgentCreatePage />} />
           <Route path="agents/:agentId/edit" element={<AgentEditPage />} />
           <Route path="agents/deploy/:templateId" element={<DeployBuiltInAgentPage />} />
           <Route path="agents" element={<AgentsList />} />

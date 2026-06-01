@@ -31,6 +31,8 @@ public class AgentRuntimeService : IAgentRuntimeService
     private readonly ITicketDataAccess _ticketDataAccess;
     private readonly INotificationService _notificationService;
     private readonly ITicketIdParsingService _ticketIdParsingService;
+    private readonly IAgentSkillDataAccess _agentSkillDataAccess;
+    private readonly IAgentSkillFolderDataAccess _agentSkillFolderDataAccess;
 
     // Status GUID from seeding
     private static readonly Guid CompletedStatusId = Guid.Parse("88888888-8888-8888-8888-888888888888");
@@ -48,7 +50,9 @@ public class AgentRuntimeService : IAgentRuntimeService
         IConversationSnapshotRepository snapshotRepository,
         ITicketDataAccess ticketDataAccess,
         INotificationService notificationService,
-        ITicketIdParsingService ticketIdParsingService)
+        ITicketIdParsingService ticketIdParsingService,
+        IAgentSkillDataAccess agentSkillDataAccess,
+        IAgentSkillFolderDataAccess agentSkillFolderDataAccess)
     {
         _chatClientResolver = chatClientResolver;
         _agentDataAccess = agentDataAccess;
@@ -63,6 +67,8 @@ public class AgentRuntimeService : IAgentRuntimeService
         _ticketDataAccess = ticketDataAccess;
         _notificationService = notificationService;
         _ticketIdParsingService = ticketIdParsingService;
+        _agentSkillDataAccess = agentSkillDataAccess;
+        _agentSkillFolderDataAccess = agentSkillFolderDataAccess;
     }
 
     /// <inheritdoc/>
@@ -159,6 +165,9 @@ public class AgentRuntimeService : IAgentRuntimeService
 
     private bool IsCliAgent(Orchestra.Domain.Entities.Agent agent)
     {
+        if (agent.AiCliIntegrationId.HasValue)
+            return true;
+
         if (agent.TemplateIdentifier is null)
             return false;
 
@@ -177,8 +186,14 @@ public class AgentRuntimeService : IAgentRuntimeService
             throw new InvalidOperationException(
                 $"CLI agent '{agent.Id}' has no AiCliIntegrationId configured. Re-deploy the template to bind a CLI integration.");
 
-        var template = _templateRegistry.GetByIdentifier(agent.TemplateIdentifier!);
-        var isReadOnly = template?.IsReadOnlyCli ?? true;
+        bool isReadOnly;
+        if (agent.TemplateIdentifier is null)
+            isReadOnly = false;
+        else
+        {
+            var template = _templateRegistry.GetByIdentifier(agent.TemplateIdentifier);
+            isReadOnly = template?.IsReadOnlyCli ?? true;
+        }
 
         if (jobId.HasValue && workspaceId.HasValue)
             return await ExecuteCliAgentWithTrackingAsync(agent, contextPrompt, isReadOnly, jobId.Value, workspaceId.Value, cancellationToken);
@@ -204,12 +219,20 @@ public class AgentRuntimeService : IAgentRuntimeService
             agent.Id,
             cancellationToken: cancellationToken)).ToList();
 
+        var skillNames = (await _agentSkillDataAccess.GetSkillsByAgentIdAsync(agent.Id, cancellationToken))
+            .Select(s => s.Name).ToList();
+        var skillDirectories = (await _agentSkillFolderDataAccess.GetFoldersByAgentIdAsync(agent.Id, cancellationToken))
+            .Select(f => f.FolderPath).ToList();
+
         await _jobStepWriter.WriteAsync(jobId, workspaceId, JobStepType.AgentStarted, cancellationToken: cancellationToken);
         try
         {
             var result = await client.RunWithTrackingAsync(
                 contextPrompt, agent.CustomInstructions, agent.Name,
-                _jobStepWriter, jobId, workspaceId, customTools, cancellationToken);
+                _jobStepWriter, jobId, workspaceId, customTools,
+                skillDirectories.Count > 0 ? skillDirectories : null,
+                skillNames.Count > 0 ? skillNames : null,
+                cancellationToken);
 
             await _jobStepWriter.WriteAsync(jobId, workspaceId, JobStepType.AgentCompleted, content: result, cancellationToken: cancellationToken);
             return result;
@@ -227,12 +250,20 @@ public class AgentRuntimeService : IAgentRuntimeService
         bool isReadOnly,
         CancellationToken cancellationToken)
     {
+        var skillNames = (await _agentSkillDataAccess.GetSkillsByAgentIdAsync(agent.Id, cancellationToken))
+            .Select(s => s.Name).ToList();
+        var skillDirectories = (await _agentSkillFolderDataAccess.GetFoldersByAgentIdAsync(agent.Id, cancellationToken))
+            .Select(f => f.FolderPath).ToList();
+
+        IReadOnlyList<string>? skillNamesArg = skillNames.Count > 0 ? skillNames : null;
+        IReadOnlyList<string>? skillDirsArg = skillDirectories.Count > 0 ? skillDirectories : null;
+
         if (isReadOnly)
         {
             await using var client = await _cliClientFactory.CreateReadOnlyClientAsync(
                 agent.AiCliIntegrationId!.Value, agent.Model, agent.ReasoningEffort, cancellationToken);
 
-            var aiAgent = client.AsReadOnlyAgent(agent.CustomInstructions, agent.Name);
+            var aiAgent = client.AsReadOnlyAgent(agent.CustomInstructions, agent.Name, skillDirsArg, skillNamesArg);
             var response = await aiAgent.RunAsync(contextPrompt, cancellationToken: cancellationToken);
             return response.Text ?? "Agent completed execution (no response text)";
         }
@@ -241,7 +272,7 @@ public class AgentRuntimeService : IAgentRuntimeService
             await using var client = await _cliClientFactory.CreateClientAsync(
                 agent.AiCliIntegrationId!.Value, agent.Model, agent.ReasoningEffort, cancellationToken);
 
-            var aiAgent = client.AsAgent(agent.CustomInstructions, agent.Name);
+            var aiAgent = client.AsAgent(agent.CustomInstructions, agent.Name, skillDirsArg, skillNamesArg);
             var response = await aiAgent.RunAsync(contextPrompt, cancellationToken: cancellationToken);
             return response.Text ?? "Agent completed execution (no response text)";
         }

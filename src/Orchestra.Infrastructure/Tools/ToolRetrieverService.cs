@@ -36,8 +36,12 @@ public class ToolRetrieverService : IToolRetrieverService
     private readonly IChatClientResolver _chatClientResolver;
     private readonly IChatAgentRunner _chatAgentRunner;
     private readonly IBuiltInAgentTemplateRegistry _templateRegistry;
-    private readonly IAiCliClientFactory _cliClientFactory;    private readonly IAgentQuestionRepository _agentQuestionRepository;
-    private readonly INotificationService _notificationService;    private readonly ILogger<ToolRetrieverService> _logger;
+    private readonly IAiCliClientFactory _cliClientFactory;
+    private readonly IAgentSkillDataAccess _agentSkillDataAccess;
+    private readonly IAgentSkillFolderDataAccess _agentSkillFolderDataAccess;
+    private readonly IAgentQuestionRepository _agentQuestionRepository;
+    private readonly INotificationService _notificationService;
+    private readonly ILogger<ToolRetrieverService> _logger;
 
     private const string ReviewPullRequestActionName = "review_pull_request";
     private const string ReviewMergeRequestActionName = "review_merge_request";
@@ -71,6 +75,8 @@ public class ToolRetrieverService : IToolRetrieverService
         IChatAgentRunner chatAgentRunner,
         IBuiltInAgentTemplateRegistry templateRegistry,
         IAiCliClientFactory cliClientFactory,
+        IAgentSkillDataAccess agentSkillDataAccess,
+        IAgentSkillFolderDataAccess agentSkillFolderDataAccess,
         IAgentQuestionRepository agentQuestionRepository,
         INotificationService notificationService,
         ILogger<ToolRetrieverService> logger)
@@ -90,6 +96,8 @@ public class ToolRetrieverService : IToolRetrieverService
         _chatAgentRunner = chatAgentRunner;
         _templateRegistry = templateRegistry;
         _cliClientFactory = cliClientFactory;
+        _agentSkillDataAccess = agentSkillDataAccess;
+        _agentSkillFolderDataAccess = agentSkillFolderDataAccess;
         _agentQuestionRepository = agentQuestionRepository;
         _notificationService = notificationService;
         _logger = logger;
@@ -364,6 +372,9 @@ public class ToolRetrieverService : IToolRetrieverService
 
     private bool IsCliAgent(Agent agent)
     {
+        if (agent.AiCliIntegrationId.HasValue)
+            return true;
+
         if (string.IsNullOrEmpty(agent.TemplateIdentifier))
             return false;
 
@@ -397,8 +408,14 @@ public class ToolRetrieverService : IToolRetrieverService
 
         try
         {
-            var template = _templateRegistry.GetByIdentifier(subAgent.TemplateIdentifier!);
-            var isReadOnly = template?.IsReadOnlyCli ?? true;
+            bool isReadOnly;
+            if (subAgent.TemplateIdentifier is null)
+                isReadOnly = false;
+            else
+            {
+                var template = _templateRegistry.GetByIdentifier(subAgent.TemplateIdentifier);
+                isReadOnly = template?.IsReadOnlyCli ?? true;
+            }
             var instructions = subAgent.CustomInstructions ?? subAgent.ProjectPrinciples;
 
             if (jobTracking is not null)
@@ -411,6 +428,11 @@ public class ToolRetrieverService : IToolRetrieverService
 
             AIFunction aiFunction;
 
+            var agentSkills = await _agentSkillDataAccess.GetSkillsByAgentIdAsync(subAgent.Id, cancellationToken);
+            var skillNames = agentSkills.Select(s => s.Name).ToList();
+            var agentSkillFolders = await _agentSkillFolderDataAccess.GetFoldersByAgentIdAsync(subAgent.Id, cancellationToken);
+            var skillFolderPaths = agentSkillFolders.Select(sf => sf.FolderPath).ToList();
+
             if (isReadOnly)
             {
                 var cliClient = await _cliClientFactory.CreateReadOnlyClientAsync(
@@ -419,7 +441,11 @@ public class ToolRetrieverService : IToolRetrieverService
                     subAgent.ReasoningEffort,
                     cancellationToken);
 
-                aiFunction = cliClient.AsReadOnlyAgent(instructions, subAgent.Name).AsAIFunction();
+                aiFunction = cliClient.AsReadOnlyAgent(
+                    instructions,
+                    subAgent.Name,
+                    skillFolderPaths.Count > 0 ? skillFolderPaths : null,
+                    skillNames.Count > 0 ? skillNames : null).AsAIFunction();
             }
             else
             {
@@ -429,7 +455,11 @@ public class ToolRetrieverService : IToolRetrieverService
                     subAgent.ReasoningEffort,
                     cancellationToken);
 
-                aiFunction = cliClient.AsAgent(instructions, subAgent.Name).AsAIFunction();
+                aiFunction = cliClient.AsAgent(
+                    instructions,
+                    subAgent.Name,
+                    skillFolderPaths.Count > 0 ? skillFolderPaths : null,
+                    skillNames.Count > 0 ? skillNames : null).AsAIFunction();
             }
 
             _logger.LogDebug(
@@ -651,6 +681,11 @@ public class ToolRetrieverService : IToolRetrieverService
 
                 var subAgentCustomTools = (await GetAgentToolsAsync(capturedSubAgent.Id, cancellationToken: ct)).ToList();
 
+                var agentSkills = await _agentSkillDataAccess.GetSkillsByAgentIdAsync(capturedSubAgent.Id, ct);
+                var skillNames = agentSkills.Select(s => s.Name).ToList();
+                var agentSkillFolders = await _agentSkillFolderDataAccess.GetFoldersByAgentIdAsync(capturedSubAgent.Id, ct);
+                var skillFolderPaths = agentSkillFolders.Select(sf => sf.FolderPath).ToList();
+
                 var result = await client.RunWithTrackingAsync(
                     message,
                     capturedInstructions,
@@ -659,7 +694,9 @@ public class ToolRetrieverService : IToolRetrieverService
                     capturedJobTracking.JobId,
                     capturedJobTracking.WorkspaceId,
                     customTools: subAgentCustomTools.Count > 0 ? subAgentCustomTools : null,
-                    ct);
+                    skillDirectories: skillFolderPaths.Count > 0 ? skillFolderPaths : null,
+                    skillNames: skillNames.Count > 0 ? skillNames : null,
+                    cancellationToken: ct);
 
                 await capturedJobTracking.StepWriter.WriteAsync(
                     capturedJobTracking.JobId,

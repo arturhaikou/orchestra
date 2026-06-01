@@ -1,6 +1,7 @@
 using NSubstitute;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Agents.Templates;
+using Orchestra.Application.AiCliIntegrations.Interfaces;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.McpServers.Interfaces;
 using Orchestra.Domain.Entities;
@@ -39,6 +40,7 @@ public class AgentServiceTemplateDataTests
             Substitute.For<IAgentSubAgentDataAccess>(),
             Substitute.For<IAgentSkillDataAccess>(),
             Substitute.For<IAgentSkillFolderDataAccess>(),
+            Substitute.For<IAgentCliSkillDataAccess>(),
             Substitute.For<ISkillDataAccess>(),
             Substitute.For<ISkillFolderDataAccess>(),
             authService,
@@ -47,7 +49,8 @@ public class AgentServiceTemplateDataTests
             Substitute.For<ITemplateAvailabilityResolver>(),
             Substitute.For<IToolActionDataAccess>(),
             integrationDataAccess,
-            Substitute.For<IAgentSubAgentAssignmentService>());
+            Substitute.For<IAgentSubAgentAssignmentService>(),
+            Substitute.For<IAiCliIntegrationDataAccess>());
 
         return (service, agentDataAccess, templateRegistry, integrationDataAccess);
     }

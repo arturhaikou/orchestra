@@ -94,7 +94,7 @@ export const createAgentFromTemplate = async (
   return await response.json();
 };
 
-export const createAgent = async (workspaceId: string, data: { name: string; role: string; capabilities: string[]; toolActionIds: string[]; mcpSelections?: McpToolSelection[]; customInstructions?: string; projectPrinciples?: string; model?: string | null; subAgentIds?: string[]; skillIds?: string[]; skillFolderIds?: string[] }): Promise<Agent> => {
+export const createAgent = async (workspaceId: string, data: { name: string; role: string; capabilities: string[]; toolActionIds: string[]; mcpSelections?: McpToolSelection[]; customInstructions?: string; projectPrinciples?: string; model?: string | null; subAgentIds?: string[]; skillIds?: string[]; skillFolderIds?: string[]; aiCliIntegrationId?: string | null; cliSkillNames?: string[] }): Promise<Agent> => {
   try {
     const response = await fetch(API_BASE_URL, {
       method: 'POST',

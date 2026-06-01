@@ -74,15 +74,15 @@ public sealed class GithubCopilotCliClient : IAiCliClient
         return new GithubCopilotCliClient(copilotClient, modelId, reasoningEffort, ReadOnlyToolSet);
     }
 
-    public AIAgent AsAgent(string? instructions, string name)
+    public AIAgent AsAgent(string? instructions, string name, IReadOnlyList<string>? skillDirectories = null, IReadOnlyList<string>? skillNames = null)
     {
-        var config = BuildSessionConfig(instructions, name, _allowedTools);
+        var config = BuildSessionConfig(instructions, name, _allowedTools, skillDirectories: skillDirectories, skillNames: skillNames);
         return _copilotClient.AsAIAgent(sessionConfig: config, name: name);
     }
 
-    public AIAgent AsReadOnlyAgent(string? instructions, string name)
+    public AIAgent AsReadOnlyAgent(string? instructions, string name, IReadOnlyList<string>? skillDirectories = null, IReadOnlyList<string>? skillNames = null)
     {
-        var config = BuildSessionConfig(instructions, name, ReadOnlyToolSet);
+        var config = BuildSessionConfig(instructions, name, ReadOnlyToolSet, skillDirectories: skillDirectories, skillNames: skillNames);
         return _copilotClient.AsAIAgent(sessionConfig: config, name: name);
     }
 
@@ -98,9 +98,11 @@ public sealed class GithubCopilotCliClient : IAiCliClient
         Guid jobId,
         Guid workspaceId,
         IReadOnlyList<AIFunction>? customTools = null,
+        IReadOnlyList<string>? skillDirectories = null,
+        IReadOnlyList<string>? skillNames = null,
         CancellationToken cancellationToken = default)
     {
-        var config = BuildSessionConfig(instructions, name, _allowedTools, customTools);
+        var config = BuildSessionConfig(instructions, name, _allowedTools, customTools, skillDirectories, skillNames);
         var toolStartTimes = new ConcurrentDictionary<string, (string ToolName, Stopwatch Timer)>();
 
         await using var session = await _copilotClient.CreateSessionAsync(config, cancellationToken);
@@ -115,7 +117,7 @@ public sealed class GithubCopilotCliClient : IAiCliClient
         return response?.Data.Content;
     }
 
-    private SessionConfig BuildSessionConfig(string? instructions, string name, IList<string> tools, IReadOnlyList<AIFunction>? customTools = null)
+    private SessionConfig BuildSessionConfig(string? instructions, string name, IList<string> tools, IReadOnlyList<AIFunction>? customTools = null, IReadOnlyList<string>? skillDirectories = null, IReadOnlyList<string>? skillNames = null)
     {
         var agentConfig = new CustomAgentConfig
         {
@@ -124,12 +126,18 @@ public sealed class GithubCopilotCliClient : IAiCliClient
             Tools = tools
         };
 
+        if (skillNames?.Count > 0)
+            agentConfig.Skills = skillNames.ToList();
+
         var config = new SessionConfig
         {
             OnPermissionRequest = PermissionHandler.ApproveAll,
             CustomAgents = [agentConfig],
             Agent = name
         };
+
+        if (skillDirectories?.Count > 0)
+            config.SkillDirectories = skillDirectories.ToList();
 
         if (_modelId is not null)
             config.Model = _modelId;

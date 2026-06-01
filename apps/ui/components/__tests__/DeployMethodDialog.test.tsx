@@ -9,6 +9,7 @@ const defaultProps = {
   onClose: jest.fn(),
   onSelectScratch: jest.fn(),
   onSelectBuiltIn: jest.fn(),
+  onSelectCli: jest.fn(),
 };
 
 function renderDialog(overrides: Partial<typeof defaultProps> = {}) {

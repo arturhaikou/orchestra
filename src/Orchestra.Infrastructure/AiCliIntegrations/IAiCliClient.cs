@@ -6,9 +6,9 @@ namespace Orchestra.Infrastructure.AiCliIntegrations;
 
 public interface IAiCliClient : IAsyncDisposable
 {
-    AIAgent AsAgent(string? instructions, string name);
+    AIAgent AsAgent(string? instructions, string name, IReadOnlyList<string>? skillDirectories = null, IReadOnlyList<string>? skillNames = null);
 
-    AIAgent AsReadOnlyAgent(string? instructions, string name);
+    AIAgent AsReadOnlyAgent(string? instructions, string name, IReadOnlyList<string>? skillDirectories = null, IReadOnlyList<string>? skillNames = null);
 
     Task<string> RunWithTrackingAsync(
         string prompt,
@@ -18,5 +18,7 @@ public interface IAiCliClient : IAsyncDisposable
         Guid jobId,
         Guid workspaceId,
         IReadOnlyList<AIFunction>? customTools = null,
+        IReadOnlyList<string>? skillDirectories = null,
+        IReadOnlyList<string>? skillNames = null,
         CancellationToken cancellationToken = default);
 }
