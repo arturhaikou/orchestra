@@ -1,4 +1,5 @@
 using Microsoft.Extensions.AI;
+using Orchestra.Application.Agents.Models;
 using Orchestra.Application.Jobs.DTOs;
 using Orchestra.Domain.Entities;
 
@@ -20,6 +21,7 @@ public interface IChatAgentRunner
     /// <param name="agentEntity">The agent domain entity with configuration (name, instructions, etc.)</param>
     /// <param name="tools">The AIFunction tools to attach to the agent</param>
     /// <param name="message">The input message to run the agent with</param>
+    /// <param name="images">Optional image references to include as multimodal content in the agent's input message</param>
     /// <param name="jobTracking">Optional job tracking context; if null, runs without tracking middleware</param>
     /// <param name="session">Optional session object for restoring agent conversation state</param>
     /// <param name="cancellationToken">Cancellation token</param>
@@ -29,6 +31,7 @@ public interface IChatAgentRunner
         Agent agentEntity,
         IList<AIFunction> tools,
         string message,
+        IReadOnlyList<AgentImageRef>? images,
         JobTrackingContext? jobTracking,
         object? session = null,
         CancellationToken cancellationToken = default);

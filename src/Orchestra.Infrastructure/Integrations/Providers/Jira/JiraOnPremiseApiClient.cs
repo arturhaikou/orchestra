@@ -297,6 +297,45 @@ public class JiraOnPremiseApiClient : IJiraApiClient
         }
     }
 
+    public async Task<JiraAttachmentResponse> UploadAttachmentAsync(
+        string issueKey,
+        Stream fileStream,
+        string fileName,
+        string mimeType,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var form = new MultipartFormDataContent();
+            var fileContent = new StreamContent(fileStream);
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(mimeType);
+            form.Add(fileContent, "file", fileName);
+
+            var request = new HttpRequestMessage(HttpMethod.Post, $"/rest/api/2/issue/{issueKey}/attachments")
+            {
+                Content = form
+            };
+            request.Headers.Add("X-Atlassian-Token", "no-check");
+
+            var response = await _httpClient.SendAsync(request, cancellationToken);
+            EnsureSuccessOrThrowAuthError(response);
+            response.EnsureSuccessStatusCode();
+
+            var content = await response.Content.ReadAsStringAsync(cancellationToken);
+            var attachments = JsonSerializer.Deserialize<List<JiraAttachmentResponse>>(
+                content,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            return attachments?.FirstOrDefault()
+                ?? throw new InvalidOperationException("Empty attachment upload response from Jira On-Premise");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to upload attachment '{FileName}' to issue {IssueKey} in Jira On-Premise", fileName, issueKey);
+            throw;
+        }
+    }
+
     private void HandleCreateIssueErrors(HttpResponseMessage response)
     {
         // Check for auth/redirect issues first
@@ -357,6 +396,27 @@ public class JiraOnPremiseApiClient : IJiraApiClient
             var message = forbiddenMessage ?? "You do not have permission to perform this action in Jira On-Premise.";
             _logger.LogError("Jira On-Premise returned 403 Forbidden.");
             throw new InvalidOperationException(message);
+        }
+    }
+
+    public async Task<(byte[] Data, string MimeType)> GetAttachmentContentAsync(
+        string contentUrl,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync(contentUrl, cancellationToken);
+            EnsureSuccessOrThrowAuthError(response);
+            response.EnsureSuccessStatusCode();
+
+            var data = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+            var mimeType = response.Content.Headers.ContentType?.MediaType ?? "image/png";
+            return (data, mimeType);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to download attachment content from {ContentUrl} in Jira On-Premise", contentUrl);
+            throw;
         }
     }
 }

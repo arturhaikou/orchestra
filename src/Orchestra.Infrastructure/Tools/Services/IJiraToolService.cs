@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using Orchestra.Domain.Enums;
 using Orchestra.Infrastructure.Tools.Attributes;
+using Orchestra.Infrastructure.Tools.Models;
 using Orchestra.Infrastructure.Tools.Models.Jira;
 using System.Collections.Generic;
 
@@ -10,14 +11,16 @@ namespace Orchestra.Infrastructure.Tools.Services;
 public interface IJiraToolService
 {
     [ToolAction("create_issue", "Create a new Jira issue", DangerLevel.Moderate)]
-    [Description("Create a new Jira issue with summary, description, and issue type")]
+    [Description("Create a new Jira issue with summary, description blocks, and issue type")]
     Task<object> CreateIssueAsync(
             [Description("The workspace ID where the Jira integration is configured")] string workspaceId,
             [Description("The ID of the specific Jira integration instance to use. Required when the workspace has multiple Jira integrations configured.")] string integrationId,
             [Description("Brief summary of the issue")] string summary,
-            [Description("Detailed description of the issue in markdown format")] string description,
             [Description("The issue type name (e.g., Bug, Story, Task, Epic)")] string issueTypeName,
-            [Description("The Jira project ID to use (optional, required if not specified in filter query)")] string? projectId = null);
+            [Description("Ordered list of content blocks for the issue description. " +
+                         "Each block: {\"type\":\"text\",\"content\":\"markdown text\"} OR " +
+                         "{\"type\":\"image\",\"content\":\"https://url OR absolute local file path (e.g. C:\\\\Users\\\\...\\\\image.png — must be absolute, not relative)\",\"fileName\":\"optional\"}")]
+            List<ContentBlock> descriptionBlocks);
 
     [ToolAction("update_issue", "Update an existing Jira issue", DangerLevel.Moderate)]
     [Description("Update an existing Jira issue's summary and/or description")]
@@ -42,12 +45,15 @@ public interface IJiraToolService
         [Description("The Jira issue key to retrieve (e.g., PROJ-123)")] string issueKey);
 
     [ToolAction("add_comment", "Add a comment to a Jira issue", DangerLevel.Moderate)]
-    [Description("Add a comment to an existing Jira issue")]
+    [Description("Add a comment to an existing Jira issue. Supports interleaved text and images via content blocks.")]
     Task<object> AddCommentAsync(
         [Description("The workspace ID where the Jira integration is configured")] string workspaceId,
         [Description("The ID of the specific Jira integration instance to use. Required when the workspace has multiple Jira integrations configured.")] string integrationId,
         [Description("The Jira issue key to comment on (e.g., PROJ-123)")] string issueKey,
-        [Description("The comment body in markdown format")] string comment);
+        [Description("Ordered list of content blocks. Each block: " +
+                     "{\"type\":\"text\",\"content\":\"markdown text\"} OR " +
+                     "{\"type\":\"image\",\"content\":\"https://url OR absolute local file path (e.g. C:\\\\Users\\\\...\\\\image.png — must be absolute, not relative)\",\"fileName\":\"optional display name\"}")]
+        List<ContentBlock> contentBlocks);
 
     [ToolAction("create_epic", "Create a new Jira epic", DangerLevel.Moderate)]
     [Description("Create a new Jira epic with multiple child stories")]
@@ -57,6 +63,5 @@ public interface IJiraToolService
         [Description("The title of the epic")] string epicTitle,
         [Description("The description of the epic in markdown format")] string epicDescription,
         [Description("List of user stories to create under the epic")] List<StoryRequest> stories,
-        [Description("The issue type name for stories (default: Story)")] string storyTypeName = "Story",
-        [Description("The Jira project ID to use (optional, required if not specified in filter query)")] string? projectId = null);
+        [Description("The issue type name for stories (default: Story)")] string storyTypeName = "Story");
 }

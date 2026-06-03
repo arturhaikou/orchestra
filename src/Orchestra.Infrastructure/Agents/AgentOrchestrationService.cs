@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Orchestra.Application.Agents.DTOs;
+using Orchestra.Application.Agents.Models;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Integrations.DTOs;
@@ -123,15 +124,16 @@ public class AgentOrchestrationService : IAgentOrchestrationService
                 cancellationToken);
 
             // 5. Build context prompt with integrations (Phase 1: ticket, Phase 2: integrations, Phase 3: project principles)
-            var contextPrompt = await _agentContextBuilder.BuildAgentContextWithIntegrationsAsync(
+            var contextInput = await _agentContextBuilder.BuildAgentContextWithIntegrationsAsync(
                 ticket,
                 agentEntity,
                 cancellationToken);
 
             _logger.LogDebug(
-                "Built context prompt for ticket {TicketId}: {PromptLength} characters",
+                "Built context prompt for ticket {TicketId}: {PromptLength} characters, {ImageCount} image(s)",
                 ticketId,
-                contextPrompt.Length);
+                contextInput.TextPrompt.Length,
+                contextInput.Images.Count);
 
             // 6. Execute AI agent — resolve model at execution time from the agent entity.
             // agentEntity.Model is non-null when the agent has a configured model override;
@@ -146,13 +148,13 @@ public class AgentOrchestrationService : IAgentOrchestrationService
                 AgentId: agentEntity.Id,
                 AgentName: agentEntity.Name,
                 TriggerType: JobTriggerType.Ticket,
-                InitialPrompt: contextPrompt,
+                InitialPrompt: contextInput.TextPrompt,
                 TicketId: ticket.Id,
                 TicketTitle: ticket.Title);
 
             var (responseText, jobId) = await _agentRuntimeService.ExecuteAgentAsync(
                 agentEntity.Id,
-                contextPrompt,
+                contextInput,
                 agentEntity.Model,
                 agentEntity.ProjectPrinciples,
                 jobContext,

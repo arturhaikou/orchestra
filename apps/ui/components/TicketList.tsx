@@ -2,10 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Bot, Sparkles, RefreshCw, X, Send, Loader2, MessageSquare, Plus, Save, Database, Globe, Workflow as WorkflowIcon, Flag, Activity, ChevronDown, Clock, ChevronRight, Layers, Smile, Meh, Frown, ExternalLink, Zap, Trash2, AlertTriangle, User, Github, Gitlab } from 'lucide-react';
 import ModalErrorBanner from './ModalErrorBanner';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { marked } from 'marked';
+import { marked, Renderer } from 'marked';
 import { Ticket, TicketPriority, TicketStatus, Comment, WorkflowDefinition, Agent, TicketStatusChangedEvent } from '../types';
 import { onTicketStatusChanged, onReconnected } from '../services/signalRService';
-import { addComment, updateTicket, getTickets, convertToExternal, deleteTicket, getTicketStatuses, getTicketPriorities, generateSummary } from '../services/ticketService';
+import { addComment, updateTicket, getTickets, getTicketById, convertToExternal, deleteTicket, getTicketStatuses, getTicketPriorities, generateSummary } from '../services/ticketService';
 import { getWorkflowDefinitions } from '../services/workflowService';
 import { getUser } from '../services/authService';
 import { getAgents } from '../services/agentService';
@@ -57,11 +57,44 @@ const getProviderInfo = (source: string): ProviderInfo => {
   };
 };
 
+const FILE_PROXY_BASE = `${import.meta.env.VITE_API_URL}/v1/filesystem/image`;
+
+// Rewrite file:// image refs before marked tokenises them.
+// marked truncates unquoted URLs at spaces and treats backslashes as escape chars,
+// so the proxy rewrite in fileProxyRenderer never fires for Windows paths with spaces.
+const resolveFileUrls = (content: string): string => {
+  // Angle-bracket form: ![alt](<file://D:\path with spaces\img.png>)
+  let out = content.replace(
+    /!\[([^\]]*)\]\(<file:\/\/([^>]*)>\)/g,
+    (_, alt, rawPath) => {
+      const path = rawPath.replace(/\\/g, '/');
+      return `![${alt}](${FILE_PROXY_BASE}?path=${encodeURIComponent(path)})`;
+    }
+  );
+  // Plain form: ![alt](file://D:\path\img.png) — capture everything up to closing )
+  out = out.replace(
+    /!\[([^\]]*)\]\(file:\/\/([^)]*?)\s*(?:"[^"]*")?\)/g,
+    (_, alt, rawPath) => {
+      const path = rawPath.replace(/\\/g, '/').trim();
+      return `![${alt}](${FILE_PROXY_BASE}?path=${encodeURIComponent(path)})`;
+    }
+  );
+  return out;
+};
+
+const fileProxyRenderer = new Renderer();
+fileProxyRenderer.image = ({ href, text }) => {
+  const src = href?.startsWith('file://')
+    ? `${FILE_PROXY_BASE}?path=${encodeURIComponent(href.slice('file://'.length))}`
+    : (href ?? '');
+  return `<img src="${src}" alt="${text ?? ''}" style="max-width:100%;border-radius:6px" />`;
+};
+
 const Markdown: React.FC<{ content: string; className?: string }> = ({ content, className = '' }) => {
   if (!content) return null;
-  const html = marked.parse(content, { breaks: true });
+  const html = marked.parse(resolveFileUrls(content), { breaks: true, renderer: fileProxyRenderer });
   return (
-    <div 
+    <div
       className={`prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-headings:mb-2 prose-headings:mt-4 first:prose-headings:mt-0 ${className}`}
       dangerouslySetInnerHTML={{ __html: html }}
     />
@@ -271,18 +304,24 @@ const TicketList: React.FC<TicketListProps> = () => {
       setLastReadCounts(prev => ({ ...prev, [ticketId]: count }));
   };
 
-  const handleOpenTicket = (ticket: Ticket) => {
+  const handleOpenTicket = async (ticket: Ticket) => {
     setSelectedTicket(ticket);
     setUpdateError(null);
-    setEditForm({ 
+    setEditForm({
         assignedAgentId: ticket.assignedAgentId || '',
         assignedWorkflowId: ticket.assignedWorkflowId || '',
         status: ticket.status?.name || 'Unknown',
         priority: ticket.priority?.name || 'Unknown'
     });
-    setSummary(ticket.summary || ''); 
+    setSummary(ticket.summary || '');
     setNewComment('');
-    updateReadCount(ticket.id, ticket.comments?.length || 0);
+    try {
+      const full = await getTicketById(ticket.id);
+      setSelectedTicket(full);
+      updateReadCount(ticket.id, full.comments?.length || 0);
+    } catch {
+      updateReadCount(ticket.id, ticket.comments?.length || 0);
+    }
   };
 
   const handleUpdateTicket = async () => {

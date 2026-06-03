@@ -90,4 +90,36 @@ public class FileSystemController : ControllerBase
             return StatusCode(500, new { error = "Failed to list directory.", details = ex.Message });
         }
     }
+
+    /// <summary>
+    /// Serves a local image file by absolute path. Used to render file:// image references
+    /// stored in ticket comments without exposing raw file:// URLs to the browser.
+    /// </summary>
+    [HttpGet("image")]
+    public IActionResult GetImage([FromQuery] string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return BadRequest(new { error = "Path parameter is required." });
+
+        if (!Path.IsPathRooted(path))
+            return BadRequest(new { error = "Path must be an absolute path." });
+
+        if (path.Contains(".."))
+            return BadRequest(new { error = "Path traversal sequences (..) are not allowed." });
+
+        if (!System.IO.File.Exists(path))
+            return NotFound(new { error = $"File not found: {path}" });
+
+        var mimeType = Path.GetExtension(path).ToLowerInvariant() switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".gif"            => "image/gif",
+            ".svg"            => "image/svg+xml",
+            ".webp"           => "image/webp",
+            _                 => "image/png"
+        };
+
+        var bytes = System.IO.File.ReadAllBytes(path);
+        return File(bytes, mimeType);
+    }
 }

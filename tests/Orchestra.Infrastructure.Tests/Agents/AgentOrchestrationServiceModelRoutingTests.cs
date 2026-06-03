@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Orchestra.Application.Agents.DTOs;
+using Orchestra.Application.Agents.Models;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Jobs.DTOs;
@@ -47,7 +48,7 @@ public class AgentOrchestrationServiceModelRoutingTests
         runtimeService
             .ExecuteAgentAsync(
                 Arg.Any<Guid>(),
-                Arg.Any<string>(),
+                Arg.Any<AgentContextInput>(),
                 Arg.Any<string?>(),
                 Arg.Any<string?>(),
                 Arg.Any<JobContext?>(),
@@ -79,7 +80,7 @@ public class AgentOrchestrationServiceModelRoutingTests
                 Arg.Any<Ticket>(),
                 Arg.Any<Agent>(),
                 Arg.Any<CancellationToken>())
-            .Returns("Enriched context prompt");
+            .Returns(AgentContextInput.TextOnly("Enriched context prompt"));
 
         var sut = new AgentOrchestrationService(
             runtimeService,
@@ -134,7 +135,7 @@ public class AgentOrchestrationServiceModelRoutingTests
         // Assert — ExecuteAgentAsync must be called exactly once with the agent's model
         await runtimeService.Received(1).ExecuteAgentAsync(
             agent.Id,
-            Arg.Any<string>(),
+            Arg.Any<AgentContextInput>(),
             agentModel,
             Arg.Any<string?>(),
             Arg.Any<JobContext?>(),
@@ -177,7 +178,7 @@ public class AgentOrchestrationServiceModelRoutingTests
         // Assert — ExecuteAgentAsync must be called with null agentModel
         await runtimeService.Received(1).ExecuteAgentAsync(
             agent.Id,
-            Arg.Any<string>(),
+            Arg.Any<AgentContextInput>(),
             null,
             Arg.Any<string?>(),
             Arg.Any<JobContext?>(),

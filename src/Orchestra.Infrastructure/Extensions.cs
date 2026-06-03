@@ -174,6 +174,7 @@ public static class Extensions
         // Jira API client abstraction for version support (Cloud v3, On-Premise v2)
         builder.Services.AddScoped<JiraApiClientFactory>();
         builder.Services.AddScoped<IJiraTextContentConverter, JiraTextContentConverter>();
+        builder.Services.AddScoped<IJiraRichContentBuilder, JiraRichContentBuilder>();
 
         // GitHub API client abstraction
         builder.Services.AddScoped<IGitHubApiClientFactory, GitHubApiClientFactory>();
@@ -230,6 +231,8 @@ public static class Extensions
         builder.Services.AddScoped<IChatAgentRunner, ChatAgentRunner>();
         builder.Services.AddScoped<IAgentOrchestrationService, AgentOrchestrationService>();
         builder.Services.AddScoped<IAgentContextBuilder, AgentContextBuilder>();
+        builder.Services.AddScoped<ITicketImageExtractor, TicketImageExtractor>();
+        builder.Services.AddScoped<JiraImageFetcher>();
         builder.Services.AddScoped<ITicketAgentExecutionDataAccess, TicketAgentExecutionDataAccess>();
         builder.Services.AddScoped<INotificationService, NotificationService>();
 

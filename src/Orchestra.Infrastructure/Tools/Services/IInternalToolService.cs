@@ -1,6 +1,8 @@
+using System.Collections.Generic;
 using System.ComponentModel;
 using Orchestra.Domain.Enums;
 using Orchestra.Infrastructure.Tools.Attributes;
+using Orchestra.Infrastructure.Tools.Models;
 
 namespace Orchestra.Infrastructure.Tools.Services;
 
@@ -27,4 +29,22 @@ public interface IInternalToolService
         [Description("The ticket ID to update")] string ticketId,
         [Description("Optional agent ID to assign the ticket to")] string? assignedAgentId = null,
         [Description("Optional workflow ID to assign the ticket to")] string? assignedWorkflowId = null);
+
+    [ToolAction("add_comment", "Add a text comment to an internal ticket", DangerLevel.Moderate)]
+    [Description("Add a plain markdown comment to an internal ticket")]
+    Task<object> AddCommentAsync(
+        [Description("The workspace ID where the ticket exists")] string workspaceId,
+        [Description("The ticket ID (GUID)")] string ticketId,
+        [Description("The comment text in markdown format")] string comment);
+
+    [ToolAction("add_comment_with_images", "Add a rich comment with inline images to an internal ticket", DangerLevel.Moderate)]
+    [Description("Add a comment with interleaved text paragraphs and images to an internal ticket. " +
+                 "Image paths must be absolute (e.g. C:\\\\Users\\\\...\\\\image.png) — relative paths are rejected.")]
+    Task<object> AddCommentWithImagesAsync(
+        [Description("The workspace ID where the ticket exists")] string workspaceId,
+        [Description("The ticket ID (GUID)")] string ticketId,
+        [Description("Ordered list of content blocks. Each block: " +
+                     "{\"type\":\"text\",\"content\":\"markdown text\"} OR " +
+                     "{\"type\":\"image\",\"content\":\"absolute local file path (e.g. C:\\\\Users\\\\...\\\\image.png — must be absolute, not relative)\",\"fileName\":\"optional display name\"}")]
+        List<ContentBlock> contentBlocks);
 }

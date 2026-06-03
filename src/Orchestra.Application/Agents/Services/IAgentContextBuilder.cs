@@ -1,3 +1,4 @@
+using Orchestra.Application.Agents.Models;
 using Orchestra.Domain.Entities;
 
 namespace Orchestra.Application.Agents.Services;
@@ -13,8 +14,8 @@ public interface IAgentContextBuilder
     /// </summary>
     /// <param name="ticket">The ticket entity.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>Formatted context prompt for agent execution.</returns>
-    Task<string> BuildContextPromptAsync(Ticket ticket, CancellationToken cancellationToken = default);
+    /// <returns>Enriched context input containing the text prompt and any image references.</returns>
+    Task<AgentContextInput> BuildContextPromptAsync(Ticket ticket, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Builds a fully enriched execution context prompt for agent execution.
@@ -29,8 +30,8 @@ public interface IAgentContextBuilder
     /// <param name="ticket">The ticket being executed.</param>
     /// <param name="agent">The agent entity (used for tool lookups and ProjectPrinciples injection).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The fully enriched context prompt string.</returns>
-    Task<string> BuildAgentContextWithIntegrationsAsync(
+    /// <returns>The fully enriched context input containing text prompt and image references.</returns>
+    Task<AgentContextInput> BuildAgentContextWithIntegrationsAsync(
         Ticket ticket,
         Agent agent,
         CancellationToken cancellationToken = default);

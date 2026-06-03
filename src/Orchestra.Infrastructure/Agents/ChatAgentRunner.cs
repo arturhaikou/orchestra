@@ -1,6 +1,7 @@
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
+using Orchestra.Application.Agents.Models;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Jobs.DTOs;
@@ -39,6 +40,7 @@ public class ChatAgentRunner : IChatAgentRunner
         Agent agentEntity,
         IList<AIFunction> tools,
         string message,
+        IReadOnlyList<AgentImageRef>? images,
         JobTrackingContext? jobTracking,
         object? session = null,
         CancellationToken cancellationToken = default)
@@ -134,7 +136,7 @@ public class ChatAgentRunner : IChatAgentRunner
             agentSession ??= await agent.CreateSessionAsync(cancellationToken);
 #pragma warning restore MAAI001
 
-            var response = await agentWithMiddleware.RunAsync(message, session: agentSession, cancellationToken: cancellationToken);
+            var response = await agentWithMiddleware.RunAsync(await BuildChatMessageAsync(message, images, cancellationToken), session: agentSession, cancellationToken: cancellationToken);
 
             if (jobTracking.SuspendedQuestionId is not null)
             {
@@ -154,8 +156,57 @@ public class ChatAgentRunner : IChatAgentRunner
         }
         else
         {
-            var response = await agent.RunAsync(message, cancellationToken: cancellationToken);
+            var response = await agent.RunAsync(await BuildChatMessageAsync(message, images, cancellationToken), cancellationToken: cancellationToken);
             return response.Text;
+        }
+    }
+
+    private async Task<ChatMessage> BuildChatMessageAsync(
+        string message,
+        IReadOnlyList<AgentImageRef>? images,
+        CancellationToken cancellationToken)
+    {
+        if (images is null || images.Count == 0)
+            return new ChatMessage(ChatRole.User, message);
+
+        var contents = new List<AIContent> { new TextContent(message) };
+
+        foreach (var img in images)
+        {
+            var content = await LoadImageContentAsync(img, cancellationToken);
+            if (content is not null)
+                contents.Add(content);
+        }
+
+        return new ChatMessage(ChatRole.User, contents);
+    }
+
+    private async Task<AIContent?> LoadImageContentAsync(
+        AgentImageRef img,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Pre-fetched bytes (e.g. authenticated Jira attachment)
+            if (img.Bytes is { Length: > 0 })
+                return new DataContent(img.Bytes, img.MimeType);
+
+            // Local file path — load from disk
+            var localPath = img.Source.Replace("file:///", string.Empty).Replace("file://", string.Empty);
+            if (!img.Source.StartsWith("http", StringComparison.OrdinalIgnoreCase) && File.Exists(localPath))
+                return await DataContent.LoadFromAsync(localPath);
+
+            // Public HTTPS URL — let the model fetch it directly
+            if (img.Source.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                return new UriContent(new Uri(img.Source), img.MimeType);
+
+            _logger.LogWarning("Skipping image ref '{Source}': file not found or unsupported scheme", img.Source);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to load image content for '{Source}'; skipping", img.Source);
+            return null;
         }
     }
 }

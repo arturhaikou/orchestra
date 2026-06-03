@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Web;
@@ -11,6 +12,7 @@ using Orchestra.Domain.Interfaces;
 using Orchestra.Domain.Utilities;
 using Orchestra.Infrastructure.Integrations.Providers.Jira;
 using Orchestra.Infrastructure.Integrations.Providers.Jira.Models;
+using Orchestra.Infrastructure.Tools.Models;
 using Orchestra.Infrastructure.Tools.Models.Jira;
 
 namespace Orchestra.Infrastructure.Tools.Services;
@@ -21,26 +23,28 @@ public class JiraToolService : IJiraToolService
     private readonly IIntegrationResolver _integrationResolver;
     private readonly ILogger<JiraToolService> _logger;
     private readonly IJiraTextContentConverter _contentConverter;
+    private readonly IJiraRichContentBuilder _richContentBuilder;
 
     public JiraToolService(
         JiraApiClientFactory apiClientFactory,
         IIntegrationResolver integrationResolver,
         ILogger<JiraToolService> logger,
-        IJiraTextContentConverter contentConverter)
+        IJiraTextContentConverter contentConverter,
+        IJiraRichContentBuilder richContentBuilder)
     {
         _apiClientFactory = apiClientFactory;
         _integrationResolver = integrationResolver;
         _logger = logger;
         _contentConverter = contentConverter;
+        _richContentBuilder = richContentBuilder;
     }
 
     public async Task<object> CreateIssueAsync(
         string workspaceId,
         string integrationId,
         string summary,
-        string description,
         string issueTypeName,
-        string? projectId = null)
+        List<ContentBlock> descriptionBlocks)
     {
         try
         {
@@ -60,26 +64,30 @@ public class JiraToolService : IJiraToolService
                 };
             }
 
-            // Step 1: Load and validate integration
+            // Step 1: Validate image paths before making any API calls
+            ValidateImagePaths(descriptionBlocks);
+
+            // Step 2: Load and validate integration
             var integration = await _integrationResolver.ResolveAsync(workspaceGuid, integrationId, ProviderType.JIRA);
 
-            // Step 2: Create API client
+            // Step 3: Create API client
             var apiClient = _apiClientFactory.CreateClient(integration);
 
-            // Step 3: Get project ID from parameter, filter query, or throw
-            var resolvedProjectId = await GetProjectIdAsync(apiClient, integration, projectId);
+            // Step 4: Get project ID from filter query or throw
+            var resolvedProjectId = await GetProjectIdAsync(apiClient, integration);
 
-            // Step 4: Resolve issue type name to ID
+            // Step 5: Resolve issue type name to ID
             var issueTypeId = await GetIssueTypeIdAsync(apiClient, issueTypeName);
 
-            // Step 5: Create the issue
+            // Step 6: Create the issue
             var issueKey = await CreateSingleIssueAsync(
                 apiClient,
                 integration,
                 resolvedProjectId,
                 summary,
-                description,
-                issueTypeId);
+                string.Empty,
+                issueTypeId,
+                descriptionBlocks: descriptionBlocks);
 
             // Step 6: Build success response
             var issueUrl = $"{integration.Url.TrimEnd('/')}/browse/{issueKey}";
@@ -265,19 +273,25 @@ public class JiraToolService : IJiraToolService
 
             if (!string.IsNullOrEmpty(description))
             {
-                var convertedDescription = await _contentConverter.ConvertMarkdownToDescriptionAsync(
-                    description,
-                    IntegrationTypeDetector.DetectJiraType(integration.Url));
+                var jiraType = IntegrationTypeDetector.DetectJiraType(integration.Url);
 
-                // Convert object result to JsonElement if needed
-                if (convertedDescription is JsonElement je)
+                if (jiraType == JiraType.Cloud && _richContentBuilder.ContainsLocalImageRefs(description))
                 {
-                    updateRequest.Fields.Description = je;
+                    updateRequest.Fields.Description = await _richContentBuilder.BuildAdfAsync(apiClient, issueKey, description);
                 }
                 else
                 {
-                    var json = JsonSerializer.Serialize(convertedDescription);
-                    updateRequest.Fields.Description = JsonSerializer.Deserialize<JsonElement>(json);
+                    var convertedDescription = await _contentConverter.ConvertMarkdownToDescriptionAsync(description, jiraType);
+
+                    if (convertedDescription is JsonElement je)
+                    {
+                        updateRequest.Fields.Description = je;
+                    }
+                    else
+                    {
+                        var json = JsonSerializer.Serialize(convertedDescription);
+                        updateRequest.Fields.Description = JsonSerializer.Deserialize<JsonElement>(json);
+                    }
                 }
             }
 
@@ -793,8 +807,7 @@ public class JiraToolService : IJiraToolService
         string epicTitle,
         string epicDescription,
         List<StoryRequest> stories,
-        string storyTypeName = "Story",
-        string? projectId = null)
+        string storyTypeName = "Story")
     {
         try
         {
@@ -820,8 +833,8 @@ public class JiraToolService : IJiraToolService
             // Step 2: Create API client
             var apiClient = _apiClientFactory.CreateClient(integration);
 
-            // Step 3: Get project ID from parameter, filter query, or throw
-            var resolvedProjectId = await GetProjectIdAsync(apiClient, integration, projectId);
+            // Step 3: Get project ID from filter query or throw
+            var resolvedProjectId = await GetProjectIdAsync(apiClient, integration);
 
             // Step 4: Resolve issue type IDs
             var epicTypeId = await GetIssueTypeIdAsync(apiClient, "Epic");
@@ -1019,7 +1032,7 @@ public class JiraToolService : IJiraToolService
         string workspaceId,
         string integrationId,
         string issueKey,
-        string comment)
+        List<ContentBlock> contentBlocks)
     {
         try
         {
@@ -1038,14 +1051,68 @@ public class JiraToolService : IJiraToolService
                 };
             }
 
+            if (contentBlocks == null || contentBlocks.Count == 0)
+            {
+                return new
+                {
+                    success = false,
+                    error = "contentBlocks must contain at least one block",
+                    errorCode = "INVALID_ARGUMENT"
+                };
+            }
+
+            ValidateImagePaths(contentBlocks);
+
             var integration = await _integrationResolver.ResolveAsync(workspaceGuid, integrationId, ProviderType.JIRA);
-
             var apiClient = _apiClientFactory.CreateClient(integration);
-
             var jiraType = IntegrationTypeDetector.DetectJiraType(integration.Url);
-            var commentBody = await _contentConverter.ConvertMarkdownToCommentBodyAsync(comment, jiraType);
 
-            await apiClient.AddCommentAsync(issueKey, commentBody);
+            if (jiraType == JiraType.Cloud)
+            {
+                var adfBody = await _richContentBuilder.BuildAdfFromBlocksAsync(apiClient, issueKey, contentBlocks);
+                await apiClient.AddCommentAsync(issueKey, adfBody);
+            }
+            else
+            {
+                var textParts = new List<string>();
+                var attachedNames = new List<string>();
+
+                foreach (var block in contentBlocks)
+                {
+                    if (block.Type == "text")
+                    {
+                        textParts.Add(block.Content);
+                    }
+                    else if (block.Type == "image")
+                    {
+                        var filePath = block.Content;
+                        if (!filePath.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                            !filePath.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var localPath = NormalizeLocalFilePath(filePath);
+                            var fileName = block.FileName ?? Path.GetFileName(localPath);
+                            var mimeType = Path.GetExtension(fileName).ToLowerInvariant() switch
+                            {
+                                ".jpg" or ".jpeg" => "image/jpeg",
+                                ".gif"            => "image/gif",
+                                ".svg"            => "image/svg+xml",
+                                ".webp"           => "image/webp",
+                                _                 => "image/png"
+                            };
+                            await using var fileStream = File.OpenRead(localPath);
+                            await apiClient.UploadAttachmentAsync(issueKey, fileStream, fileName, mimeType);
+                            attachedNames.Add(fileName);
+                        }
+                    }
+                }
+
+                var commentText = string.Join("\n\n", textParts);
+                if (attachedNames.Count > 0)
+                    commentText += $"\n\n*Attached images: {string.Join(", ", attachedNames)}*";
+
+                var commentBody = await _contentConverter.ConvertMarkdownToCommentBodyAsync(commentText, jiraType);
+                await apiClient.AddCommentAsync(issueKey, commentBody);
+            }
 
             var issueUrl = $"{integration.Url.TrimEnd('/')}/browse/{issueKey}";
 
@@ -1064,103 +1131,62 @@ public class JiraToolService : IJiraToolService
         }
         catch (IntegrationNotFoundException ex)
         {
-            _logger.LogError(ex,
-                "Integration not found for workspace {WorkspaceId}",
-                workspaceId);
-
-            return new
-            {
-                success = false,
-                error = $"Integration not found for workspace {workspaceId}",
-                errorCode = "INTEGRATION_NOT_FOUND"
-            };
+            _logger.LogError(ex, "Integration not found for workspace {WorkspaceId}", workspaceId);
+            return new { success = false, error = $"Integration not found for workspace {workspaceId}", errorCode = "INTEGRATION_NOT_FOUND" };
         }
         catch (InvalidOperationException ex)
         {
-            _logger.LogError(ex,
-                "Invalid operation while adding comment to JIRA issue {IssueKey}: {ErrorMessage}",
-                issueKey,
-                ex.Message);
-
+            _logger.LogError(ex, "Invalid operation adding comment to {IssueKey}: {ErrorMessage}", issueKey, ex.Message);
             return new
             {
                 success = false,
                 error = ex.Message,
                 errorCode = ex.Message.Contains("integrationId is required") ? "INTEGRATION_ID_REQUIRED" :
-                           ex.Message.Contains("No active integration found for the supplied ID") ? "INTEGRATION_NOT_FOUND" :
+                           ex.Message.Contains("No active integration found") ? "INTEGRATION_NOT_FOUND" :
                            ex.Message.Contains("not a Jira integration") ? "INTEGRATION_WRONG_PROVIDER" :
                            "INVALID_OPERATION"
             };
         }
+        catch (ArgumentException ex)
+        {
+            _logger.LogError(ex, "Invalid argument adding comment to {IssueKey}: {ErrorMessage}", issueKey, ex.Message);
+            return new { success = false, error = ex.Message, errorCode = "INVALID_ARGUMENT" };
+        }
+        catch (FileNotFoundException ex)
+        {
+            _logger.LogError(ex, "Image file not found: {ErrorMessage}", ex.Message);
+            return new { success = false, error = $"Image file not found: {ex.FileName}", errorCode = "FILE_NOT_FOUND" };
+        }
         catch (HttpRequestException ex) when (ex.InnerException is System.Net.Sockets.SocketException)
         {
-            _logger.LogError(ex,
-                "Failed to connect to JIRA for workspace {WorkspaceId}",
-                workspaceId);
-
-            return new
-            {
-                success = false,
-                error = "Failed to connect to JIRA. Please verify the integration URL.",
-                errorCode = "JIRA_NETWORK_ERROR"
-            };
+            _logger.LogError(ex, "Failed to connect to JIRA for workspace {WorkspaceId}", workspaceId);
+            return new { success = false, error = "Failed to connect to JIRA. Please verify the integration URL.", errorCode = "JIRA_NETWORK_ERROR" };
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogError(ex,
-                "Failed to communicate with JIRA adding comment to issue {IssueKey} in workspace {WorkspaceId}: {ErrorMessage}",
-                issueKey,
-                workspaceId,
-                ex.Message);
-
-            return new
-            {
-                success = false,
-                error = $"Failed to communicate with JIRA: {ex.Message}",
-                errorCode = "JIRA_HTTP_ERROR"
-            };
+            _logger.LogError(ex, "Failed to communicate with JIRA adding comment to {IssueKey}: {ErrorMessage}", issueKey, ex.Message);
+            return new { success = false, error = $"Failed to communicate with JIRA: {ex.Message}", errorCode = "JIRA_HTTP_ERROR" };
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex,
-                "Unexpected error adding comment to JIRA issue {IssueKey} in workspace {WorkspaceId}: {ErrorMessage}",
-                issueKey,
-                workspaceId,
-                ex.Message);
-
-            return new
-            {
-                success = false,
-                error = $"Unexpected error: {ex.Message}",
-                errorCode = "UNEXPECTED_ERROR"
-            };
+            _logger.LogError(ex, "Unexpected error adding comment to JIRA issue {IssueKey}: {ErrorMessage}", issueKey, ex.Message);
+            return new { success = false, error = $"Unexpected error: {ex.Message}", errorCode = "UNEXPECTED_ERROR" };
         }
     }
 
     private async Task<string> GetProjectIdAsync(
         IJiraApiClient apiClient,
         Integration integration,
-        string? projectId,
         CancellationToken cancellationToken = default)
     {
-        // 1. If projectId is provided, use it
-        if (!string.IsNullOrWhiteSpace(projectId))
-        {
-            _logger.LogDebug("Using provided projectId: {ProjectId}", projectId);
-            return projectId;
-        }
-
-        // 2. Try to extract project key from FilterQuery (JQL)
         var filterQuery = integration.FilterQuery;
         if (!string.IsNullOrWhiteSpace(filterQuery))
         {
-            // Try to extract project key from JQL (e.g., project = KEY or project = "KEY")
             var match = System.Text.RegularExpressions.Regex.Match(filterQuery, "project\\s*=\\s*['\"]?(\\w+)['\"]?", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             if (match.Success && match.Groups.Count > 1)
             {
                 var projectKey = match.Groups[1].Value;
                 _logger.LogDebug("Extracted project key from filter query: {ProjectKey}", projectKey);
-                // Resolve project key to project ID via JIRA API
                 var resolvedId = await apiClient.GetProjectIdByKeyAsync(projectKey, cancellationToken);
                 if (!string.IsNullOrEmpty(resolvedId))
                 {
@@ -1169,9 +1195,8 @@ public class JiraToolService : IJiraToolService
             }
         }
 
-        // 3. If neither, throw
-        _logger.LogError("Project ID must be specified via parameter or filter query for integration {IntegrationId}", integration.Id);
-        throw new InvalidOperationException("Project ID must be specified via parameter or filter query.");
+        _logger.LogError("Could not resolve project for integration {IntegrationId}", integration.Id);
+        throw new InvalidOperationException("Project must be specified in the integration's filter query (e.g. project = PROJ).");
     }
 
     private async Task<string> GetIssueTypeIdAsync(
@@ -1223,33 +1248,84 @@ public class JiraToolService : IJiraToolService
         string description,
         string issueTypeId,
         string? parentKey = null,
+        IReadOnlyList<ContentBlock>? descriptionBlocks = null,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            // Build description in the appropriate format
-            var descriptionBody = await _contentConverter.ConvertMarkdownToDescriptionAsync(
-                description,
-                IntegrationTypeDetector.DetectJiraType(integration.Url),
-                cancellationToken);
+            var jiraType = IntegrationTypeDetector.DetectJiraType(integration.Url);
 
-            // Build create issue request
+            object descriptionForCreate;
+            bool needsBlocksUpdate = false;
+
+            if (descriptionBlocks != null && descriptionBlocks.Count > 0 && jiraType == JiraType.Cloud)
+            {
+                bool hasFilePathImages = descriptionBlocks.Any(b =>
+                    b.Type == "image" &&
+                    !b.Content.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                    !b.Content.StartsWith("https://", StringComparison.OrdinalIgnoreCase));
+
+                if (hasFilePathImages)
+                {
+                    // Create with text-only first; update description with images after we have the issue key
+                    var textOnly = string.Join("\n\n", descriptionBlocks
+                        .Where(b => b.Type == "text")
+                        .Select(b => b.Content));
+                    descriptionForCreate = await _contentConverter.ConvertMarkdownToDescriptionAsync(
+                        textOnly, jiraType, cancellationToken);
+                    needsBlocksUpdate = true;
+                }
+                else
+                {
+                    // All images are external URLs — build ADF directly
+                    descriptionForCreate = await _richContentBuilder.BuildAdfFromBlocksAsync(
+                        apiClient, string.Empty, descriptionBlocks, cancellationToken);
+                }
+            }
+            else if (descriptionBlocks != null && descriptionBlocks.Count > 0)
+            {
+                // OnPremise: join text blocks as plain description; images are uploaded as attachments after creation
+                var textOnly = string.Join("\n\n", descriptionBlocks
+                    .Where(b => b.Type == "text")
+                    .Select(b => b.Content));
+                descriptionForCreate = await _contentConverter.ConvertMarkdownToDescriptionAsync(
+                    textOnly, jiraType, cancellationToken);
+                needsBlocksUpdate = true;
+            }
+            else
+            {
+                var hasLocalImages = jiraType == JiraType.Cloud && _richContentBuilder.ContainsLocalImageRefs(description);
+
+                if (hasLocalImages)
+                {
+                    descriptionForCreate = await _contentConverter.ConvertMarkdownToDescriptionAsync(
+                        _richContentBuilder.StripLocalImageRefs(description), jiraType, cancellationToken);
+                    needsBlocksUpdate = false; // handled below via legacy path
+                }
+                else
+                {
+                    descriptionForCreate = await _contentConverter.ConvertMarkdownToDescriptionAsync(
+                        description, jiraType, cancellationToken);
+                }
+
+                // Legacy file:// image path — mark for post-create update
+                if (jiraType == JiraType.Cloud && _richContentBuilder.ContainsLocalImageRefs(description))
+                    needsBlocksUpdate = true;
+            }
+
             var request = new CreateIssueRequest
             {
                 Fields = new CreateIssueFields
                 {
                     Summary = summary,
-                    Description = descriptionBody,
+                    Description = descriptionForCreate,
                     Issuetype = new IssueTypeField { Id = issueTypeId },
                     Project = new ProjectField { Id = projectId }
                 }
             };
 
-            // Add parent if provided (for subtasks/stories under epics)
             if (!string.IsNullOrEmpty(parentKey))
-            {
                 request.Fields.Parent = new ParentField { Key = parentKey };
-            }
 
             _logger.LogDebug(
                 "Creating JIRA issue in project {ProjectId} with type {IssueTypeId}",
@@ -1260,22 +1336,78 @@ public class JiraToolService : IJiraToolService
 
             if (result == null || string.IsNullOrEmpty(result.Key))
             {
-                _logger.LogError(
-                    "Failed to parse create issue response");
+                _logger.LogError("Failed to parse create issue response");
                 throw new InvalidOperationException("Failed to parse JIRA create issue response");
             }
 
-            _logger.LogInformation(
-                "Successfully created JIRA issue {IssueKey}",
-                result.Key);
+            if (needsBlocksUpdate)
+            {
+                if (jiraType == JiraType.Cloud)
+                {
+                    var adf = descriptionBlocks != null
+                        ? await _richContentBuilder.BuildAdfFromBlocksAsync(apiClient, result.Key, descriptionBlocks, cancellationToken)
+                        : await _richContentBuilder.BuildAdfAsync(apiClient, result.Key, description, cancellationToken);
+                    await apiClient.UpdateIssueAsync(result.Key, new { description = adf }, cancellationToken);
+                }
+                else if (descriptionBlocks != null)
+                {
+                    // OnPremise: upload local file-path images as attachments
+                    foreach (var block in descriptionBlocks)
+                    {
+                        if (block.Type != "image") continue;
+                        var filePath = block.Content;
+                        if (filePath.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                            filePath.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                            continue;
+
+                        var localPath = NormalizeLocalFilePath(filePath);
+                        var fileName = block.FileName ?? Path.GetFileName(localPath);
+                        var mimeType = Path.GetExtension(fileName).ToLowerInvariant() switch
+                        {
+                            ".jpg" or ".jpeg" => "image/jpeg",
+                            ".gif"            => "image/gif",
+                            ".svg"            => "image/svg+xml",
+                            ".webp"           => "image/webp",
+                            _                 => "image/png"
+                        };
+                        await using var fileStream = File.OpenRead(localPath);
+                        await apiClient.UploadAttachmentAsync(result.Key, fileStream, fileName, mimeType, cancellationToken);
+                    }
+                }
+            }
+
+            _logger.LogInformation("Successfully created JIRA issue {IssueKey}", result.Key);
 
             return result.Key;
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogError(ex,
-                "Failed to create issue");
+            _logger.LogError(ex, "Failed to create issue");
             throw;
+        }
+    }
+
+    private static string NormalizeLocalFilePath(string path) =>
+        path.StartsWith("file:///", StringComparison.OrdinalIgnoreCase)
+            ? path[8..]
+            : path.StartsWith("file://", StringComparison.OrdinalIgnoreCase)
+                ? path[7..]
+                : path;
+
+    private static void ValidateImagePaths(IEnumerable<ContentBlock>? blocks)
+    {
+        if (blocks == null) return;
+        foreach (var block in blocks)
+        {
+            if (block.Type != "image") continue;
+            var content = block.Content;
+            if (content.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                content.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                continue;
+            var localPath = NormalizeLocalFilePath(content);
+            if (!Path.IsPathRooted(localPath))
+                throw new ArgumentException(
+                    $"Image path must be absolute. Received relative path: '{content}'. Please provide the full absolute path (e.g. C:\\Users\\...\\image.png).");
         }
     }
 

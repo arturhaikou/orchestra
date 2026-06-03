@@ -95,4 +95,6 @@ audit/
 research/
 */node_modules/
 *.lscache
+.claude
+.codemie
 # End of file

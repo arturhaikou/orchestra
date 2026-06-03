@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using NSubstitute.ExceptionExtensions;
 using Orchestra.Application.Agents.DTOs;
+using Orchestra.Application.Agents.Models;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Jobs.DTOs;
@@ -39,7 +40,7 @@ public class AgentOrchestrationServiceNotificationTests
         runtimeService
             .ExecuteAgentAsync(
                 Arg.Any<Guid>(),
-                Arg.Any<string>(),
+                Arg.Any<AgentContextInput>(),
                 Arg.Any<string?>(),
                 Arg.Any<string?>(),
                 Arg.Any<JobContext?>(),
@@ -70,7 +71,7 @@ public class AgentOrchestrationServiceNotificationTests
                 Arg.Any<Ticket>(),
                 Arg.Any<Agent>(),
                 Arg.Any<CancellationToken>())
-            .Returns("Enriched context prompt");
+            .Returns(AgentContextInput.TextOnly("Enriched context prompt"));
 
         var sut = new AgentOrchestrationService(
             runtimeService,
@@ -146,7 +147,7 @@ public class AgentOrchestrationServiceNotificationTests
         runtimeService
             .ExecuteAgentAsync(
                 Arg.Any<Guid>(),
-                Arg.Any<string>(),
+                Arg.Any<AgentContextInput>(),
                 Arg.Any<string?>(),
                 Arg.Any<string?>(),
                 Arg.Any<JobContext?>(),

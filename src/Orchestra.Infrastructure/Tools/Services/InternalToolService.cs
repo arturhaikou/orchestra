@@ -1,7 +1,12 @@
+using System.Collections.Generic;
+using System.IO;
+using System.Text;
 using Microsoft.Extensions.Logging;
+
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Common.Exceptions;
 using Orchestra.Application.Tickets.DTOs;
+using Orchestra.Infrastructure.Tools.Models;
 
 namespace Orchestra.Infrastructure.Tools.Services;
 
@@ -263,7 +268,8 @@ public class InternalToolService : IInternalToolService
                     externalUrl = ticketDto.ExternalUrl,
                     source = ticketDto.Source,
                     satisfaction = ticketDto.Satisfaction,
-                    summary = ticketDto.Summary
+                    summary = ticketDto.Summary,
+                    comments = ticketDto.Comments
                 },
                 message = $"Successfully retrieved ticket {ticketId}"
             };
@@ -858,4 +864,147 @@ public class InternalToolService : IInternalToolService
             };
         }
     }
+
+    public async Task<object> AddCommentAsync(
+        string workspaceId,
+        string ticketId,
+        string comment)
+    {
+        try
+        {
+            _logger.LogInformation(
+                "Adding comment to internal ticket {TicketId} in workspace {WorkspaceId}",
+                ticketId,
+                workspaceId);
+
+            if (!Guid.TryParse(workspaceId, out var workspaceGuid))
+            {
+                return new { success = false, error = $"Invalid GUID format for workspaceId: {workspaceId}", errorCode = "INVALID_WORKSPACE_ID" };
+            }
+
+            var workspace = await _workspaceDataAccess.GetByIdAsync(workspaceGuid);
+            if (workspace == null)
+            {
+                return new { success = false, error = $"Workspace not found: {workspaceId}", errorCode = "WORKSPACE_NOT_FOUND" };
+            }
+
+            if (string.IsNullOrWhiteSpace(comment))
+            {
+                return new { success = false, error = "Comment cannot be empty", errorCode = "INVALID_ARGUMENT" };
+            }
+
+            var created = await _ticketService.AddCommentAsync(ticketId, workspace.OwnerId, new AddCommentRequest(comment));
+
+            _logger.LogInformation(
+                "Successfully added comment to internal ticket {TicketId}",
+                ticketId);
+
+            return new { success = true, commentId = created.Id, ticketId = ticketId, message = "Comment added successfully" };
+        }
+        catch (TicketNotFoundException ex)
+        {
+            _logger.LogError(ex, "Ticket {TicketId} not found", ticketId);
+            return new { success = false, error = ex.Message, errorCode = "TICKET_NOT_FOUND" };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error adding comment to ticket {TicketId}: {ErrorMessage}", ticketId, ex.Message);
+            return new { success = false, error = $"Unexpected error: {ex.Message}", errorCode = "UNEXPECTED_ERROR" };
+        }
+    }
+
+    public async Task<object> AddCommentWithImagesAsync(
+        string workspaceId,
+        string ticketId,
+        List<ContentBlock> contentBlocks)
+    {
+        try
+        {
+            _logger.LogInformation(
+                "Adding rich comment with images to internal ticket {TicketId} in workspace {WorkspaceId}",
+                ticketId,
+                workspaceId);
+
+            if (!Guid.TryParse(workspaceId, out var workspaceGuid))
+            {
+                return new { success = false, error = $"Invalid GUID format for workspaceId: {workspaceId}", errorCode = "INVALID_WORKSPACE_ID" };
+            }
+
+            if (contentBlocks == null || contentBlocks.Count == 0)
+            {
+                return new { success = false, error = "contentBlocks must contain at least one block", errorCode = "INVALID_ARGUMENT" };
+            }
+
+            foreach (var block in contentBlocks)
+            {
+                if (block.Type != "image") continue;
+                var path = block.Content;
+                if (!Path.IsPathRooted(path))
+                    throw new ArgumentException(
+                        $"Image path must be absolute. Received relative path: '{path}'. Please provide the full absolute path (e.g. C:\\Users\\...\\image.png).");
+            }
+
+            var workspace = await _workspaceDataAccess.GetByIdAsync(workspaceGuid);
+            if (workspace == null)
+            {
+                return new { success = false, error = $"Workspace not found: {workspaceId}", errorCode = "WORKSPACE_NOT_FOUND" };
+            }
+
+            var sb = new StringBuilder();
+
+            foreach (var block in contentBlocks)
+            {
+                if (sb.Length > 0)
+                {
+                    sb.AppendLine();
+                    sb.AppendLine();
+                }
+
+                if (block.Type == "text")
+                {
+                    sb.Append(block.Content);
+                }
+                else if (block.Type == "image")
+                {
+                    var filePath = block.Content;
+                    var fileName = block.FileName ?? Path.GetFileName(filePath);
+                    // Forward slashes are required: marked treats backslashes as escape sequences.
+                    // Angle-bracket syntax handles paths that contain spaces.
+                    var fwdPath = filePath.Replace('\\', '/');
+                    var href = fwdPath.Contains(' ') ? $"<file://{fwdPath}>" : $"file://{fwdPath}";
+                    sb.Append($"![{fileName}]({href})");
+                }
+            }
+
+            var commentContent = sb.ToString();
+            var created = await _ticketService.AddCommentAsync(ticketId, workspace.OwnerId, new AddCommentRequest(commentContent));
+
+            _logger.LogInformation(
+                "Successfully added rich comment to internal ticket {TicketId}",
+                ticketId);
+
+            return new { success = true, commentId = created.Id, ticketId = ticketId, message = "Rich comment with images added successfully" };
+        }
+        catch (TicketNotFoundException ex)
+        {
+            _logger.LogError(ex, "Ticket {TicketId} not found", ticketId);
+            return new { success = false, error = ex.Message, errorCode = "TICKET_NOT_FOUND" };
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogError(ex, "Invalid argument adding rich comment to ticket {TicketId}: {ErrorMessage}", ticketId, ex.Message);
+            return new { success = false, error = ex.Message, errorCode = "INVALID_ARGUMENT" };
+        }
+        catch (FileNotFoundException ex)
+        {
+            _logger.LogError(ex, "Image file not found: {FileName}", ex.FileName);
+            return new { success = false, error = $"Image file not found: {ex.FileName}", errorCode = "FILE_NOT_FOUND" };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error adding rich comment to ticket {TicketId}: {ErrorMessage}", ticketId, ex.Message);
+            return new { success = false, error = $"Unexpected error: {ex.Message}", errorCode = "UNEXPECTED_ERROR" };
+        }
+    }
+
 }

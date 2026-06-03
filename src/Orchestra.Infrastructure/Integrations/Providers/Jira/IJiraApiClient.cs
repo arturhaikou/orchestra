@@ -105,4 +105,35 @@ public interface IJiraApiClient
     Task<string?> GetProjectIdByKeyAsync(
         string projectKey,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Uploads a file as an attachment to an issue.
+    /// </summary>
+    /// <param name="issueKey">The issue key (e.g., PROJ-123).</param>
+    /// <param name="fileStream">The file content stream.</param>
+    /// <param name="fileName">The file name including extension.</param>
+    /// <param name="mimeType">The MIME type of the file.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The attachment metadata including mediaApiFileId for ADF embedding.</returns>
+    Task<JiraAttachmentResponse> UploadAttachmentAsync(
+        string issueKey,
+        Stream fileStream,
+        string fileName,
+        string mimeType,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Downloads the raw bytes of an attachment from its content URL.
+    /// Used to pre-fetch authenticated attachment images for injection into the agent's
+    /// multimodal context (the LLM cannot authenticate to Jira directly).
+    /// </summary>
+    /// <param name="contentUrl">
+    /// The full URL of the attachment content, e.g.
+    /// https://jira.company.com/rest/api/3/attachment/content/12345
+    /// </param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A tuple of the raw image bytes and the MIME type from the Content-Type header.</returns>
+    Task<(byte[] Data, string MimeType)> GetAttachmentContentAsync(
+        string contentUrl,
+        CancellationToken cancellationToken = default);
 }

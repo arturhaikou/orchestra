@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using NSubstitute.ExceptionExtensions;
 using Orchestra.Application.Agents.DTOs;
+using Orchestra.Application.Agents.Models;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Jobs.DTOs;
@@ -64,11 +65,11 @@ public class AgentOrchestrationServiceTests
         _agentDataAccess.GetByIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(agent);
         _agentContextBuilder
             .BuildAgentContextWithIntegrationsAsync(ticket, agent, Arg.Any<CancellationToken>())
-            .Returns("context prompt");
+            .Returns(AgentContextInput.TextOnly("context prompt"));
         
         var jobId = Guid.NewGuid();
         _agentRuntimeService
-            .ExecuteAgentAsync(agentId, "context prompt", agent.Model, agent.ProjectPrinciples, Arg.Any<JobContext?>(), Arg.Any<CancellationToken>())
+            .ExecuteAgentAsync(agentId, Arg.Any<AgentContextInput>(), agent.Model, agent.ProjectPrinciples, Arg.Any<JobContext?>(), Arg.Any<CancellationToken>())
             .Returns(("response", jobId));
         
         _jobService
@@ -147,9 +148,9 @@ public class AgentOrchestrationServiceTests
         _agentDataAccess.GetByIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(agent);
         _agentContextBuilder
             .BuildAgentContextWithIntegrationsAsync(ticket, agent, Arg.Any<CancellationToken>())
-            .Returns("context prompt");
+            .Returns(AgentContextInput.TextOnly("context prompt"));
         _agentRuntimeService
-            .ExecuteAgentAsync(agentId, "context prompt", agent.Model, agent.ProjectPrinciples, Arg.Any<JobContext?>(), Arg.Any<CancellationToken>())
+            .ExecuteAgentAsync(agentId, Arg.Any<AgentContextInput>(), agent.Model, agent.ProjectPrinciples, Arg.Any<JobContext?>(), Arg.Any<CancellationToken>())
             .ThrowsAsync(new Exception("AI execution failed"));
 
         await _sut.ExecuteAgentForTicketAsync(ticketId);
@@ -197,11 +198,11 @@ public class AgentOrchestrationServiceTests
         _agentDataAccess.GetByIdAsync(agentId, Arg.Any<CancellationToken>()).Returns(agent);
         _agentContextBuilder
             .BuildAgentContextWithIntegrationsAsync(ticket, agent, Arg.Any<CancellationToken>())
-            .Returns("context prompt");
+            .Returns(AgentContextInput.TextOnly("context prompt"));
 
         var jobId = Guid.NewGuid();
         _agentRuntimeService
-            .ExecuteAgentAsync(agentId, "context prompt", agent.Model, agent.ProjectPrinciples, Arg.Any<JobContext?>(), Arg.Any<CancellationToken>())
+            .ExecuteAgentAsync(agentId, Arg.Any<AgentContextInput>(), agent.Model, agent.ProjectPrinciples, Arg.Any<JobContext?>(), Arg.Any<CancellationToken>())
             .Returns(("response", jobId));
 
         _jobService

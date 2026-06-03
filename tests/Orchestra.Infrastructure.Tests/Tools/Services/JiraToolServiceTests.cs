@@ -14,6 +14,7 @@ using Orchestra.Domain.Enums;
 using Orchestra.Domain.Interfaces;
 using Orchestra.Infrastructure.Integrations.Providers.Jira;
 using Orchestra.Infrastructure.Tools.Attributes;
+using Orchestra.Infrastructure.Tools.Models;
 using Orchestra.Infrastructure.Tools.Services;
 using Orchestra.Tests.Shared.Builders;
 using Orchestra.Tests.Shared.Fixtures;
@@ -34,7 +35,8 @@ public class JiraToolServiceTests : ServiceTestFixture<JiraToolService>
         var mockLoggerFactory = Substitute.For<ILoggerFactory>();
 
         var apiClientFactory = new JiraApiClientFactory(mockHttpClientFactory, mockCredentialService, mockLoggerFactory);
-        _sut = new JiraToolService(apiClientFactory, _integrationResolver, Logger, _contentConverter);
+        var richContentBuilder = Substitute.For<IJiraRichContentBuilder>();
+        _sut = new JiraToolService(apiClientFactory, _integrationResolver, Logger, _contentConverter, richContentBuilder);
     }
 
     #region Attribute Verification Tests
@@ -102,8 +104,8 @@ public class JiraToolServiceTests : ServiceTestFixture<JiraToolService>
             _testWorkspaceId.ToString(),
             string.Empty,
             "Test summary",
-            "Description",
-            "Bug");
+            "Bug",
+            [new ContentBlock("text", "Description")]);
 
         // Assert
         var resultDict = SerializeToDict(result);
@@ -124,8 +126,8 @@ public class JiraToolServiceTests : ServiceTestFixture<JiraToolService>
             _testWorkspaceId.ToString(),
             null!,
             "Test summary",
-            "Description",
-            "Bug");
+            "Bug",
+            [new ContentBlock("text", "Description")]);
 
         // Assert
         var resultDict = SerializeToDict(result);
@@ -146,8 +148,8 @@ public class JiraToolServiceTests : ServiceTestFixture<JiraToolService>
             _testWorkspaceId.ToString(),
             Guid.NewGuid().ToString(),
             "Test summary",
-            "Description",
-            "Bug");
+            "Bug",
+            [new ContentBlock("text", "Description")]);
 
         // Assert
         var resultDict = SerializeToDict(result);
@@ -168,8 +170,8 @@ public class JiraToolServiceTests : ServiceTestFixture<JiraToolService>
             _testWorkspaceId.ToString(),
             Guid.NewGuid().ToString(),
             "Test summary",
-            "Description",
-            "Bug");
+            "Bug",
+            [new ContentBlock("text", "Description")]);
 
         // Assert — must return not-found (no cross-workspace data leakage)
         var resultDict = SerializeToDict(result);
@@ -191,8 +193,8 @@ public class JiraToolServiceTests : ServiceTestFixture<JiraToolService>
             _testWorkspaceId.ToString(),
             Guid.NewGuid().ToString(),
             "Test summary",
-            "Description",
-            "Bug");
+            "Bug",
+            [new ContentBlock("text", "Description")]);
 
         // Assert
         var resultDict = SerializeToDict(result);
@@ -207,7 +209,7 @@ public class JiraToolServiceTests : ServiceTestFixture<JiraToolService>
     [Fact]
     public async Task AddCommentAsync_ReturnsError_WhenWorkspaceIdIsInvalid()
     {
-        var result = await _sut.AddCommentAsync("not-a-guid", "integration-id", "PROJ-1", "A comment");
+        var result = await _sut.AddCommentAsync("not-a-guid", "integration-id", "PROJ-1", [new Orchestra.Infrastructure.Tools.Models.ContentBlock("text", "A comment", null)]);
 
         var resultDict = SerializeToDict(result);
         Assert.False(GetBooleanValue(resultDict["success"]));
@@ -222,7 +224,7 @@ public class JiraToolServiceTests : ServiceTestFixture<JiraToolService>
             .ThrowsAsync(new Orchestra.Application.Common.Exceptions.IntegrationNotFoundException(Guid.NewGuid()));
 
         var result = await _sut.AddCommentAsync(
-            _testWorkspaceId.ToString(), "some-integration-id", "PROJ-1", "A comment");
+            _testWorkspaceId.ToString(), "some-integration-id", "PROJ-1", [new Orchestra.Infrastructure.Tools.Models.ContentBlock("text", "A comment", null)]);
 
         var resultDict = SerializeToDict(result);
         Assert.False(GetBooleanValue(resultDict["success"]));
@@ -237,11 +239,73 @@ public class JiraToolServiceTests : ServiceTestFixture<JiraToolService>
             .ThrowsAsync(new InvalidOperationException("integrationId is required for this tool action; no integration credentials were accessed."));
 
         var result = await _sut.AddCommentAsync(
-            _testWorkspaceId.ToString(), string.Empty, "PROJ-1", "A comment");
+_testWorkspaceId.ToString(), string.Empty, "PROJ-1", [new Orchestra.Infrastructure.Tools.Models.ContentBlock("text", "A comment", null)]);
 
         var resultDict = SerializeToDict(result);
         Assert.False(GetBooleanValue(resultDict["success"]));
         Assert.Contains("integrationId is required", resultDict["error"].ToString());
+    }
+
+    #endregion
+
+    #region Image Path Validation Tests
+
+    [Theory]
+    [InlineData("./screenshots/image.png")]
+    [InlineData("screenshots/image.png")]
+    [InlineData("../images/screenshot.png")]
+    public async Task AddCommentAsync_ReturnsInvalidArgument_WhenImagePathIsRelative(string relativePath)
+    {
+        // Arrange — OnPremise integration (non-atlassian.net URL) so the local-path branch is exercised
+        var integration = new IntegrationBuilder()
+            .WithWorkspaceId(_testWorkspaceId)
+            .WithProvider(ProviderType.JIRA)
+            .WithUrl("https://jira.mycompany.local")
+            .Build();
+
+        _integrationResolver
+            .ResolveAsync(_testWorkspaceId, Arg.Any<string>(), ProviderType.JIRA, Arg.Any<CancellationToken>())
+            .Returns(integration);
+
+        var blocks = new List<ContentBlock>
+        {
+            new ContentBlock("image", relativePath, "screenshot.png")
+        };
+
+        // Act
+        var result = await _sut.AddCommentAsync(
+            _testWorkspaceId.ToString(), Guid.NewGuid().ToString(), "PROJ-1", blocks);
+
+        // Assert
+        var resultDict = SerializeToDict(result);
+        Assert.False(GetBooleanValue(resultDict["success"]));
+        Assert.Equal("INVALID_ARGUMENT", resultDict["errorCode"].ToString());
+        Assert.Contains("relative path", resultDict["error"].ToString());
+        Assert.Contains(relativePath, resultDict["error"].ToString());
+    }
+
+    [Theory]
+    [InlineData("./screenshots/image.png")]
+    [InlineData("screenshots/image.png")]
+    public async Task CreateIssueAsync_ReturnsInvalidArgument_WhenImagePathIsRelative(string relativePath)
+    {
+        // Arrange — validation fires before any API call, so no integration setup needed
+        var blocks = new List<ContentBlock>
+        {
+            new ContentBlock("text", "Description text"),
+            new ContentBlock("image", relativePath, "screenshot.png")
+        };
+
+        // Act
+        var result = await _sut.CreateIssueAsync(
+            _testWorkspaceId.ToString(), Guid.NewGuid().ToString(), "Test issue", "Bug", blocks);
+
+        // Assert
+        var resultDict = SerializeToDict(result);
+        Assert.False(GetBooleanValue(resultDict["success"]));
+        Assert.Equal("INVALID_ARGUMENT", resultDict["errorCode"].ToString());
+        Assert.Contains("relative path", resultDict["error"].ToString());
+        Assert.Contains(relativePath, resultDict["error"].ToString());
     }
 
     #endregion

@@ -269,11 +269,13 @@ public class ToolRetrieverService : IToolRetrieverService
 
         var groups = connectedTools.GroupBy(t => t.McpServerId);
 
-        var tasks = groups.Select(g =>
-            ResolveConnectedMcpToolsForServerAsync(g.Key, g.Select(t => t.ToolName).ToList(), agentWorkspaceId, cancellationToken));
-
-        var results = await Task.WhenAll(tasks);
-        return results.SelectMany(r => r).ToList();
+        var results = new List<AIFunction>();
+        foreach (var g in groups)
+        {
+            var tools = await ResolveConnectedMcpToolsForServerAsync(g.Key, g.Select(t => t.ToolName).ToList(), agentWorkspaceId, cancellationToken);
+            results.AddRange(tools);
+        }
+        return results;
     }
 
     private async Task<List<AIFunction>> ResolveConnectedMcpToolsForServerAsync(
@@ -602,6 +604,7 @@ public class ToolRetrieverService : IToolRetrieverService
                     capturedSubAgent,
                     subAgentTools.ToList(),
                     message,
+                    null,
                     nestedJobTracking,
                     ct);
 
@@ -747,12 +750,13 @@ public class ToolRetrieverService : IToolRetrieverService
     {
         var groups = mcpActions.GroupBy(a => a.ToolCategoryId);
 
-        var tasks = groups.Select(g =>
-            ResolveMcpToolsForCategoryAsync(g.Key, g.ToList(), agentWorkspaceId, cancellationToken));
-
-        var results = await Task.WhenAll(tasks);
-
-        return results.SelectMany(r => r).ToList();
+        var results = new List<AIFunction>();
+        foreach (var g in groups)
+        {
+            var tools = await ResolveMcpToolsForCategoryAsync(g.Key, g.ToList(), agentWorkspaceId, cancellationToken);
+            results.AddRange(tools);
+        }
+        return results;
     }
 
     private async Task<List<AIFunction>> ResolveMcpToolsForCategoryAsync(

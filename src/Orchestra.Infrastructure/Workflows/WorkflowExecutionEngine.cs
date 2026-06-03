@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Orchestra.Application.Agents.Models;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Jobs.DTOs;
@@ -261,7 +262,7 @@ public class WorkflowExecutionEngine : IWorkflowExecutionEngine
 
         try
         {
-            var contextPrompt = await BuildStepContextAsync(
+            var contextInput = await BuildStepContextAsync(
                 ticket, agent, step, previousOutput, cancellationToken);
 
             var jobContext = new JobContext(
@@ -269,7 +270,7 @@ public class WorkflowExecutionEngine : IWorkflowExecutionEngine
                 AgentId: agent.Id,
                 AgentName: agent.Name,
                 TriggerType: JobTriggerType.Ticket,
-                InitialPrompt: contextPrompt,
+                InitialPrompt: contextInput.TextPrompt,
                 TicketId: ticket.Id,
                 TicketTitle: ticket.Title,
                 ParentJobId: workflowExecution.WorkflowJobId,
@@ -277,7 +278,7 @@ public class WorkflowExecutionEngine : IWorkflowExecutionEngine
 
             var (text, createdJobId) = await _agentRuntimeService.ExecuteAgentAsync(
                 agent.Id,
-                contextPrompt,
+                contextInput,
                 agent.Model,
                 agent.ProjectPrinciples,
                 jobContext,
@@ -317,21 +318,21 @@ public class WorkflowExecutionEngine : IWorkflowExecutionEngine
         }
     }
 
-    private async Task<string> BuildStepContextAsync(
+    private async Task<AgentContextInput> BuildStepContextAsync(
         Ticket ticket,
         Agent agent,
         WorkflowStep step,
         string? previousOutput,
         CancellationToken cancellationToken)
     {
-        var baseContext = await _agentContextBuilder.BuildAgentContextWithIntegrationsAsync(
+        var baseInput = await _agentContextBuilder.BuildAgentContextWithIntegrationsAsync(
             ticket, agent, cancellationToken);
 
         if (!step.PassPreviousOutput || string.IsNullOrWhiteSpace(previousOutput))
-            return AppendInstructionOverride(baseContext, step.InstructionOverride);
+            return new AgentContextInput(AppendInstructionOverride(baseInput.TextPrompt, step.InstructionOverride), baseInput.Images);
 
-        var contextWithPrevious = $"{baseContext}\n\n[Previous Step Output]\n{previousOutput}";
-        return AppendInstructionOverride(contextWithPrevious, step.InstructionOverride);
+        var textWithPrevious = $"{baseInput.TextPrompt}\n\n[Previous Step Output]\n{previousOutput}";
+        return new AgentContextInput(AppendInstructionOverride(textWithPrevious, step.InstructionOverride), baseInput.Images);
     }
 
     private static string AppendInstructionOverride(string context, string? instructionOverride)

@@ -8,6 +8,7 @@ using Orchestra.Domain.Interfaces;
 using Orchestra.Domain.Utilities;
 using Orchestra.Infrastructure.Integrations.Providers.Jira.Models;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Net;
 
 namespace Orchestra.Infrastructure.Integrations.Providers.Jira;
@@ -17,15 +18,18 @@ public class JiraTicketProvider : ITicketProvider
     private readonly JiraApiClientFactory _apiClientFactory;
     private readonly ILogger<JiraTicketProvider> _logger;
     private readonly IJiraTextContentConverter _contentConverter;
+    private readonly IJiraRichContentBuilder _richContentBuilder;
 
     public JiraTicketProvider(
         JiraApiClientFactory apiClientFactory,
         ILogger<JiraTicketProvider> logger,
-        IJiraTextContentConverter contentConverter)
+        IJiraTextContentConverter contentConverter,
+        IJiraRichContentBuilder richContentBuilder)
     {
         _apiClientFactory = apiClientFactory;
         _logger = logger;
         _contentConverter = contentConverter;
+        _richContentBuilder = richContentBuilder;
     }
 
     public async Task<(List<ExternalTicketDto> Tickets, bool IsLast, string? NextPageToken)>
@@ -180,11 +184,14 @@ public class JiraTicketProvider : ITicketProvider
             // Step 2: Resolve issue type name to ID
             var issueTypeId = await GetIssueTypeIdAsync(apiClient, issueTypeName, cancellationToken);
 
-            // Step 3: Convert markdown description to appropriate format
-            var descriptionBody = await _contentConverter.ConvertMarkdownToDescriptionAsync(
-                description,
-                IntegrationTypeDetector.DetectJiraType(integration.Url),
-                cancellationToken);
+            // Step 3: Convert markdown description, handling file:// image refs transparently
+            var jiraType = IntegrationTypeDetector.DetectJiraType(integration.Url);
+            var hasLocalImages = jiraType == Domain.Enums.JiraType.Cloud && _richContentBuilder.ContainsLocalImageRefs(description);
+
+            var descriptionBody = hasLocalImages
+                ? await _contentConverter.ConvertMarkdownToDescriptionAsync(
+                    _richContentBuilder.StripLocalImageRefs(description), jiraType, cancellationToken)
+                : await _contentConverter.ConvertMarkdownToDescriptionAsync(description, jiraType, cancellationToken);
 
             // Step 4: Build create issue request
             var request = new CreateIssueRequest
@@ -210,6 +217,13 @@ public class JiraTicketProvider : ITicketProvider
             {
                 _logger.LogError("JIRA returned null or empty issue key for integration {IntegrationId}", integration.Id);
                 throw new InvalidOperationException("Failed to create JIRA issue: No issue key returned.");
+            }
+
+            // Step 5: Update description with full ADF including uploaded images
+            if (hasLocalImages)
+            {
+                var adf = await _richContentBuilder.BuildAdfAsync(apiClient, response.Key, description, cancellationToken);
+                await apiClient.UpdateIssueAsync(response.Key, new { description = adf }, cancellationToken);
             }
 
             var baseUrl = integration.Url?.TrimEnd('/') ?? string.Empty;
@@ -326,6 +340,7 @@ public class JiraTicketProvider : ITicketProvider
         var comments = await ConvertCommentsAsync(
             jiraTicket.Fields?.Comment?.Comments,
             IntegrationTypeDetector.DetectJiraType(integration.Url),
+            integration.Url,
             cancellationToken);
 
         // Build external URL directly from integration base URL and ticket key
@@ -341,6 +356,7 @@ public class JiraTicketProvider : ITicketProvider
             Description: await ExtractDescriptionTextAsync(
                 jiraTicket.Fields?.Description,
                 IntegrationTypeDetector.DetectJiraType(integration.Url),
+                integration.Url,
                 cancellationToken),
             StatusName: statusName,
             StatusColor: GetStatusColor(statusCategoryId, statusName),
@@ -358,6 +374,7 @@ public class JiraTicketProvider : ITicketProvider
     private async Task<List<CommentDto>> ConvertCommentsAsync(
         IEnumerable<JiraComment>? jiraComments,
         Domain.Enums.JiraType jiraType,
+        string? baseUrl,
         CancellationToken cancellationToken = default)
     {
         if (jiraComments == null || !jiraComments.Any())
@@ -370,8 +387,16 @@ public class JiraTicketProvider : ITicketProvider
             var comments = new List<CommentDto>();
             foreach (var comment in jiraComments)
             {
+                var body = comment.Body;
+                if (jiraType == Domain.Enums.JiraType.Cloud
+                    && !string.IsNullOrEmpty(baseUrl)
+                    && body is JsonElement bodyElement)
+                {
+                    body = MaterializeMediaNodes(bodyElement, baseUrl);
+                }
+
                 var markdown = await _contentConverter.ConvertCommentBodyToMarkdownAsync(
-                    comment.Body,
+                    body,
                     jiraType,
                     cancellationToken);
 
@@ -399,6 +424,7 @@ public class JiraTicketProvider : ITicketProvider
     private async Task<string> ExtractDescriptionTextAsync(
         JsonElement? description,
         Domain.Enums.JiraType jiraType,
+        string? baseUrl,
         CancellationToken cancellationToken = default)
     {
         if (!description.HasValue ||
@@ -410,8 +436,12 @@ public class JiraTicketProvider : ITicketProvider
 
         try
         {
+            var adf = description.Value;
+            if (jiraType == Domain.Enums.JiraType.Cloud && !string.IsNullOrEmpty(baseUrl))
+                adf = MaterializeMediaNodes(adf, baseUrl);
+
             var markdown = await _contentConverter.ConvertDescriptionToMarkdownAsync(
-                description.Value,
+                adf,
                 jiraType,
                 cancellationToken);
 
@@ -423,6 +453,38 @@ public class JiraTicketProvider : ITicketProvider
         {
             _logger.LogError(ex, "Failed to convert description to Markdown. Sync operation will fail.");
             throw;
+        }
+    }
+
+    private static JsonElement MaterializeMediaNodes(JsonElement adf, string baseUrl)
+    {
+        var node = JsonNode.Parse(adf.GetRawText());
+        WalkAndMaterialize(node, baseUrl.TrimEnd('/'));
+        return JsonSerializer.Deserialize<JsonElement>(node!.ToJsonString());
+    }
+
+    private static void WalkAndMaterialize(JsonNode? node, string baseUrl)
+    {
+        if (node is JsonObject obj)
+        {
+            if (obj["type"]?.GetValue<string>() == "media" &&
+                obj["attrs"] is JsonObject attrs &&
+                attrs["type"]?.GetValue<string>() == "file" &&
+                attrs["id"] is JsonNode idNode)
+            {
+                var id = idNode.GetValue<string>();
+                attrs["type"] = "external";
+                attrs["url"] = $"{baseUrl}/rest/api/3/attachment/content/{id}";
+                attrs.Remove("id");
+                attrs.Remove("collection");
+            }
+            foreach (var prop in obj)
+                WalkAndMaterialize(prop.Value, baseUrl);
+        }
+        else if (node is JsonArray arr)
+        {
+            foreach (var item in arr)
+                WalkAndMaterialize(item, baseUrl);
         }
     }
 

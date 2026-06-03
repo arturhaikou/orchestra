@@ -296,6 +296,44 @@ public class JiraCloudApiClient : IJiraApiClient
         }
     }
 
+    public async Task<JiraAttachmentResponse> UploadAttachmentAsync(
+        string issueKey,
+        Stream fileStream,
+        string fileName,
+        string mimeType,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var form = new MultipartFormDataContent();
+            var fileContent = new StreamContent(fileStream);
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(mimeType);
+            form.Add(fileContent, "file", fileName);
+
+            var request = new HttpRequestMessage(HttpMethod.Post, $"/rest/api/3/issue/{issueKey}/attachments")
+            {
+                Content = form
+            };
+            request.Headers.Add("X-Atlassian-Token", "no-check");
+
+            var response = await _httpClient.SendAsync(request, cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            var content = await response.Content.ReadAsStringAsync(cancellationToken);
+            var attachments = JsonSerializer.Deserialize<List<JiraAttachmentResponse>>(
+                content,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            return attachments?.FirstOrDefault()
+                ?? throw new InvalidOperationException("Empty attachment upload response from Jira Cloud");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to upload attachment '{FileName}' to issue {IssueKey} in Jira Cloud", fileName, issueKey);
+            throw;
+        }
+    }
+
     private void HandleCreateIssueErrors(HttpResponseMessage response)
     {
         if (response.StatusCode == HttpStatusCode.Unauthorized)
@@ -323,5 +361,25 @@ public class JiraCloudApiClient : IJiraApiClient
         }
 
         response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<(byte[] Data, string MimeType)> GetAttachmentContentAsync(
+        string contentUrl,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync(contentUrl, cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            var data = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+            var mimeType = response.Content.Headers.ContentType?.MediaType ?? "image/png";
+            return (data, mimeType);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to download attachment content from {ContentUrl} in Jira Cloud", contentUrl);
+            throw;
+        }
     }
 }

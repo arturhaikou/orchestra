@@ -1,5 +1,6 @@
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using Orchestra.Application.Agents.Models;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Agents.Templates;
 using Orchestra.Application.Common.Interfaces;
@@ -74,7 +75,7 @@ public class AgentRuntimeService : IAgentRuntimeService
     /// <inheritdoc/>
     public async Task<(string ResponseText, Guid? JobId)> ExecuteAgentAsync(
         Guid agentId,
-        string contextPrompt,
+        AgentContextInput contextInput,
         string? agentModel = null,
         string? projectPrinciples = null,
         JobContext? jobContext = null,
@@ -94,7 +95,7 @@ public class AgentRuntimeService : IAgentRuntimeService
             JobTrackingContext? jobTracking = null;
 
             if (IsCliAgent(agentEntity))
-                result = await ExecuteCliAgentAsync(agentEntity, contextPrompt, jobId, jobContext?.WorkspaceId, cancellationToken);
+                result = await ExecuteCliAgentAsync(agentEntity, contextInput.TextPrompt, jobId, jobContext?.WorkspaceId, cancellationToken);
             else
             {
                 jobTracking = jobId.HasValue && jobContext?.WorkspaceId is not null
@@ -106,7 +107,8 @@ public class AgentRuntimeService : IAgentRuntimeService
                     agentId,
                     agentModel,
                     projectPrinciples,
-                    contextPrompt,
+                    contextInput.TextPrompt,
+                    contextInput.Images,
                     jobTracking,
                     cancellationToken);
             }
@@ -284,6 +286,7 @@ public class AgentRuntimeService : IAgentRuntimeService
         string? agentModel,
         string? projectPrinciples,
         string contextPrompt,
+        IReadOnlyList<AgentImageRef> images,
         JobTrackingContext? jobTracking,
         CancellationToken cancellationToken)
     {
@@ -314,6 +317,7 @@ public class AgentRuntimeService : IAgentRuntimeService
             agentEntity,
             aiFunctions.ToList(),
             contextPrompt,
+            images,
             jobTracking,
             cancellationToken: cancellationToken);
 
@@ -380,6 +384,7 @@ public class AgentRuntimeService : IAgentRuntimeService
                 agentEntity,
                 aiFunctions.ToList(),
                 resumeMessage,
+                null,
                 jobTracking,
                 session: session,
                 cancellationToken: cancellationToken);

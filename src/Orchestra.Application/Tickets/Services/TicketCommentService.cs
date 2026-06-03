@@ -112,7 +112,8 @@ public class TicketCommentService : ITicketCommentService
         return new CommentDto(
             comment.Id.ToString(),
             comment.Author,
-            comment.Content);
+            comment.Content,
+            comment.CreatedAt);
     }
 
     /// <summary>

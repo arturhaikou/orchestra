@@ -1,3 +1,4 @@
+using Orchestra.Application.Agents.Models;
 using Orchestra.Application.Jobs.DTOs;
 
 namespace Orchestra.Application.Agents.Services;
@@ -13,9 +14,9 @@ public interface IAgentRuntimeService
     /// by the caller before invocation via BuildAgentContextWithIntegrationsAsync().
     /// </summary>
     /// <param name="agentId">The unique identifier of the agent.</param>
-    /// <param name="contextPrompt">
-    /// The fully enriched execution context prompt, including ticket context and any
-    /// integration metadata blocks appended by the caller.
+    /// <param name="contextInput">
+    /// The fully enriched context input, containing the text prompt (ticket context +
+    /// integration metadata blocks) and any image references extracted from the ticket.
     /// </param>
     /// <param name="agentModel">
     /// The LLM model identifier stored on the agent entity, or null if the agent has
@@ -32,7 +33,7 @@ public interface IAgentRuntimeService
     /// <returns>A tuple containing the text response from agent execution and the optional job ID.</returns>
     Task<(string ResponseText, Guid? JobId)> ExecuteAgentAsync(
         Guid agentId,
-        string contextPrompt,
+        AgentContextInput contextInput,
         string? agentModel = null,
         string? projectPrinciples = null,
         JobContext? jobContext = null,

@@ -84,7 +84,23 @@ function convertNode(node) {
     
     case 'hardBreak':
       return '  \n';
-    
+
+    case 'mediaSingle':
+      if (node.content && node.content.length > 0) {
+        return convertNode(node.content[0]) + '\n';
+      }
+      return '';
+
+    case 'media':
+      if (node.attrs?.type === 'external' && node.attrs.url) {
+        const alt = node.attrs.alt || 'image';
+        return `![${alt}](${node.attrs.url})`;
+      }
+      if (node.attrs?.type === 'file' && node.attrs.id) {
+        return `![image](${node.attrs.id})`;
+      }
+      return '';
+
     default:
       // For unknown node types, try to extract text content
       if (node.content) {

@@ -1,7 +1,9 @@
 using Orchestra.Application.AiCliIntegrations.Interfaces;
+using Orchestra.Application.Agents.Models;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Domain.Entities;
+using Orchestra.Infrastructure.Integrations.Providers.Jira;
 using System.Text;
 
 namespace Orchestra.Infrastructure.Agents;
@@ -18,6 +20,8 @@ public class AgentContextBuilder : IAgentContextBuilder
     private readonly IAgentSubAgentDataAccess _agentSubAgentDataAccess;
     private readonly IAgentDataAccess _agentDataAccess;
     private readonly IAiCliIntegrationDataAccess _cliIntegrationDataAccess;
+    private readonly ITicketImageExtractor _imageExtractor;
+    private readonly JiraImageFetcher _jiraImageFetcher;
 
     public AgentContextBuilder(
         ITicketDataAccess ticketDataAccess,
@@ -26,7 +30,9 @@ public class AgentContextBuilder : IAgentContextBuilder
         IAgentToolActionDataAccess agentToolActionDataAccess,
         IAgentSubAgentDataAccess agentSubAgentDataAccess,
         IAgentDataAccess agentDataAccess,
-        IAiCliIntegrationDataAccess cliIntegrationDataAccess)
+        IAiCliIntegrationDataAccess cliIntegrationDataAccess,
+        ITicketImageExtractor imageExtractor,
+        JiraImageFetcher jiraImageFetcher)
     {
         _ticketDataAccess = ticketDataAccess;
         _integrationDataAccess = integrationDataAccess;
@@ -35,24 +41,21 @@ public class AgentContextBuilder : IAgentContextBuilder
         _agentSubAgentDataAccess = agentSubAgentDataAccess;
         _agentDataAccess = agentDataAccess;
         _cliIntegrationDataAccess = cliIntegrationDataAccess;
+        _imageExtractor = imageExtractor;
+        _jiraImageFetcher = jiraImageFetcher;
     }
 
-    public async Task<string> BuildContextPromptAsync(
+    public async Task<AgentContextInput> BuildContextPromptAsync(
         Ticket ticket,
         CancellationToken cancellationToken = default)
     {
-        string result = string.Empty;
         if (ticket.IsInternal)
-        {
             return await BuildInternalTicketPromptAsync(ticket, cancellationToken);
-        }
         else
-        {
             return await BuildExternalTicketPromptAsync(ticket, cancellationToken);
-        }
     }
 
-    private async Task<string> BuildInternalTicketPromptAsync(
+    private async Task<AgentContextInput> BuildInternalTicketPromptAsync(
         Ticket ticket,
         CancellationToken cancellationToken)
     {
@@ -72,19 +75,33 @@ public class AgentContextBuilder : IAgentContextBuilder
         if (comments.Any())
         {
             foreach (var comment in comments)
-            {
                 sb.AppendLine($"• {comment.Author} ({comment.CreatedAt:yyyy-MM-dd HH:mm} UTC): {comment.Content}");
-            }
         }
         else
         {
             sb.AppendLine("No comments yet.");
         }
 
-        return sb.ToString();
+        // Extract image refs from description and all comments
+        var allMarkdown = new StringBuilder();
+        allMarkdown.Append(ticket.Description ?? string.Empty);
+        foreach (var comment in comments)
+            allMarkdown.Append('\n').Append(comment.Content);
+
+        var sources = _imageExtractor.Extract(allMarkdown.ToString());
+        var imageRefs = sources
+            .Select(s => new AgentImageRef(
+                Source: s,
+                MimeType: ResolveMimeTypeFromPath(s),
+                FileName: Path.GetFileName(s.Replace("file:///", string.Empty).Replace("file://", string.Empty))))
+            .ToList();
+
+        AppendImagesSectionIfAny(sb, imageRefs);
+
+        return new AgentContextInput(sb.ToString(), imageRefs);
     }
 
-    private async Task<string> BuildExternalTicketPromptAsync(
+    private async Task<AgentContextInput> BuildExternalTicketPromptAsync(
         Ticket ticket,
         CancellationToken cancellationToken)
     {
@@ -148,17 +165,30 @@ public class AgentContextBuilder : IAgentContextBuilder
             sb.AppendLine("No comments yet.");
         }
 
-        return sb.ToString();
+        // Extract image URLs from description and all comments, then fetch bytes in-memory
+        var allMarkdown = new StringBuilder();
+        allMarkdown.Append(externalTicket.Description);
+        foreach (var comment in externalTicket.Comments)
+            allMarkdown.Append('\n').Append(comment.Content);
+
+        var imageUrls = _imageExtractor.Extract(allMarkdown.ToString());
+        var imageRefs = await _jiraImageFetcher.FetchAsync(integration, imageUrls, cancellationToken);
+
+        AppendImagesSectionIfAny(sb, imageRefs);
+
+        return new AgentContextInput(sb.ToString(), imageRefs);
     }
 
     /// <inheritdoc/>
-    public async Task<string> BuildAgentContextWithIntegrationsAsync(
+    public async Task<AgentContextInput> BuildAgentContextWithIntegrationsAsync(
         Ticket ticket,
         Agent agent,
         CancellationToken cancellationToken = default)
     {
-        // Phase 1: Build base ticket context
-        var contextPrompt = await BuildContextPromptAsync(ticket, cancellationToken);
+        // Phase 1: Build base ticket context (text + images)
+        var contextInput = await BuildContextPromptAsync(ticket, cancellationToken);
+        var contextPrompt = contextInput.TextPrompt;
+        var images = contextInput.Images;
 
         // Phase 2: Determine which external provider types the agent's tools require.
         // INTERNAL tools are excluded — they never need an integrationId.
@@ -204,7 +234,7 @@ public class AgentContextBuilder : IAgentContextBuilder
             contextPrompt = sb.ToString();
         }
 
-        return contextPrompt;
+        return new AgentContextInput(contextPrompt, images);
     }
 
     /// <summary>
@@ -268,5 +298,35 @@ public class AgentContextBuilder : IAgentContextBuilder
         }
 
         return ids;
+    }
+
+    /// <summary>
+    /// Appends an [Images] section listing each image's source and file name so the agent
+    /// can reference them when calling tools like AddCommentAsync or CreateIssueAsync.
+    /// No-op when <paramref name="images"/> is empty.
+    /// </summary>
+    private static void AppendImagesSectionIfAny(StringBuilder sb, IReadOnlyList<AgentImageRef> images)
+    {
+        if (images.Count == 0)
+            return;
+
+        sb.AppendLine();
+        sb.AppendLine("[Images]");
+        foreach (var img in images)
+            sb.AppendLine($"- Source: {img.Source} | FileName: {img.FileName}");
+    }
+
+    private static string ResolveMimeTypeFromPath(string source)
+    {
+        var ext = Path.GetExtension(source.Split('?')[0]).ToLowerInvariant();
+        return ext switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".gif" => "image/gif",
+            ".svg" => "image/svg+xml",
+            ".webp" => "image/webp",
+            ".bmp" => "image/bmp",
+            _ => "image/png"
+        };
     }
 }
