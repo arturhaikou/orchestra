@@ -68,4 +68,39 @@ public class WorkflowDefinitionRepository : IWorkflowDefinitionRepository
         await _context.WorkflowSteps.AddRangeAsync(steps, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task<Dictionary<Guid, List<string>>> GetSystemToolsByDefinitionIdAsync(Guid workflowDefinitionId, CancellationToken cancellationToken = default)
+    {
+        var stepIds = await _context.WorkflowSteps
+            .Where(s => s.WorkflowDefinitionId == workflowDefinitionId)
+            .Select(s => s.Id)
+            .ToListAsync(cancellationToken);
+
+        var tools = await _context.WorkflowStepSystemTools
+            .Where(t => stepIds.Contains(t.WorkflowStepId))
+            .ToListAsync(cancellationToken);
+
+        return tools
+            .GroupBy(t => t.WorkflowStepId)
+            .ToDictionary(g => g.Key, g => g.Select(t => t.ToolIdentifier).ToList());
+    }
+
+    public async Task ReplaceStepSystemToolsAsync(Guid stepId, List<string> toolIdentifiers, CancellationToken cancellationToken = default)
+    {
+        var existing = await _context.WorkflowStepSystemTools
+            .Where(t => t.WorkflowStepId == stepId)
+            .ToListAsync(cancellationToken);
+
+        _context.WorkflowStepSystemTools.RemoveRange(existing);
+
+        var newTools = toolIdentifiers
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => WorkflowStepSystemTool.Create(stepId, id))
+            .ToList();
+
+        if (newTools.Count > 0)
+            await _context.WorkflowStepSystemTools.AddRangeAsync(newTools, cancellationToken);
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
 }

@@ -7,5 +7,6 @@ public record WorkflowStepDto(
     Guid AgentId,
     string AgentName,
     string? InstructionOverride,
-    bool PassPreviousOutput
+    bool PassPreviousOutput,
+    List<string> SystemTools
 );

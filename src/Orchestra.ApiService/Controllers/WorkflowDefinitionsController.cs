@@ -14,13 +14,16 @@ namespace Orchestra.ApiService.Controllers;
 public class WorkflowDefinitionsController : ControllerBase
 {
     private readonly IWorkflowDefinitionService _workflowDefinitionService;
+    private readonly IWorkflowSystemToolRegistry _systemToolRegistry;
     private readonly ILogger<WorkflowDefinitionsController> _logger;
 
     public WorkflowDefinitionsController(
         IWorkflowDefinitionService workflowDefinitionService,
+        IWorkflowSystemToolRegistry systemToolRegistry,
         ILogger<WorkflowDefinitionsController> logger)
     {
         _workflowDefinitionService = workflowDefinitionService;
+        _systemToolRegistry = systemToolRegistry;
         _logger = logger;
     }
 
@@ -33,6 +36,13 @@ public class WorkflowDefinitionsController : ControllerBase
             return Unauthorized(new ErrorResponse("Invalid user token"));
         }
         return null;
+    }
+
+    [HttpGet("system-tools")]
+    [ProducesResponseType(typeof(List<string>), 200)]
+    public IActionResult GetSystemTools()
+    {
+        return Ok(_systemToolRegistry.AvailableTools);
     }
 
     [HttpGet]

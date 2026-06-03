@@ -27,4 +27,5 @@ public interface INotificationService
     Task NotifyWorkflowStepStartedAsync(WorkflowStepStartedNotification notification, CancellationToken cancellationToken = default);
     Task NotifyWorkflowStepCompletedAsync(WorkflowStepCompletedNotification notification, CancellationToken cancellationToken = default);
     Task NotifyWorkflowExecutionStatusChangedAsync(WorkflowExecutionStatusChangedNotification notification, CancellationToken cancellationToken = default);
+    Task NotifyWorkflowTicketSwitchedAsync(WorkflowTicketSwitchedNotification notification, CancellationToken cancellationToken = default);
 }

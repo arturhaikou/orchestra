@@ -11,4 +11,5 @@ public record JobContext(
     Guid? TicketId = null,
     string? TicketTitle = null,
     Guid? ParentJobId = null,
-    Guid? WorkflowExecutionId = null);
+    Guid? WorkflowExecutionId = null,
+    IReadOnlyList<string>? WorkflowSystemTools = null);

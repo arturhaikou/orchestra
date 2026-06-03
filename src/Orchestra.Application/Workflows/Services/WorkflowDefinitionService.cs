@@ -33,8 +33,10 @@ public class WorkflowDefinitionService : IWorkflowDefinitionService
 
         var steps = BuildSteps(definition.Id, request.Steps);
         await _repository.ReplaceStepsAsync(definition.Id, steps, cancellationToken);
+        await SaveStepSystemToolsAsync(steps, request.Steps, cancellationToken);
 
-        return await BuildDtoAsync(definition, steps, cancellationToken);
+        var systemToolsMap = await _repository.GetSystemToolsByDefinitionIdAsync(definition.Id, cancellationToken);
+        return await BuildDtoAsync(definition, steps, systemToolsMap, cancellationToken);
     }
 
     public async Task<WorkflowDefinitionDto> UpdateAsync(
@@ -53,8 +55,10 @@ public class WorkflowDefinitionService : IWorkflowDefinitionService
 
         var steps = BuildSteps(definition.Id, request.Steps);
         await _repository.ReplaceStepsAsync(definition.Id, steps, cancellationToken);
+        await SaveStepSystemToolsAsync(steps, request.Steps, cancellationToken);
 
-        return await BuildDtoAsync(definition, steps, cancellationToken);
+        var systemToolsMap = await _repository.GetSystemToolsByDefinitionIdAsync(definition.Id, cancellationToken);
+        return await BuildDtoAsync(definition, steps, systemToolsMap, cancellationToken);
     }
 
     public async Task DeleteAsync(
@@ -81,7 +85,8 @@ public class WorkflowDefinitionService : IWorkflowDefinitionService
         await _workspaceAuthorizationService.EnsureUserIsMemberAsync(userId, definition.WorkspaceId, cancellationToken);
 
         var steps = await _repository.GetStepsByDefinitionIdAsync(workflowId, cancellationToken);
-        return await BuildDtoAsync(definition, steps, cancellationToken);
+        var systemToolsMap = await _repository.GetSystemToolsByDefinitionIdAsync(workflowId, cancellationToken);
+        return await BuildDtoAsync(definition, steps, systemToolsMap, cancellationToken);
     }
 
     public async Task<List<WorkflowDefinitionDto>> GetByWorkspaceAsync(
@@ -97,7 +102,8 @@ public class WorkflowDefinitionService : IWorkflowDefinitionService
         foreach (var definition in definitions)
         {
             var steps = await _repository.GetStepsByDefinitionIdAsync(definition.Id, cancellationToken);
-            results.Add(await BuildDtoAsync(definition, steps, cancellationToken));
+            var systemToolsMap = await _repository.GetSystemToolsByDefinitionIdAsync(definition.Id, cancellationToken);
+            results.Add(await BuildDtoAsync(definition, steps, systemToolsMap, cancellationToken));
         }
 
         return results;
@@ -113,9 +119,22 @@ public class WorkflowDefinitionService : IWorkflowDefinitionService
             r.PassPreviousOutput)).ToList();
     }
 
+    private async Task SaveStepSystemToolsAsync(
+        List<WorkflowStep> steps,
+        List<CreateWorkflowStepRequest> requests,
+        CancellationToken cancellationToken)
+    {
+        for (var i = 0; i < steps.Count; i++)
+        {
+            var tools = requests[i].SystemTools ?? [];
+            await _repository.ReplaceStepSystemToolsAsync(steps[i].Id, tools, cancellationToken);
+        }
+    }
+
     private async Task<WorkflowDefinitionDto> BuildDtoAsync(
         WorkflowDefinition definition,
         List<WorkflowStep> steps,
+        Dictionary<Guid, List<string>> systemToolsMap,
         CancellationToken cancellationToken)
     {
         var agentIds = steps.Select(s => s.AgentId).Distinct().ToList();
@@ -128,7 +147,8 @@ public class WorkflowDefinitionService : IWorkflowDefinitionService
             s.AgentId,
             agents.TryGetValue(s.AgentId, out var a) ? a.Name : "Unknown",
             s.InstructionOverride,
-            s.PassPreviousOutput)).ToList();
+            s.PassPreviousOutput,
+            systemToolsMap.GetValueOrDefault(s.Id, []))).ToList();
 
         return new WorkflowDefinitionDto(
             definition.Id,

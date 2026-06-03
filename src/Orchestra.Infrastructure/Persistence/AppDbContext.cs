@@ -70,6 +70,8 @@ namespace Orchestra.Infrastructure.Persistence
 
         public DbSet<WorkflowStepExecution> WorkflowStepExecutions => Set<WorkflowStepExecution>();
 
+        public DbSet<WorkflowStepSystemTool> WorkflowStepSystemTools => Set<WorkflowStepSystemTool>();
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -107,6 +109,7 @@ namespace Orchestra.Infrastructure.Persistence
             modelBuilder.ApplyConfiguration(new Configurations.WorkflowStepConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.WorkflowExecutionConfiguration());
             modelBuilder.ApplyConfiguration(new Configurations.WorkflowStepExecutionConfiguration());
+            modelBuilder.ApplyConfiguration(new Configurations.WorkflowStepSystemToolConfiguration());
         }
     }
 }

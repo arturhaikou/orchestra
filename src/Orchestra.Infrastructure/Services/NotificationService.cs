@@ -354,4 +354,39 @@ public class NotificationService : INotificationService
                 notification.WorkflowExecutionId);
         }
     }
+
+    public async Task NotifyWorkflowTicketSwitchedAsync(
+        WorkflowTicketSwitchedNotification notification,
+        CancellationToken cancellationToken = default)
+    {
+        var groupName = $"workspace-{notification.WorkspaceId}";
+
+        var payload = new
+        {
+            workflowExecutionId = notification.WorkflowExecutionId,
+            previousTicketId = notification.PreviousTicketId,
+            newTicketId = notification.NewTicketId,
+            externalTicketKey = notification.ExternalTicketKey
+        };
+
+        try
+        {
+            await _hubContext.Clients.Group(groupName)
+                .SendAsync("WorkflowTicketSwitched", payload, cancellationToken);
+
+            _logger.LogDebug(
+                "Dispatched WorkflowTicketSwitched. WorkspaceId={WorkspaceId} ExecutionId={ExecutionId} ExternalKey={ExternalKey}",
+                notification.WorkspaceId,
+                notification.WorkflowExecutionId,
+                notification.ExternalTicketKey);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Failed to dispatch WorkflowTicketSwitched. WorkspaceId={WorkspaceId} ExecutionId={ExecutionId}",
+                notification.WorkspaceId,
+                notification.WorkflowExecutionId);
+        }
+    }
 }

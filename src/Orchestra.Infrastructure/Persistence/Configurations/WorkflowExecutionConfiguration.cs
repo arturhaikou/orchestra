@@ -53,5 +53,14 @@ public class WorkflowExecutionConfiguration : IEntityTypeConfiguration<WorkflowE
 
         builder.Property(e => e.WorkflowJobId)
             .IsRequired(false);
+
+        builder.Property(e => e.ActiveTicketId)
+            .IsRequired(false);
+
+        builder.HasOne<Ticket>()
+            .WithMany()
+            .HasForeignKey(e => e.ActiveTicketId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
     }
 }

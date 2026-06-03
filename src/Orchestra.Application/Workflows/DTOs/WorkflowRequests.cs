@@ -11,7 +11,8 @@ public record CreateWorkflowStepRequest(
     int Order,
     Guid AgentId,
     string? InstructionOverride,
-    bool PassPreviousOutput
+    bool PassPreviousOutput,
+    List<string>? SystemTools = null
 );
 
 public record UpdateWorkflowDefinitionRequest(

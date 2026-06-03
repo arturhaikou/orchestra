@@ -27,6 +27,7 @@ public class WorkflowExecutionEngine : IWorkflowExecutionEngine
     private readonly IJobService _jobService;
     private readonly INotificationService _notificationService;
     private readonly ITicketIdParsingService _ticketIdParsingService;
+    private readonly IWorkflowSystemToolRegistry _systemToolRegistry;
     private readonly ILogger<WorkflowExecutionEngine> _logger;
 
     public WorkflowExecutionEngine(
@@ -39,6 +40,7 @@ public class WorkflowExecutionEngine : IWorkflowExecutionEngine
         IJobService jobService,
         INotificationService notificationService,
         ITicketIdParsingService ticketIdParsingService,
+        IWorkflowSystemToolRegistry systemToolRegistry,
         ILogger<WorkflowExecutionEngine> logger)
     {
         _executionRepository = executionRepository;
@@ -50,6 +52,7 @@ public class WorkflowExecutionEngine : IWorkflowExecutionEngine
         _jobService = jobService;
         _notificationService = notificationService;
         _ticketIdParsingService = ticketIdParsingService;
+        _systemToolRegistry = systemToolRegistry;
         _logger = logger;
     }
 
@@ -238,12 +241,17 @@ public class WorkflowExecutionEngine : IWorkflowExecutionEngine
             return;
         }
 
-        var ticket = await _ticketDataAccess.GetTicketByIdAsync(workflowExecution.TicketId, cancellationToken);
+        var effectiveTicketId = workflowExecution.ActiveTicketId ?? workflowExecution.TicketId;
+        var ticket = await _ticketDataAccess.GetTicketByIdAsync(effectiveTicketId, cancellationToken);
         if (ticket is null)
         {
             await FailWorkflowAsync(workflowExecution, cancellationToken);
             return;
         }
+
+        var stepToolsMap = await _definitionRepository.GetSystemToolsByDefinitionIdAsync(
+            workflowExecution.WorkflowDefinitionId, cancellationToken);
+        var stepTools = stepToolsMap.GetValueOrDefault(step.Id, []);
 
         var stepExecution = WorkflowStepExecution.Create(workflowExecution.Id, stepIndex);
         await _executionRepository.AddStepExecutionAsync(stepExecution, cancellationToken);
@@ -263,7 +271,7 @@ public class WorkflowExecutionEngine : IWorkflowExecutionEngine
         try
         {
             var contextInput = await BuildStepContextAsync(
-                ticket, agent, step, previousOutput, cancellationToken);
+                ticket, agent, step, stepTools, previousOutput, cancellationToken);
 
             var jobContext = new JobContext(
                 WorkspaceId: workflowExecution.WorkspaceId,
@@ -274,7 +282,8 @@ public class WorkflowExecutionEngine : IWorkflowExecutionEngine
                 TicketId: ticket.Id,
                 TicketTitle: ticket.Title,
                 ParentJobId: workflowExecution.WorkflowJobId,
-                WorkflowExecutionId: workflowExecution.Id);
+                WorkflowExecutionId: workflowExecution.Id,
+                WorkflowSystemTools: stepTools);
 
             var (text, createdJobId) = await _agentRuntimeService.ExecuteAgentAsync(
                 agent.Id,
@@ -322,17 +331,21 @@ public class WorkflowExecutionEngine : IWorkflowExecutionEngine
         Ticket ticket,
         Agent agent,
         WorkflowStep step,
+        List<string> stepTools,
         string? previousOutput,
         CancellationToken cancellationToken)
     {
         var baseInput = await _agentContextBuilder.BuildAgentContextWithIntegrationsAsync(
             ticket, agent, cancellationToken);
 
-        if (!step.PassPreviousOutput || string.IsNullOrWhiteSpace(previousOutput))
-            return new AgentContextInput(AppendInstructionOverride(baseInput.TextPrompt, step.InstructionOverride), baseInput.Images);
+        var text = step.PassPreviousOutput && !string.IsNullOrWhiteSpace(previousOutput)
+            ? $"{baseInput.TextPrompt}\n\n[Previous Step Output]\n{previousOutput}"
+            : baseInput.TextPrompt;
 
-        var textWithPrevious = $"{baseInput.TextPrompt}\n\n[Previous Step Output]\n{previousOutput}";
-        return new AgentContextInput(AppendInstructionOverride(textWithPrevious, step.InstructionOverride), baseInput.Images);
+        text = AppendInstructionOverride(text, step.InstructionOverride);
+        text = AppendSystemToolInstructions(text, stepTools);
+
+        return new AgentContextInput(text, baseInput.Images);
     }
 
     private static string AppendInstructionOverride(string context, string? instructionOverride)
@@ -341,6 +354,18 @@ public class WorkflowExecutionEngine : IWorkflowExecutionEngine
             return context;
 
         return $"{context}\n\n[Step Instructions]\n{instructionOverride}";
+    }
+
+    private static string AppendSystemToolInstructions(string context, List<string> stepTools)
+    {
+        if (!stepTools.Contains("switch_workflow_ticket"))
+            return context;
+
+        return context +
+               "\n\n[Workflow Tool Instructions]\n" +
+               "If you create an external ticket (Jira issue, GitHub issue, GitLab issue, etc.) during this step, " +
+               "you MUST immediately call `switch_workflow_ticket` with the issue key and the integration ID. " +
+               "This redirects all subsequent workflow steps to work on the newly created ticket instead of the current one.";
     }
 
     private async Task CompleteWorkflowAsync(WorkflowExecution workflowExecution, CancellationToken cancellationToken)

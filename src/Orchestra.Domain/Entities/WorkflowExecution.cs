@@ -13,6 +13,7 @@ public class WorkflowExecution
     public DateTime StartedAt { get; private set; }
     public DateTime? CompletedAt { get; private set; }
     public Guid? WorkflowJobId { get; private set; }
+    public Guid? ActiveTicketId { get; private set; }
 
     private WorkflowExecution() { }
 
@@ -59,5 +60,10 @@ public class WorkflowExecution
     public void AssignWorkflowJob(Guid jobId)
     {
         WorkflowJobId = jobId;
+    }
+
+    public void SwitchActiveTicket(Guid newTicketId)
+    {
+        ActiveTicketId = newTicketId;
     }
 }

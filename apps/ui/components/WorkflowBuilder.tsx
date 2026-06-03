@@ -24,6 +24,7 @@ import {
   createWorkflowDefinition,
   updateWorkflowDefinition,
   deleteWorkflowDefinition,
+  getWorkflowSystemTools,
   CreateWorkflowStepPayload,
 } from '../services/workflowService';
 import { getAgents } from '../services/agentService';
@@ -60,6 +61,7 @@ interface StepDraft {
   agentId: string;
   instructionOverride: string;
   passPreviousOutput: boolean;
+  systemTools: string[];
 }
 
 interface AgentStepNodeData {
@@ -93,6 +95,7 @@ const emptyStep = (): StepDraft => ({
   agentId: '',
   instructionOverride: '',
   passPreviousOutput: false,
+  systemTools: [],
 });
 
 // ── Custom Nodes ──────────────────────────────────────────────────────────────
@@ -232,6 +235,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ workspaceId }) => {
   const [workflows, setWorkflows] = useState<WorkflowDefinition[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [availableSystemTools, setAvailableSystemTools] = useState<string[]>([]);
 
   // Editor state
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -261,8 +265,8 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ workspaceId }) => {
   useEffect(() => {
     if (!workspaceId) return;
     setIsLoading(true);
-    Promise.all([getWorkflowDefinitions(workspaceId), getAgents(workspaceId)])
-      .then(([wfs, ags]) => { setWorkflows(wfs); setAgents(ags); })
+    Promise.all([getWorkflowDefinitions(workspaceId), getAgents(workspaceId), getWorkflowSystemTools()])
+      .then(([wfs, ags, tools]) => { setWorkflows(wfs); setAgents(ags); setAvailableSystemTools(tools); })
       .catch(console.error)
       .finally(() => setIsLoading(false));
     setView('list');
@@ -355,6 +359,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ workspaceId }) => {
             agentId: s.agentId,
             instructionOverride: s.instructionOverride ?? '',
             passPreviousOutput: s.passPreviousOutput,
+            systemTools: s.systemTools ?? [],
           }))
         : [emptyStep()]
     );
@@ -405,6 +410,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ workspaceId }) => {
           agentId: s.agentId,
           instructionOverride: s.instructionOverride.trim() || null,
           passPreviousOutput: s.passPreviousOutput,
+          systemTools: s.systemTools.length > 0 ? s.systemTools : null,
         })),
       };
       if (editingId) {
@@ -734,6 +740,53 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ workspaceId }) => {
                     }}
                   />
                 </div>
+
+                {availableSystemTools.length > 0 && (
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: t.textSec, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+                      Additional Tools
+                    </label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {availableSystemTools.map(toolId => {
+                        const checked = selectedStep.systemTools.includes(toolId);
+                        return (
+                          <label
+                            key={toolId}
+                            style={{
+                              display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer',
+                              padding: '8px 10px', borderRadius: 8,
+                              border: `1px solid ${checked ? 'rgba(99,102,241,0.5)' : t.border}`,
+                              background: checked ? 'rgba(99,102,241,0.07)' : t.surfaceHl,
+                              transition: 'border-color 0.15s, background 0.15s',
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => {
+                                const next = checked
+                                  ? selectedStep.systemTools.filter(t => t !== toolId)
+                                  : [...selectedStep.systemTools, toolId];
+                                updateStep(selectedStepIndex!, { systemTools: next });
+                              }}
+                              style={{ marginTop: 1, accentColor: INDIGO, flexShrink: 0 }}
+                            />
+                            <div style={{ minWidth: 0 }}>
+                              <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: t.textSec, fontFamily: 'monospace' }}>
+                                {toolId}
+                              </p>
+                              {toolId === 'switch_workflow_ticket' && (
+                                <p style={{ margin: '2px 0 0', fontSize: 11, color: t.textTert, lineHeight: 1.4 }}>
+                                  Lets this agent redirect the rest of the workflow to a newly created external ticket
+                                </p>
+                              )}
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {selectedStepIndex! > 0 && (
                   <div style={{ padding: '12px 14px', borderRadius: 10, background: t.surfaceHl, border: `1px solid ${t.border}` }}>

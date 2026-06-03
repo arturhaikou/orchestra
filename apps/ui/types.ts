@@ -265,6 +265,7 @@ export interface WorkflowStep {
   agentName: string;
   instructionOverride?: string | null;
   passPreviousOutput: boolean;
+  systemTools: string[];
 }
 
 export interface WorkflowDefinition {

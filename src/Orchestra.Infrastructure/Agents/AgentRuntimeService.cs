@@ -10,6 +10,7 @@ using Orchestra.Application.Tickets.Common;
 using Orchestra.Application.Tickets.DTOs;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
+using Orchestra.Application.Workflows.Interfaces;
 using Orchestra.Infrastructure.AiCliIntegrations;
 
 namespace Orchestra.Infrastructure.Agents;
@@ -34,6 +35,7 @@ public class AgentRuntimeService : IAgentRuntimeService
     private readonly ITicketIdParsingService _ticketIdParsingService;
     private readonly IAgentSkillDataAccess _agentSkillDataAccess;
     private readonly IAgentSkillFolderDataAccess _agentSkillFolderDataAccess;
+    private readonly IWorkflowSystemToolRegistry _systemToolRegistry;
 
     // Status GUID from seeding
     private static readonly Guid CompletedStatusId = Guid.Parse("88888888-8888-8888-8888-888888888888");
@@ -53,7 +55,8 @@ public class AgentRuntimeService : IAgentRuntimeService
         INotificationService notificationService,
         ITicketIdParsingService ticketIdParsingService,
         IAgentSkillDataAccess agentSkillDataAccess,
-        IAgentSkillFolderDataAccess agentSkillFolderDataAccess)
+        IAgentSkillFolderDataAccess agentSkillFolderDataAccess,
+        IWorkflowSystemToolRegistry systemToolRegistry)
     {
         _chatClientResolver = chatClientResolver;
         _agentDataAccess = agentDataAccess;
@@ -70,6 +73,7 @@ public class AgentRuntimeService : IAgentRuntimeService
         _ticketIdParsingService = ticketIdParsingService;
         _agentSkillDataAccess = agentSkillDataAccess;
         _agentSkillFolderDataAccess = agentSkillFolderDataAccess;
+        _systemToolRegistry = systemToolRegistry;
     }
 
     /// <inheritdoc/>
@@ -99,7 +103,7 @@ public class AgentRuntimeService : IAgentRuntimeService
             else
             {
                 jobTracking = jobId.HasValue && jobContext?.WorkspaceId is not null
-                    ? new JobTrackingContext(_jobStepWriter, jobId.Value, jobContext.WorkspaceId)
+                    ? new JobTrackingContext(_jobStepWriter, jobId.Value, jobContext.WorkspaceId, jobContext.WorkflowExecutionId)
                     : null;
 
                 result = await ExecuteChatAgentAsync(
@@ -110,6 +114,7 @@ public class AgentRuntimeService : IAgentRuntimeService
                     contextInput.TextPrompt,
                     contextInput.Images,
                     jobTracking,
+                    jobContext?.WorkflowSystemTools,
                     cancellationToken);
             }
 
@@ -288,6 +293,7 @@ public class AgentRuntimeService : IAgentRuntimeService
         string contextPrompt,
         IReadOnlyList<AgentImageRef> images,
         JobTrackingContext? jobTracking,
+        IReadOnlyList<string>? workflowSystemTools,
         CancellationToken cancellationToken)
     {
         var chatClient = await _chatClientResolver.ResolveAsync(
@@ -305,17 +311,27 @@ public class AgentRuntimeService : IAgentRuntimeService
                 "return that string verbatim and stop calling further tools.";
         }
 
-        var aiFunctions = await _toolRetrieverService.GetAgentToolsAsync(
+        var aiFunctions = (await _toolRetrieverService.GetAgentToolsAsync(
             agentId,
             agentModel,
             effectiveProjectPrinciples,
             jobTracking: jobTracking,
-            cancellationToken);
+            cancellationToken)).ToList();
+
+        if (workflowSystemTools?.Count > 0 && jobTracking is not null)
+        {
+            foreach (var toolId in workflowSystemTools)
+            {
+                var fn = _systemToolRegistry.Create(toolId, jobTracking);
+                if (fn is not null)
+                    aiFunctions.Add(fn);
+            }
+        }
 
         var result = await _chatAgentRunner.RunAsync(
             chatClient,
             agentEntity,
-            aiFunctions.ToList(),
+            aiFunctions,
             contextPrompt,
             images,
             jobTracking,

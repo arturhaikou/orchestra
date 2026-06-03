@@ -23,3 +23,11 @@ public record WorkflowExecutionStatusChangedNotification(
     Guid TicketId,
     WorkflowExecutionStatus Status
 );
+
+public record WorkflowTicketSwitchedNotification(
+    Guid WorkspaceId,
+    Guid WorkflowExecutionId,
+    Guid PreviousTicketId,
+    Guid NewTicketId,
+    string ExternalTicketKey
+);

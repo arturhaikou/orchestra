@@ -238,6 +238,14 @@ export interface WorkflowExecutionStatusChangedEvent {
   status: string;
 }
 
+export interface WorkflowTicketSwitchedEvent {
+  workspaceId: string;
+  workflowExecutionId: string;
+  previousTicketId: string;
+  newTicketId: string;
+  externalTicketKey: string;
+}
+
 export const onWorkflowStepStarted = (handler: (event: WorkflowStepStartedEvent) => void): (() => void) => {
   if (!activeConnection) return () => {};
   activeConnection.on('WorkflowStepStarted', handler);
@@ -254,4 +262,10 @@ export const onWorkflowExecutionStatusChanged = (handler: (event: WorkflowExecut
   if (!activeConnection) return () => {};
   activeConnection.on('WorkflowExecutionStatusChanged', handler);
   return () => activeConnection?.off('WorkflowExecutionStatusChanged', handler);
+};
+
+export const onWorkflowTicketSwitched = (handler: (event: WorkflowTicketSwitchedEvent) => void): (() => void) => {
+  if (!activeConnection) return () => {};
+  activeConnection.on('WorkflowTicketSwitched', handler);
+  return () => activeConnection?.off('WorkflowTicketSwitched', handler);
 };

@@ -11,4 +11,6 @@ public interface IWorkflowDefinitionRepository
     Task UpdateAsync(WorkflowDefinition definition, CancellationToken cancellationToken = default);
     Task DeleteAsync(Guid id, CancellationToken cancellationToken = default);
     Task ReplaceStepsAsync(Guid workflowDefinitionId, List<WorkflowStep> steps, CancellationToken cancellationToken = default);
+    Task<Dictionary<Guid, List<string>>> GetSystemToolsByDefinitionIdAsync(Guid workflowDefinitionId, CancellationToken cancellationToken = default);
+    Task ReplaceStepSystemToolsAsync(Guid stepId, List<string> toolIdentifiers, CancellationToken cancellationToken = default);
 }

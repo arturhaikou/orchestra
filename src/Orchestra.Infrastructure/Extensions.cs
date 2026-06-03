@@ -242,6 +242,7 @@ public static class Extensions
         builder.Services.AddScoped<IWorkflowDefinitionService, WorkflowDefinitionService>();
         builder.Services.AddScoped<IWorkflowExecutionService, WorkflowExecutionService>();
         builder.Services.AddScoped<IWorkflowExecutionEngine, WorkflowExecutionEngine>();
+        builder.Services.AddScoped<IWorkflowSystemToolRegistry, WorkflowSystemToolRegistry>();
 
         // AG-UI streaming endpoint services
         builder.Services.AddHttpContextAccessor();

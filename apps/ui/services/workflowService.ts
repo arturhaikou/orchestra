@@ -34,6 +34,7 @@ export interface CreateWorkflowStepPayload {
   agentId: string;
   instructionOverride?: string | null;
   passPreviousOutput: boolean;
+  systemTools?: string[] | null;
 }
 
 export interface CreateWorkflowPayload {
@@ -65,6 +66,13 @@ export const updateWorkflowDefinition = async (id: string, payload: UpdateWorkfl
     body: JSON.stringify(payload)
   });
   return handleResponse<WorkflowDefinition>(response);
+};
+
+export const getWorkflowSystemTools = async (): Promise<string[]> => {
+  const response = await fetch(`${DEFINITIONS_URL}/system-tools`, {
+    headers: getAuthHeaders()
+  });
+  return handleResponse<string[]>(response);
 };
 
 export const deleteWorkflowDefinition = async (id: string): Promise<void> => {
