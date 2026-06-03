@@ -16,7 +16,7 @@ const Header: React.FC<HeaderProps> = ({ isDarkMode, toggleTheme, toggleSidebar,
     const location = useLocation();
     const activeView = deriveActiveView(location.pathname);
     return (
-        <header className="h-16 bg-surface/50 backdrop-blur border-b border-border flex items-center justify-between px-4 md:px-6 shrink-0 z-20">
+        <header className="h-16 bg-background/80 backdrop-blur-md border-b border-border flex items-center justify-between px-4 md:px-6 shrink-0 z-20">
           <div className="flex items-center gap-3 md:gap-4 text-sm text-textMuted">
              <button 
                 onClick={toggleSidebar}

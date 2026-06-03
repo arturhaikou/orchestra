@@ -53,10 +53,10 @@ const Dashboard: React.FC<DashboardProps> = ({ workspaceId, isDarkMode = true })
   }, [workspaceId]);
 
   const stats = [
-    { label: 'Active Tickets', value: tickets.filter(t => t.status.name !== 'Done').length, color: 'text-blue-400' },
-    { label: 'Active Agents', value: agents.filter(a => a.status === 'BUSY').length, color: 'text-purple-400' },
-    { label: 'Jobs Running', value: jobs.filter(j => j.status === 'Running').length, color: 'text-emerald-400' },
-    { label: 'Avg Satisfaction', value: tickets.length > 0 ? `${Math.round(tickets.reduce((acc, t) => acc + t.satisfaction, 0) / tickets.length)}%` : '0%', color: 'text-yellow-400' },
+    { label: 'Active Tickets', value: tickets.filter(t => t.status.name !== 'Done').length, color: 'text-accent-cyan', glow: 'hover:shadow-[0_0_16px_rgba(34,211,238,0.1)]' },
+    { label: 'Active Agents', value: agents.filter(a => a.status === 'BUSY').length, color: 'text-accent-purple', glow: 'hover:shadow-[0_0_16px_rgba(168,85,247,0.1)]' },
+    { label: 'Jobs Running', value: jobs.filter(j => j.status === 'Running').length, color: 'text-accent-emerald', glow: 'hover:shadow-[0_0_16px_rgba(16,185,129,0.1)]' },
+    { label: 'Avg Satisfaction', value: tickets.length > 0 ? `${Math.round(tickets.reduce((acc, t) => acc + t.satisfaction, 0) / tickets.length)}%` : '0%', color: 'text-accent-yellow', glow: 'hover:shadow-[0_0_16px_rgba(234,179,8,0.1)]' },
   ];
 
   const volumeMultiplier = Math.max(1, tickets.length / 3);
@@ -88,7 +88,7 @@ const Dashboard: React.FC<DashboardProps> = ({ workspaceId, isDarkMode = true })
   return (
     <div className="space-y-6 animate-fade-in h-full flex flex-col">
       <div className="flex justify-between items-center shrink-0">
-        <h2 className="text-2xl font-bold text-text">Dashboard</h2>
+        <h2 className="text-2xl font-bold bg-gradient-to-r from-text to-textMuted bg-clip-text text-transparent">Dashboard</h2>
         <button 
             onClick={fetchData} 
             className="p-2 hover:bg-surfaceHighlight rounded-md text-textMuted hover:text-text transition-colors"
@@ -101,7 +101,7 @@ const Dashboard: React.FC<DashboardProps> = ({ workspaceId, isDarkMode = true })
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 shrink-0">
         {stats.map((stat, idx) => (
-          <div key={idx} className="bg-surface border border-border p-5 rounded-lg shadow-sm hover:border-primary/30 transition-colors">
+          <div key={idx} className={`bg-surface border border-border p-5 rounded-lg shadow-sm hover:border-primary/30 transition-all duration-300 ${stat.glow}`}>
             <p className="text-textMuted text-[10px] font-bold uppercase tracking-widest">{stat.label}</p>
             <p className={`text-3xl font-mono font-semibold mt-2 ${stat.color}`}>{stat.value}</p>
           </div>
@@ -136,7 +136,7 @@ const Dashboard: React.FC<DashboardProps> = ({ workspaceId, isDarkMode = true })
         {/* Live Feed */}
         <div className="bg-surface border border-border p-6 rounded-lg min-h-[350px] overflow-hidden flex flex-col shadow-lg shadow-black/10">
           <h3 className="text-lg font-semibold text-text mb-4 flex items-center gap-2 shrink-0">
-            <Activity className="w-4 h-4 text-emerald-400" /> System Feed
+            <Activity className="w-4 h-4 text-accent-emerald" /> System Feed
           </h3>
           <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
             {jobs.length === 0 ? (

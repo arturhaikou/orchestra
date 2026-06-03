@@ -548,7 +548,7 @@ const TicketList: React.FC<TicketListProps> = () => {
            </div>
            <button 
               onClick={() => navigate('new')}
-              className="bg-primary hover:bg-primaryHover text-white px-4 py-2 rounded-md flex items-center gap-2 text-sm transition-all shadow-lg shadow-primary/20 shrink-0 active:scale-95"
+              className="bg-primary hover:bg-primaryHover text-white px-4 py-2 rounded-md flex items-center gap-2 text-sm transition-all shadow-lg shadow-primary/20 hover:shadow-[0_0_20px_rgba(99,102,241,0.2)] shrink-0 active:scale-95"
             >
               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Ticket</span><span className="sm:hidden">New</span>
            </button>
@@ -1163,7 +1163,7 @@ const TicketList: React.FC<TicketListProps> = () => {
                       <button
                         onClick={handleConvertToExternal}
                         disabled={!conversionConfig?.integrationId || !conversionConfig?.issueTypeName || isConverting}
-                        className="w-full px-5 py-2.5 bg-primary hover:bg-primaryHover text-white text-xs font-bold uppercase tracking-widest rounded-lg transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full px-5 py-2.5 bg-primary hover:bg-primaryHover text-white text-xs font-bold uppercase tracking-widest rounded-lg transition-all shadow-lg shadow-primary/20 hover:shadow-[0_0_20px_rgba(99,102,241,0.2)] flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {isConverting ? (
                           <>
@@ -1212,7 +1212,7 @@ const TicketList: React.FC<TicketListProps> = () => {
                           <button 
                             onClick={handleUpdateTicket}
                             disabled={isUpdating || isConverting}
-                            className="px-8 py-2.5 bg-primary hover:bg-primaryHover text-white text-xs font-bold uppercase tracking-widest rounded-lg transition-all shadow-lg shadow-primary/20 flex items-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-8 py-2.5 bg-primary hover:bg-primaryHover text-white text-xs font-bold uppercase tracking-widest rounded-lg transition-all shadow-lg shadow-primary/20 hover:shadow-[0_0_20px_rgba(99,102,241,0.2)] flex items-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {isUpdating ? <Loader2 className="w-4 h-4 animate-spin" /> : updateError ? 'Retry' : 'Save Changes'}
                           </button>

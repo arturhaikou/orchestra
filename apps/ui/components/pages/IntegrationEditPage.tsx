@@ -79,9 +79,9 @@ const IntegrationEditPage: React.FC = () => {
         <ArrowLeft className="w-4 h-4" /> Back to Integrations
       </Link>
 
-      <div className="bg-surface border border-border rounded-xl shadow-lg overflow-hidden">
-        <div className="px-6 py-4 border-b border-border">
-          <h1 className="text-2xl font-bold text-text">Edit Integration</h1>
+      <div className="bg-surface border border-border rounded-xl shadow-xl shadow-primary/5 overflow-hidden">
+        <div className="px-6 py-4 border-b border-border-elevated">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-text to-textMuted bg-clip-text text-transparent">Edit Integration</h1>
           <p className="text-sm text-textMuted mt-0.5">Update integration configuration.</p>
         </div>
 
@@ -255,7 +255,7 @@ const IntegrationEditPage: React.FC = () => {
             <button
               type="submit"
               disabled={isSaving}
-              className="px-4 py-2.5 bg-primary hover:bg-primaryHover text-white rounded-lg text-sm font-bold transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 active:scale-[0.98]"
+              className="px-4 py-2.5 bg-primary hover:bg-primaryHover text-white rounded-lg text-sm font-bold transition-all shadow-lg shadow-primary/20 hover:shadow-[0_0_20px_rgba(99,102,241,0.2)] flex items-center justify-center gap-2 active:scale-[0.98]"
             >
               {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               {isSaving ? 'Saving...' : 'Save Changes'}

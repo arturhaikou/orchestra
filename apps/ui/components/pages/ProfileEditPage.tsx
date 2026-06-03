@@ -94,7 +94,7 @@ const ProfileEditPage: React.FC = () => {
         </button>
       </div>
 
-      <h1 className="text-2xl font-bold text-text mb-6 flex items-center gap-2">
+      <h1 className="text-2xl font-bold bg-gradient-to-r from-text to-textMuted bg-clip-text text-transparent mb-6 flex items-center gap-2">
         <UserIcon className="w-6 h-6 text-primary" /> Profile Settings
       </h1>
 
@@ -233,7 +233,7 @@ const ProfileEditPage: React.FC = () => {
           <button
             type="submit"
             disabled={isSaving}
-            className="flex-1 px-4 py-2.5 bg-primary hover:bg-primaryHover text-white rounded-md text-sm font-bold uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
+            className="flex-1 px-4 py-2.5 bg-primary hover:bg-primaryHover text-white rounded-md text-sm font-bold uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:shadow-[0_0_20px_rgba(99,102,241,0.2)]"
           >
             {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             {isSaving ? 'Saving...' : 'Save Profile'}

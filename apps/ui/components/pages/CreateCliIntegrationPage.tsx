@@ -19,9 +19,9 @@ const CreateCliIntegrationPage: React.FC = () => {
 
   return (
     <div className="max-w-3xl mx-auto py-8 px-4">
-      <div className="bg-surface border border-border rounded-xl shadow-lg overflow-hidden">
+      <div className="bg-surface border border-border rounded-xl shadow-xl shadow-primary/5 overflow-hidden">
 
-        <div className="px-6 py-4 border-b border-border">
+        <div className="px-6 py-4 border-b border-border-elevated">
           <h1 className="text-lg font-semibold text-text">Add CLI Connection</h1>
           <p className="text-sm text-textMuted mt-0.5">Connect an AI CLI to your workspace.</p>
         </div>

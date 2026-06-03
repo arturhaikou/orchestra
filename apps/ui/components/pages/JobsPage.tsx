@@ -58,7 +58,7 @@ const JobsPage: React.FC = () => {
     <div className="flex-1 p-6 max-w-6xl mx-auto w-full">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-text">Jobs</h1>
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-text to-textMuted bg-clip-text text-transparent">Jobs</h1>
           <p className="text-textMuted text-sm mt-1">Agent execution history for this workspace.</p>
         </div>
         <JobStatusFilter selected={statusFilter} onChange={setStatusFilter} />
@@ -73,8 +73,8 @@ const JobsPage: React.FC = () => {
       )}
 
       {!isLoading && !error && items.length === 0 && (
-        <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-border rounded-lg">
-          <Activity className="w-12 h-12 text-textMuted opacity-20 mb-4" />
+        <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-border rounded-lg bg-surfaceHighlight/20">
+          <Activity className="w-12 h-12 text-accent-cyan opacity-30 mb-4" />
           <p className="text-textMuted">No jobs yet. Run an agent to see executions here.</p>
         </div>
       )}

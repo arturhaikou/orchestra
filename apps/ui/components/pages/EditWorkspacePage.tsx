@@ -359,10 +359,10 @@ const EditWorkspacePage: React.FC<EditWorkspacePageProps> = () => {
   // ── Main render ─────────────────────────────────────────────────────────
   return (
     <div className="max-w-2xl mx-auto py-8">
-      <div className="bg-surface border border-border rounded-xl shadow-lg overflow-hidden">
+      <div className="bg-surface border border-border rounded-xl shadow-xl shadow-primary/5 overflow-hidden">
 
         {/* Page header */}
-        <div className="px-6 py-4 border-b border-border bg-surfaceHighlight/50">
+        <div className="px-6 py-4 border-b border-border-elevated bg-surfaceHighlight/50">
           <h2 className="text-xl font-bold text-text">Edit Workspace</h2>
           <p className="text-sm text-textMuted mt-0.5">
             Update workspace settings and AI provider configuration.

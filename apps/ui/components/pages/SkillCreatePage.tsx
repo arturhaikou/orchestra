@@ -40,9 +40,9 @@ const SkillCreatePage: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4">
-      <div className="bg-surface border border-border rounded-xl shadow-lg overflow-hidden">
-        <div className="px-6 py-4 border-b border-border">
-          <h1 className="text-2xl font-bold text-text">Create Skill</h1>
+      <div className="bg-surface border border-border rounded-xl shadow-xl shadow-primary/5 overflow-hidden">
+        <div className="px-6 py-4 border-b border-border-elevated">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-text to-textMuted bg-clip-text text-transparent">Create Skill</h1>
         </div>
 
         <form onSubmit={handleSave} className="p-6 space-y-6">
@@ -139,7 +139,7 @@ const SkillCreatePage: React.FC = () => {
             <button
               type="submit"
               disabled={isSaving}
-              className="px-6 py-2 bg-primary hover:bg-primaryHover text-white rounded-md text-sm font-medium transition-colors flex items-center gap-2 shadow-lg shadow-primary/20"
+              className="px-6 py-2 bg-primary hover:bg-primaryHover text-white rounded-md text-sm font-medium transition-colors flex items-center gap-2 shadow-lg shadow-primary/20 hover:shadow-[0_0_20px_rgba(99,102,241,0.2)]"
             >
               {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
               {isSaving ? 'Saving…' : 'Create Skill'}

@@ -48,7 +48,7 @@ const SidebarItem: React.FC<{
     onClick={onClick}
     className={`w-full flex items-center gap-3 px-4 py-3 rounded-md transition-all duration-200 group
       ${active
-        ? 'bg-primary/10 text-primary border-r-2 border-primary'
+        ? 'bg-gradient-to-r from-primary/15 to-transparent text-primary border-r-2 border-primary shadow-[0_0_12px_rgba(99,102,241,0.15)]'
         : 'text-textMuted hover:bg-surfaceHighlight hover:text-text'
       }`}
   >

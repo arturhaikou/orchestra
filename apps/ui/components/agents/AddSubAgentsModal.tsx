@@ -181,7 +181,7 @@ const AddSubAgentsModal: React.FC<AddSubAgentsModalProps> = ({
           <button
             type="button"
             onClick={handleCommit}
-            className="px-5 py-2 bg-primary hover:bg-primaryHover text-white rounded-md text-sm font-medium transition-colors flex items-center gap-2 shadow-lg shadow-primary/20"
+            className="px-5 py-2 bg-primary hover:bg-primaryHover text-white rounded-md text-sm font-medium transition-colors flex items-center gap-2 shadow-lg shadow-primary/20 hover:shadow-[0_0_20px_rgba(99,102,241,0.2)]"
           >
             <Check className="w-4 h-4" />
             {selectedCount === 0 ? 'Add None' : `Add ${selectedCount} Agent${selectedCount !== 1 ? 's' : ''}`}

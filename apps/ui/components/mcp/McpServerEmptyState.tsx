@@ -6,8 +6,8 @@ interface McpServerEmptyStateProps {
 }
 
 const McpServerEmptyState: React.FC<McpServerEmptyStateProps> = ({ onAdd }) => (
-  <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
-    <Server size={64} className="text-textMuted" />
+  <div className="flex flex-col items-center justify-center gap-4 py-20 text-center border-2 border-dashed border-border rounded-lg bg-surfaceHighlight/20">
+    <Server size={64} className="text-accent-cyan opacity-40" />
     <h2 className="text-xl font-semibold text-text">No MCP Servers yet</h2>
     <p className="text-sm text-textMuted">
       Connect your first MCP server to unlock tool discovery for your agents.

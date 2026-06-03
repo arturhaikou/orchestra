@@ -189,7 +189,7 @@ const CreateMcpServerPage: React.FC<CreateMcpServerPageProps> = ({
     <div className="max-w-2xl mx-auto py-8 px-4">
       <McpServerBreadcrumb workspaceId={workspaceId} />
 
-      <h1 className="text-2xl font-bold text-text mb-6">Add MCP Server</h1>
+      <h1 className="text-2xl font-bold bg-gradient-to-r from-text to-textMuted bg-clip-text text-transparent mb-6">Add MCP Server</h1>
 
       <SaveErrorBanner error={saveError} onDismiss={clearError} />
 

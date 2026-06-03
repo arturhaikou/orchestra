@@ -273,22 +273,22 @@ const AgentsList: React.FC<AgentsListProps> = () => {
     <div className="space-y-6 pb-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-            <h2 className="text-2xl font-bold text-text">AI Teammates</h2>
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-text to-textMuted bg-clip-text text-transparent">AI Teammates</h2>
             <p className="text-textMuted text-sm mt-1">Manage autonomous agents deployed in this workspace.</p>
         </div>
         <button 
             ref={deployButtonRef}
             onClick={() => setIsDeployDialogOpen(true)}
-            className="w-full sm:w-auto bg-primary hover:bg-primaryHover text-white px-4 py-2 rounded-md flex items-center justify-center gap-2 text-sm transition-colors shadow-lg shadow-primary/20 shrink-0"
+            className="w-full sm:w-auto bg-primary hover:bg-primaryHover text-white px-4 py-2 rounded-md flex items-center justify-center gap-2 text-sm transition-colors shadow-lg shadow-primary/20 hover:shadow-[0_0_20px_rgba(99,102,241,0.2)] shrink-0"
         >
           <Plus className="w-4 h-4" /> Deploy Agent
         </button>
       </div>
 
       {agents.length === 0 ? (
-        <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed border-border rounded-lg text-textMuted bg-surface/50">
-          <div className="w-16 h-16 bg-surfaceHighlight rounded-full flex items-center justify-center mb-4">
-              <Bot className="w-8 h-8 text-textMuted" />
+        <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed border-border rounded-lg text-textMuted bg-surfaceHighlight/20">
+          <div className="w-16 h-16 bg-surfaceHighlight rounded-full flex items-center justify-center mb-4 shadow-[0_0_20px_rgba(168,85,247,0.1)]">
+              <Bot className="w-8 h-8 text-accent-purple opacity-60" />
           </div>
           <p className="text-lg font-medium text-text">No agents deployed</p>
           <p className="text-sm">Create your first AI teammate to start automating tasks.</p>
@@ -637,7 +637,7 @@ const AgentsList: React.FC<AgentsListProps> = () => {
                           (isReviewAgent ? !formState.projectPrinciples.trim() : !formState.customInstructions.trim()) ||
                           isSaving)
                         }
-                        className="flex-1 sm:flex-none px-6 py-2.5 bg-primary hover:bg-primaryHover text-white rounded-md text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-primary/20 active:scale-95"
+                        className="flex-1 sm:flex-none px-6 py-2.5 bg-primary hover:bg-primaryHover text-white rounded-md text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:shadow-[0_0_20px_rgba(99,102,241,0.2)] active:scale-95"
                     >
                         {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Changes'}
                     </button>
@@ -817,7 +817,7 @@ const AgentsList: React.FC<AgentsListProps> = () => {
                           setConfiguringToolId(null);
                           setSelectedActionIds([]);
                         }}
-                        className="flex-1 sm:flex-none px-6 py-2.5 bg-primary hover:bg-primaryHover text-white rounded-md text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20 active:scale-95"
+                        className="flex-1 sm:flex-none px-6 py-2.5 bg-primary hover:bg-primaryHover text-white rounded-md text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:shadow-[0_0_20px_rgba(99,102,241,0.2)] active:scale-95"
                     >
                         Confirm Selection
                     </button>

@@ -506,7 +506,7 @@ const DeployBuiltInAgentModal: React.FC<DeployBuiltInAgentModalProps> = ({
             onClick={handleDeploy}
             disabled={!isValid || isDeploying}
             aria-disabled={!isValid || isDeploying}
-            className={`px-6 py-2.5 rounded-md text-sm font-medium shadow-lg shadow-primary/20 transition-all ${
+            className={`px-6 py-2.5 rounded-md text-sm font-medium shadow-lg shadow-primary/20 hover:shadow-[0_0_20px_rgba(99,102,241,0.2)] transition-all ${
               isValid && !isDeploying
                 ? 'bg-primary hover:bg-primaryHover text-white'
                 : 'bg-primary text-white opacity-50 cursor-not-allowed'

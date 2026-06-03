@@ -118,8 +118,12 @@ const WorkspaceLayout: React.FC<WorkspaceLayoutProps> = ({
           workspaceId={workspaceId || ''}
         />
 
-        <div className="flex-1 overflow-auto p-4 md:p-6 scroll-smooth">
-          <div className="max-w-7xl mx-auto h-full">
+        <div className="flex-1 overflow-auto p-4 md:p-6 scroll-smooth relative">
+          <div className="pointer-events-none absolute inset-0 overflow-hidden">
+            <div className="absolute -top-40 -right-32 h-96 w-96 rounded-full bg-primary/5 blur-[120px]" />
+            <div className="absolute -bottom-40 -left-32 h-96 w-96 rounded-full bg-purple-500/5 blur-[120px]" />
+          </div>
+          <div className="max-w-7xl mx-auto h-full relative">
             <Outlet />
           </div>
         </div>

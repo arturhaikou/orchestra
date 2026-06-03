@@ -53,7 +53,7 @@ const FilterWarningModal: React.FC<FilterWarningModalProps> = ({
           <button
             onClick={onProceed}
             disabled={isProcessing}
-            className="flex-1 px-4 py-2 bg-primary hover:bg-primaryHover text-white rounded-lg text-xs font-bold uppercase tracking-widest shadow-lg shadow-primary/20 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="flex-1 px-4 py-2 bg-primary hover:bg-primaryHover text-white rounded-lg text-xs font-bold uppercase tracking-widest shadow-lg shadow-primary/20 hover:shadow-[0_0_20px_rgba(99,102,241,0.2)] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {isProcessing ? (
               <>

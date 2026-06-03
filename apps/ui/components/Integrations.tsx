@@ -80,7 +80,7 @@ const Integrations: React.FC = () => {
         <div className="flex items-center gap-2">
           <button
             onClick={() => navigate('new')}
-            className="bg-primary hover:bg-primaryHover text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-semibold transition-all shadow-lg shadow-primary/20 active:scale-95"
+            className="bg-primary hover:bg-primaryHover text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-semibold transition-all shadow-lg shadow-primary/20 hover:shadow-[0_0_20px_rgba(99,102,241,0.2)] active:scale-95"
           >
             <Plus className="w-4 h-4" /> Add Connection
           </button>

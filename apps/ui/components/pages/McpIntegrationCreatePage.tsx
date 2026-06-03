@@ -21,9 +21,9 @@ const McpIntegrationCreatePage: React.FC = () => {
         <ArrowLeft className="w-4 h-4" /> Back to Integrations
       </Link>
 
-      <div className="bg-surface border border-border rounded-xl shadow-lg overflow-hidden">
-        <div className="px-6 py-4 border-b border-border">
-          <h1 className="text-2xl font-bold text-text">Add MCP Server</h1>
+      <div className="bg-surface border border-border rounded-xl shadow-xl shadow-primary/5 overflow-hidden">
+        <div className="px-6 py-4 border-b border-border-elevated">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-text to-textMuted bg-clip-text text-transparent">Add MCP Server</h1>
           <p className="text-sm text-textMuted mt-0.5">
             Connect an MCP-compatible server to your workspace via HTTP or stdio transport.
           </p>

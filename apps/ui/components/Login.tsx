@@ -75,10 +75,10 @@ const Login: React.FC<LoginProps> = ({ onLogin, isDarkMode, toggleTheme }) => {
 
       <div className="relative z-10 w-full max-w-md animate-fade-in rounded-xl border border-border bg-surface shadow-2xl">
         <div className="p-8 pb-6 text-center">
-          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-border bg-background shadow-lg shadow-primary/20">
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-border bg-background shadow-lg shadow-primary/20 hover:shadow-[0_0_20px_rgba(99,102,241,0.2)]">
             <img src="/orchestra_logo.png" alt="Orchestra logo" className="h-full w-full object-contain" />
           </div>
-          <h1 className="text-2xl font-bold text-text mb-2">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-text to-textMuted bg-clip-text text-transparent mb-2">
             {isRegistering ? 'Create Account' : 'Welcome Back'}
           </h1>
           <p className="text-textMuted text-sm">

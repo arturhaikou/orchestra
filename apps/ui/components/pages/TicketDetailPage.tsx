@@ -78,7 +78,7 @@ const TicketDetailPage: React.FC = () => {
         <div className="lg:col-span-2 space-y-6">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-2xl font-bold text-text">{ticket.title}</h1>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-text to-textMuted bg-clip-text text-transparent">{ticket.title}</h1>
             </div>
             <p className="text-xs text-textMuted font-mono">
               {ticket.id.length > 20 ? ticket.id.substring(0, 8) + '...' : ticket.id}

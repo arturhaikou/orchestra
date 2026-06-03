@@ -96,10 +96,10 @@ const CreateWorkspacePage: React.FC<CreateWorkspacePageProps> = ({
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="max-w-2xl mx-auto py-8">
-      <div className="bg-surface border border-border rounded-xl shadow-lg overflow-hidden">
+      <div className="bg-surface border border-border rounded-xl shadow-xl shadow-primary/5 overflow-hidden">
 
         {/* Page header */}
-        <div className="px-6 py-4 border-b border-border bg-surfaceHighlight/50">
+        <div className="px-6 py-4 border-b border-border-elevated bg-surfaceHighlight/50">
           <h2 className="text-xl font-bold text-text">
             {hasExistingWorkspaces ? 'New Workspace' : 'Welcome to Orchestra'}
           </h2>
@@ -228,7 +228,7 @@ const CreateWorkspacePage: React.FC<CreateWorkspacePageProps> = ({
             <button
               type="submit"
               disabled={!isFormValid || isProcessing}
-              className="flex-1 px-4 py-2.5 bg-primary hover:bg-primaryHover text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
+              className="flex-1 px-4 py-2.5 bg-primary hover:bg-primaryHover text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:shadow-[0_0_20px_rgba(99,102,241,0.2)]"
             >
               {isProcessing && <Loader2 className="w-4 h-4 animate-spin" />}
               {isProcessing ? 'Creating...' : 'Create Workspace'}

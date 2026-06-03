@@ -110,7 +110,7 @@ const TicketCreatePage: React.FC = () => {
         Back to Tickets
       </button>
 
-      <h1 className="text-2xl font-bold text-text mb-6">Create New Ticket</h1>
+      <h1 className="text-2xl font-bold bg-gradient-to-r from-text to-textMuted bg-clip-text text-transparent mb-6">Create New Ticket</h1>
 
       <div className="space-y-6">
         <div className="space-y-1.5">
@@ -202,7 +202,7 @@ const TicketCreatePage: React.FC = () => {
             type="button"
             onClick={handleSave}
             disabled={isSaving}
-            className="flex-1 px-4 py-2.5 bg-primary hover:bg-primaryHover text-white rounded-lg text-sm font-bold transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 active:scale-[0.98]"
+            className="flex-1 px-4 py-2.5 bg-primary hover:bg-primaryHover text-white rounded-lg text-sm font-bold transition-all shadow-lg shadow-primary/20 hover:shadow-[0_0_20px_rgba(99,102,241,0.2)] flex items-center justify-center gap-2 active:scale-[0.98]"
           >
             {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             {isSaving ? 'Saving...' : 'Save'}
