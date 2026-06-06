@@ -1,6 +1,7 @@
 using Orchestra.Application.Agents.Templates;
 using Orchestra.Application.Common.Exceptions;
 using Orchestra.Application.Common.Interfaces;
+using Orchestra.Domain.Enums;
 
 namespace Orchestra.Application.Agents.Services;
 
@@ -75,11 +76,12 @@ public class AgentOptionalToolService : IAgentOptionalToolService
             .Select(ta => ta.Id)
             .ToHashSet();
 
-        var targetActions = await _toolActionDataAccess.GetByNamesAsync(methodNames.ToList(), cancellationToken);
-        var workspaceIntegrationIds = await GetWorkspaceIntegrationIdsAsync(agent.WorkspaceId, cancellationToken);
+        var workspaceProviderTypes = await GetWorkspaceCodeSourceProviderTypesAsync(agent.WorkspaceId, cancellationToken);
+        var targetActions = await _toolActionDataAccess.GetByNamesAndProviderTypesAsync(
+            methodNames.ToList(), workspaceProviderTypes, cancellationToken);
         var targetIds = targetActions
-            .Where(ta => ta.IntegrationId == null || workspaceIntegrationIds.Contains(ta.IntegrationId.Value))
-            .Select(ta => ta.Id)
+            .GroupBy(ta => ta.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First().Id)
             .ToHashSet();
 
         var toRemove = currentOptionalIds.Except(targetIds).ToList();
@@ -112,9 +114,12 @@ public class AgentOptionalToolService : IAgentOptionalToolService
             .ToHashSet();
     }
 
-    private async Task<HashSet<Guid>> GetWorkspaceIntegrationIdsAsync(Guid workspaceId, CancellationToken cancellationToken)
+    private async Task<List<ProviderType>> GetWorkspaceCodeSourceProviderTypesAsync(Guid workspaceId, CancellationToken cancellationToken)
     {
         var integrations = await _integrationDataAccess.GetByWorkspaceIdAsync(workspaceId, cancellationToken);
-        return integrations.Select(i => i.Id).ToHashSet();
+        return integrations
+            .Where(i => i.Types.Contains(IntegrationType.CODE_SOURCE))
+            .Select(i => i.Provider)
+            .ToList();
     }
 }

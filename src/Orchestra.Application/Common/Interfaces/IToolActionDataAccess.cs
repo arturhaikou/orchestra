@@ -1,4 +1,5 @@
 using Orchestra.Domain.Entities;
+using Orchestra.Domain.Enums;
 
 namespace Orchestra.Application.Common.Interfaces;
 
@@ -110,6 +111,11 @@ public interface IToolActionDataAccess
     /// <returns>Tool actions matching the provided names.</returns>
     Task<List<ToolAction>> GetByNamesAsync(
         List<string> names,
+        CancellationToken cancellationToken = default);
+
+    Task<List<ToolAction>> GetByNamesAndProviderTypesAsync(
+        List<string> names,
+        List<ProviderType> providerTypes,
         CancellationToken cancellationToken = default);
 
     Task<ToolAction?> FindByToolCategoryIdAndMethodNameAsync(

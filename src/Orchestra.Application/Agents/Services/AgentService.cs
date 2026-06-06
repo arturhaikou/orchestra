@@ -486,7 +486,10 @@ public class AgentService : IAgentService
             agent.WorkspaceId,
             cancellationToken);
 
-        // 4. Delete agent via data access layer
+        // 4. Remove sub-agent assignments where this agent is the sub-agent (RESTRICT FK)
+        await _agentSubAgentDataAccess.RemoveBySubAgentIdAsync(agentId, cancellationToken);
+
+        // 5. Delete agent via data access layer
         await _agentDataAccess.DeleteAsync(agentId, cancellationToken);
     }
 
@@ -611,21 +614,22 @@ public class AgentService : IAgentService
         if (unknown.Count > 0)
             throw new ArgumentException($"Unknown optional tool method names: {string.Join(", ", unknown)}.");
 
-        var toolActions = await _toolActionDataAccess.GetByNamesAsync(selectedMethodNames.ToList(), cancellationToken);
-        var workspaceIntegrationIds = await GetWorkspaceIntegrationIdsAsync(workspaceId, cancellationToken);
-        var toolActionIds = toolActions
-            .Where(ta => ta.IntegrationId == null || workspaceIntegrationIds.Contains(ta.IntegrationId.Value))
-            .Select(ta => ta.Id)
-            .ToList();
+        var workspaceProviderTypes = await GetWorkspaceCodeSourceProviderTypesAsync(workspaceId, cancellationToken);
+        var toolActions = await _toolActionDataAccess.GetByNamesAndProviderTypesAsync(
+            selectedMethodNames.ToList(), workspaceProviderTypes, cancellationToken);
+        var toolActionIds = toolActions.Select(ta => ta.Id).ToList();
 
         if (toolActionIds.Count > 0)
             await _agentToolActionDataAccess.AssignToolActionsAsync(agentId, toolActionIds, cancellationToken);
     }
 
-    private async Task<HashSet<Guid>> GetWorkspaceIntegrationIdsAsync(Guid workspaceId, CancellationToken cancellationToken)
+    private async Task<List<ProviderType>> GetWorkspaceCodeSourceProviderTypesAsync(Guid workspaceId, CancellationToken cancellationToken)
     {
         var integrations = await _integrationDataAccess.GetByWorkspaceIdAsync(workspaceId, cancellationToken);
-        return integrations.Select(i => i.Id).ToHashSet();
+        return integrations
+            .Where(i => i.Types.Contains(IntegrationType.CODE_SOURCE))
+            .Select(i => i.Provider)
+            .ToList();
     }
 
     private static Agent CreateAgentFromTemplate(CreateAgentFromTemplateRequest request, BuiltInAgentTemplate template)

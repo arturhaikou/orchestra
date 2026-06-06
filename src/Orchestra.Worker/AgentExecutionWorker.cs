@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Options;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Common.Configuration;
@@ -15,6 +16,9 @@ public class AgentExecutionWorker : BackgroundService
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<AgentExecutionWorker> _logger;
     private readonly AgentExecutionSettings _settings;
+
+    // Tracks in-flight tasks by ticket ID to prevent double-launching and support graceful shutdown.
+    private readonly ConcurrentDictionary<Guid, Task> _runningTasks = new();
 
     public AgentExecutionWorker(
         IServiceProvider serviceProvider,
@@ -42,7 +46,7 @@ public class AgentExecutionWorker : BackgroundService
         {
             try
             {
-                await ProcessEligibleTicketsAsync(stoppingToken);
+                await LaunchEligibleTicketTasksAsync(stoppingToken);
             }
             catch (Exception ex)
             {
@@ -56,41 +60,76 @@ public class AgentExecutionWorker : BackgroundService
         }
 
         _logger.LogInformation("AgentExecutionWorker stopped");
+
+        await WaitForInFlightTasksAsync();
     }
 
-    private async Task ProcessEligibleTicketsAsync(CancellationToken cancellationToken)
+    private async Task LaunchEligibleTicketTasksAsync(CancellationToken cancellationToken)
     {
-        // Get eligible tickets in a dedicated scope
-        await using (var scope = _serviceProvider.CreateAsyncScope())
+        // Remove completed tasks from the tracking dictionary
+        foreach (var kvp in _runningTasks.Where(k => k.Value.IsCompleted).ToList())
+            _runningTasks.TryRemove(kvp.Key, out _);
+
+        await using var scope = _serviceProvider.CreateAsyncScope();
+
+        var ticketDataAccess = scope.ServiceProvider
+            .GetRequiredService<ITicketAgentExecutionDataAccess>();
+
+        var internalTickets = await ticketDataAccess
+            .GetInternalTicketsReadyForAgentAsync(cancellationToken);
+        var externalTickets = await ticketDataAccess
+            .GetExternalMaterializedTicketsReadyForAgentAsync(cancellationToken);
+
+        var allTickets = internalTickets.Concat(externalTickets).ToList();
+
+        if (!allTickets.Any())
         {
-            var ticketDataAccess = scope.ServiceProvider
-                .GetRequiredService<ITicketAgentExecutionDataAccess>();
+            _logger.LogDebug("No tickets ready for agent execution");
+            return;
+        }
 
-            // Get eligible tickets
-            var internalTickets = await ticketDataAccess
-                .GetInternalTicketsReadyForAgentAsync(cancellationToken);
-            var externalTickets = await ticketDataAccess
-                .GetExternalMaterializedTicketsReadyForAgentAsync(cancellationToken);
+        _logger.LogInformation(
+            "Found {Count} ticket(s) ready for agent execution ({InternalCount} internal, {ExternalCount} external)",
+            allTickets.Count,
+            internalTickets.Count,
+            externalTickets.Count);
 
-            var allTickets = internalTickets.Concat(externalTickets).ToList();
+        foreach (var ticket in allTickets)
+        {
+            // Status flip (ToDo → InProgress) is the primary deduplication gate;
+            // this check is a safety net for tickets returned before the flip lands.
+            if (_runningTasks.ContainsKey(ticket.Id))
+                continue;
 
-            if (!allTickets.Any())
-            {
-                _logger.LogDebug("No tickets ready for agent execution");
-                return;
-            }
+            var task = ExecuteTicketAsync(ticket.Id, ticket.AssignedWorkflowId, cancellationToken);
+            _runningTasks.TryAdd(ticket.Id, task);
+        }
+    }
 
-            _logger.LogInformation(
-                "Found {Count} ticket(s) ready for agent execution ({InternalCount} internal, {ExternalCount} external)",
-                allTickets.Count,
-                internalTickets.Count,
-                externalTickets.Count);
+    private async Task WaitForInFlightTasksAsync()
+    {
+        var pending = _runningTasks.Values.Where(t => !t.IsCompleted).ToList();
+        if (!pending.Any())
+            return;
 
-            // Execute agents for each ticket with separate scopes (concurrent execution allowed)
-            var tasks = allTickets.Select(ticket =>
-                ExecuteTicketAsync(ticket.Id, ticket.AssignedWorkflowId, cancellationToken));
+        _logger.LogInformation(
+            "Waiting for {Count} in-flight agent task(s) to complete (timeout: {Seconds}s)...",
+            pending.Count,
+            _settings.GracefulShutdownTimeoutSeconds);
 
-            await Task.WhenAll(tasks);
+        using var cts = new CancellationTokenSource(
+            TimeSpan.FromSeconds(_settings.GracefulShutdownTimeoutSeconds));
+        try
+        {
+            await Task.WhenAll(pending).WaitAsync(cts.Token);
+            _logger.LogInformation("All in-flight agent tasks completed");
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning(
+                "Graceful shutdown timed out after {Seconds}s; {Count} task(s) may still be running",
+                _settings.GracefulShutdownTimeoutSeconds,
+                pending.Count(t => !t.IsCompleted));
         }
     }
 

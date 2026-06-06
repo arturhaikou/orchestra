@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Domain.Entities;
+using Orchestra.Domain.Enums;
 using Orchestra.Infrastructure.Persistence;
 
 namespace Orchestra.Infrastructure.Tools;
@@ -100,6 +101,23 @@ public class ToolActionDataAccess : IToolActionDataAccess
         return await _context.Set<ToolAction>()
             .AsNoTracking()
             .Where(ta => names.Contains(ta.Name))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<List<ToolAction>> GetByNamesAndProviderTypesAsync(
+        List<string> names,
+        List<ProviderType> providerTypes,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.Set<ToolAction>()
+            .AsNoTracking()
+            .Join(
+                _context.Set<ToolCategory>(),
+                ta => ta.ToolCategoryId,
+                tc => tc.Id,
+                (ta, tc) => new { ta, tc.ProviderType })
+            .Where(x => names.Contains(x.ta.Name) && providerTypes.Contains(x.ProviderType))
+            .Select(x => x.ta)
             .ToListAsync(cancellationToken);
     }
 

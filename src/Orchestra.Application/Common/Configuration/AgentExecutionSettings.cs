@@ -11,4 +11,9 @@ public class AgentExecutionSettings
     /// Polling interval in seconds for checking tickets eligible for agent execution.
     /// </summary>
     public int PollingIntervalSeconds { get; set; } = 30;
+
+    /// <summary>
+    /// Seconds to wait for in-flight agent tasks during graceful shutdown.
+    /// </summary>
+    public int GracefulShutdownTimeoutSeconds { get; set; } = 300;
 }

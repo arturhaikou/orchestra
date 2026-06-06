@@ -166,9 +166,23 @@ public class ToolRetrieverService : IToolRetrieverService
             allFunctions.Add(askQuestionsTool);
         }
 
-        _logger.LogInformation("Retrieved {Count} tools for agent {AgentId}", allFunctions.Count, agentId);
+        var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var dedupedFunctions = new List<AIFunction>(allFunctions.Count);
+        foreach (var f in allFunctions)
+        {
+            if (!seenNames.Add(f.Name))
+            {
+                _logger.LogWarning(
+                    "Duplicate AIFunction name '{FunctionName}' for agent {AgentId}; skipping second occurrence.",
+                    f.Name, agentId);
+                continue;
+            }
+            dedupedFunctions.Add(f);
+        }
 
-        return allFunctions;
+        _logger.LogInformation("Retrieved {Count} tools for agent {AgentId}", dedupedFunctions.Count, agentId);
+
+        return dedupedFunctions;
     }
 
     private async Task<List<ToolAction>> LoadToolActionsAsync(

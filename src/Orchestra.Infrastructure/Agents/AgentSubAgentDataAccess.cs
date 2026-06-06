@@ -80,6 +80,21 @@ public class AgentSubAgentDataAccess : IAgentSubAgentDataAccess
         await _context.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task RemoveBySubAgentIdAsync(
+        Guid subAgentId,
+        CancellationToken cancellationToken = default)
+    {
+        var assignments = await _context.AgentSubAgents
+            .Where(asa => asa.SubAgentId == subAgentId)
+            .ToListAsync(cancellationToken);
+
+        if (assignments.Count == 0)
+            return;
+
+        _context.AgentSubAgents.RemoveRange(assignments);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<Dictionary<Guid, List<Guid>>> GetSubAgentIdsByWorkspaceIdAsync(
         Guid workspaceId,
         CancellationToken cancellationToken = default)

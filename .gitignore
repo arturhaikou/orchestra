@@ -95,6 +95,8 @@ audit/
 research/
 */node_modules/
 *.lscache
+.playwright-cli
 .claude
 .codemie
+artifacts
 # End of file
