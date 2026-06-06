@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { AgentQuestion } from '../types';
-import { getPendingQuestions } from '../services/agentQuestionService';
+import { getPendingQuestions, onQuestionAnswered } from '../services/agentQuestionService';
 import { onAgentQuestionAsked, onAgentQuestionResolved } from '../services/signalRService';
 
 export function useAgentQuestions(workspaceId: string | undefined) {
@@ -32,6 +32,12 @@ export function useAgentQuestions(workspaceId: string | undefined) {
       unsubResolved();
     };
   }, [refetch]);
+
+  useEffect(() => {
+    return onQuestionAnswered((questionId) => {
+      setQuestions(prev => prev.filter(q => q.id !== questionId));
+    });
+  }, []);
 
   return { questions, pendingCount: questions.length, isLoading, refetch };
 }

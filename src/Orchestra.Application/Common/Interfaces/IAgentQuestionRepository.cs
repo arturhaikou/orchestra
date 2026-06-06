@@ -1,3 +1,4 @@
+using Orchestra.Application.Agents.DTOs;
 using Orchestra.Domain.Entities;
 
 namespace Orchestra.Application.Common.Interfaces;
@@ -8,6 +9,10 @@ public interface IAgentQuestionRepository
 
     Task<List<AgentQuestion>> GetPendingByWorkspaceAsync(
         Guid workspaceId,
+        CancellationToken cancellationToken = default);
+
+    Task<List<GlobalAgentQuestionDto>> GetGlobalPendingByUserAsync(
+        Guid userId,
         CancellationToken cancellationToken = default);
 
     Task SaveAsync(AgentQuestion question, CancellationToken cancellationToken = default);

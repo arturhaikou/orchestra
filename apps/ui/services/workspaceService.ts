@@ -15,6 +15,8 @@ export const getWorkspaces = async (): Promise<Workspace[]> => {
       headers: getAuthHeaders()
     });
 
+    if (response.status === 401) throw new Error('UNAUTHORIZED');
+
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.includes("text/html")) throw new Error("Not JSON");
 

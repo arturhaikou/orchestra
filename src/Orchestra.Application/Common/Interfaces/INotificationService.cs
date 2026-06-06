@@ -22,6 +22,12 @@ public interface INotificationService
     Task NotifyAgentQuestionAskedAsync(
         Guid workspaceId,
         Guid questionId,
+        Guid? jobId = null,
+        CancellationToken cancellationToken = default);
+
+    Task NotifyAgentQuestionAnsweredAsync(
+        Guid workspaceId,
+        Guid questionId,
         CancellationToken cancellationToken = default);
 
     Task NotifyWorkflowStepStartedAsync(WorkflowStepStartedNotification notification, CancellationToken cancellationToken = default);

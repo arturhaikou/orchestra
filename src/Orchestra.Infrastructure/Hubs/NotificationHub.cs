@@ -61,4 +61,32 @@ public class NotificationHub : Hub
             "SignalR client left workspace group. ConnectionId={ConnectionId} WorkspaceId={WorkspaceId}",
             Context.ConnectionId, workspaceId);
     }
+
+    public async Task JoinUserGroup()
+    {
+        var userIdClaim = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdClaim))
+            throw new HubException("Access denied.");
+
+        await Groups.AddToGroupAsync(
+            Context.ConnectionId, $"user-{userIdClaim.ToLower()}", Context.ConnectionAborted);
+
+        _logger.LogDebug(
+            "SignalR client joined user group. ConnectionId={ConnectionId} UserId={UserId}",
+            Context.ConnectionId, userIdClaim);
+    }
+
+    public async Task LeaveUserGroup()
+    {
+        var userIdClaim = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdClaim))
+            return;
+
+        await Groups.RemoveFromGroupAsync(
+            Context.ConnectionId, $"user-{userIdClaim.ToLower()}", Context.ConnectionAborted);
+
+        _logger.LogDebug(
+            "SignalR client left user group. ConnectionId={ConnectionId} UserId={UserId}",
+            Context.ConnectionId, userIdClaim);
+    }
 }

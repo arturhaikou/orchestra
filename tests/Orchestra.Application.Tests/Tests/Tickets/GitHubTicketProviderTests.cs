@@ -147,6 +147,30 @@ public class GitHubTicketProviderTests : ServiceTestFixture<GitHubTicketProvider
     }
 
     [Fact]
+    public async Task FetchTicketsAsync_ExcludesPullRequests_FromTicketList()
+    {
+        // Arrange
+        var integration = IntegrationBuilder.GitHubIntegration();
+        var issues = new List<GitHubIssue>
+        {
+            new() { Number = 1, Title = "Real issue", State = "open", Labels = new() },
+            new() { Number = 2, Title = "A pull request", State = "open", Labels = new(), PullRequest = new { } }
+        };
+
+        _apiClient.GetRepositoryIssuesAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns((issues, false));
+        _apiClient.GetIssueCommentsAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new List<GitHubComment>());
+
+        // Act
+        var (tickets, _, _) = await _sut.FetchTicketsAsync(integration);
+
+        // Assert — only the real issue is returned, the PR is filtered out
+        Assert.Single(tickets);
+        Assert.Equal("1", tickets[0].ExternalTicketId);
+    }
+
+    [Fact]
     public async Task FetchTicketsAsync_ResumesFromPageToken()
     {
         // Arrange — pass pageToken="3" to resume from page 3

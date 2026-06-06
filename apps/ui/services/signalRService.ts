@@ -5,6 +5,17 @@ import { ModelPullProgressEvent, ModelPullCompletedEvent, ModelPullFailedEvent, 
 
 export type { ConnectionStatus };
 
+export interface GlobalAgentQuestionEvent {
+  workspaceId: string;
+  workspaceName: string;
+  questionId: string;
+  ticketId: string | null;
+  ticketTitle: string | null;
+  agentName: string;
+  questionsJson: string;
+  createdAt: string;
+}
+
 const HUB_URL = `${import.meta.env.VITE_API_URL}/hubs/notifications`;
 
 let activeConnection: HubConnection | null = null;
@@ -14,6 +25,8 @@ let connectionStatusHandlers: Set<(status: ConnectionStatus) => void> = new Set(
 let executionCompletedHandler: ((event: AgentExecutionCompletedEvent) => void) | null = null;
 let ticketStatusChangedHandlers: Set<(event: TicketStatusChangedEvent) => void> = new Set();
 let reconnectedHandlers: Set<() => void> = new Set();
+let globalQuestionHandlers: Set<(event: GlobalAgentQuestionEvent) => void> = new Set();
+let globalQuestionResolvedHandlers: Set<(event: { questionId: string }) => void> = new Set();
 
 const RETRY_DELAYS = [0, 2000, 5000, 10000, 30000];
 
@@ -45,8 +58,9 @@ export const connect = async (workspaceId: string): Promise<void> => {
       if (activeWorkspaceId) {
         await connection.invoke('JoinWorkspaceGroup', activeWorkspaceId);
       }
+      await connection.invoke('JoinUserGroup');
     } catch (err) {
-      console.error('SignalR: Failed to re-join workspace group after reconnect:', err);
+      console.error('SignalR: Failed to re-join groups after reconnect:', err);
     }
     reconnectedHandlers.forEach(h => h());
   });
@@ -66,6 +80,14 @@ export const connect = async (workspaceId: string): Promise<void> => {
     ticketStatusChangedHandlers.forEach(h => h(event));
   });
 
+  connection.on('GlobalAgentQuestionAsked', (event: GlobalAgentQuestionEvent) => {
+    globalQuestionHandlers.forEach(h => h(event));
+  });
+
+  connection.on('GlobalAgentQuestionResolved', (event: { questionId: string }) => {
+    globalQuestionResolvedHandlers.forEach(h => h(event));
+  });
+
   activeConnection = connection;
   activeWorkspaceId = workspaceId;
 
@@ -83,9 +105,10 @@ export const connect = async (workspaceId: string): Promise<void> => {
 
   try {
     await connection.invoke('JoinWorkspaceGroup', workspaceId);
+    await connection.invoke('JoinUserGroup');
     emitConnectionStatus('connected');
   } catch (err) {
-    console.error('SignalR: Failed to join workspace group:', err);
+    console.error('SignalR: Failed to join groups:', err);
     throw err;
   }
 };
@@ -268,4 +291,14 @@ export const onWorkflowTicketSwitched = (handler: (event: WorkflowTicketSwitched
   if (!activeConnection) return () => {};
   activeConnection.on('WorkflowTicketSwitched', handler);
   return () => activeConnection?.off('WorkflowTicketSwitched', handler);
+};
+
+export const onGlobalAgentQuestionAsked = (handler: (event: GlobalAgentQuestionEvent) => void): (() => void) => {
+  globalQuestionHandlers.add(handler);
+  return () => globalQuestionHandlers.delete(handler);
+};
+
+export const onGlobalAgentQuestionResolved = (handler: (event: { questionId: string }) => void): (() => void) => {
+  globalQuestionResolvedHandlers.add(handler);
+  return () => globalQuestionResolvedHandlers.delete(handler);
 };

@@ -35,6 +35,8 @@ public class GitHubTicketProvider : ITicketProvider
 
             foreach (var issue in issues)
             {
+                if (issue.PullRequest != null) continue;
+
                 var comments = await client.GetIssueCommentsAsync(issue.Number, cancellationToken);
                 var commentDtos = comments.Select(c => new CommentDto(
                     Id: c.Id.ToString(),

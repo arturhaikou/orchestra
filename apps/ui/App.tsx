@@ -39,6 +39,7 @@ import { getToken, logout } from './services/authService';
 import AuthGuard from './components/AuthGuard';
 import WorkspaceLayout from './components/WorkspaceLayout';
 import PostLoginRedirect from './components/PostLoginRedirect';
+import BotWidget from './components/global/BotWidget';
 import { Loader2 } from 'lucide-react';
 
 const RedirectToMcpNew: React.FC = () => {
@@ -210,6 +211,8 @@ const App: React.FC = () => {
       {appToast && (
         <Toast message={appToast.message} type={appToast.type} onClose={() => setAppToast(null)} />
       )}
+
+      {isAuthenticated && <BotWidget />}
     </>
   );
 };

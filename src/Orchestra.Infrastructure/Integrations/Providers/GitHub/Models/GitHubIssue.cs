@@ -36,4 +36,7 @@ public class GitHubIssue
 
     [JsonPropertyName("id")]
     public long Id { get; set; }
+
+    [JsonPropertyName("pull_request")]
+    public object? PullRequest { get; set; }
 }

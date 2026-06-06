@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,8 +13,36 @@ namespace Orchestra.ApiService.Controllers;
 [Route("v1")]
 public class AgentQuestionsController(
     IAgentQuestionRepository questionRepository,
-    IConnectionMultiplexer redis) : ControllerBase
+    IConnectionMultiplexer redis,
+    INotificationService notificationService) : ControllerBase
 {
+    [HttpGet("agent-questions/global-pending")]
+    public async Task<IActionResult> GetGlobalPendingAsync(CancellationToken cancellationToken)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!Guid.TryParse(userIdClaim, out var userId))
+            return Unauthorized();
+
+        var questions = await questionRepository.GetGlobalPendingByUserAsync(userId, cancellationToken);
+        var camelCase = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+        };
+        return Ok(questions.Select(q => new
+        {
+            q.WorkspaceId,
+            q.WorkspaceName,
+            q.QuestionId,
+            q.TicketId,
+            q.TicketTitle,
+            q.AgentName,
+            QuestionsJson = JsonSerializer.Serialize(
+                JsonSerializer.Deserialize<List<QuestionItem>>(q.QuestionsJson), camelCase),
+            q.CreatedAt
+        }));
+    }
+
     [HttpGet("workspaces/{workspaceId:guid}/agent-questions")]
     public async Task<IActionResult> GetPendingAsync(
         Guid workspaceId,
@@ -80,6 +109,9 @@ public class AgentQuestionsController(
 
         await redis.GetSubscriber()
             .PublishAsync(RedisChannel.Literal("job-resume"), payload);
+
+        await notificationService.NotifyAgentQuestionAnsweredAsync(
+            question.WorkspaceId, questionId, cancellationToken);
 
         return NoContent();
     }

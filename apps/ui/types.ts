@@ -583,6 +583,17 @@ export interface AgentQuestion {
   createdAt: string;
 }
 
+export interface GlobalAgentQuestion {
+  workspaceId: string;
+  workspaceName: string;
+  questionId: string;
+  ticketId: string | null;
+  ticketTitle: string | null;
+  agentName: string;
+  questionsJson: string;
+  createdAt: string;
+}
+
 /** Three-state connection status reflected from the last Connect verification. */
 export type McpServerConnectionStatus = 'Connected' | 'ConnectionFailed' | 'Unverified';
 

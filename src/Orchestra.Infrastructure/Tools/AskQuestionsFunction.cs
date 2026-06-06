@@ -42,7 +42,7 @@ public static class AskQuestionsFunction
                 jobTracking.SuspendedQuestionId = agentQuestion.Id;
 
                 await notificationService.NotifyAgentQuestionAskedAsync(
-                    jobTracking.WorkspaceId, agentQuestion.Id, cancellationToken);
+                    jobTracking.WorkspaceId, agentQuestion.Id, jobTracking.JobId, cancellationToken);
 
                 logger.LogInformation(
                     "Agent asked {Count} question(s) for job {JobId}. QuestionId={QuestionId}",

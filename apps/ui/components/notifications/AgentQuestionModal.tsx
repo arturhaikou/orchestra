@@ -36,13 +36,11 @@ const AgentQuestionModal: React.FC<Props> = ({ question, onClose, onAnswered }) 
       }
     }
     await submitAnswers(question.id, finalAnswers);
-    onAnswered();
-    onClose();
   };
 
   const { execute, isLoading, error } = useModalAction(
     handleAnswer,
-    onAnswered
+    () => { onAnswered(); onClose(); }
   );
 
   useEffect(() => {

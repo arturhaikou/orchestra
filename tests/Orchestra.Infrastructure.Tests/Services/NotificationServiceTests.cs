@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NSubstitute.ExceptionExtensions;
 using Orchestra.Application.Agents.DTOs;
 using Orchestra.Application.Tickets.DTOs;
 using Orchestra.Infrastructure.Hubs;
+using Orchestra.Infrastructure.Persistence;
 using Orchestra.Infrastructure.Services;
 
 namespace Orchestra.Infrastructure.Tests.Services;
@@ -24,7 +26,12 @@ public class NotificationServiceTests
         hubContext.Clients.Returns(hubClients);
         hubClients.Group(Arg.Any<string>()).Returns(clientProxy);
 
-        var sut = new NotificationService(hubContext, logger);
+        var dbOptions = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .Options;
+        var db = new AppDbContext(dbOptions);
+
+        var sut = new NotificationService(hubContext, db, logger);
         return (sut, hubContext, clientProxy);
     }
 

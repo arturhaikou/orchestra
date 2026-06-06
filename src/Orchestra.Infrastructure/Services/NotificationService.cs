@@ -1,4 +1,6 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Orchestra.Application.Agents.DTOs;
 using Orchestra.Application.Common.Interfaces;
@@ -7,19 +9,23 @@ using Orchestra.Application.Tickets.DTOs;
 using Orchestra.Application.Workflows.DTOs;
 using Orchestra.Domain.Enums;
 using Orchestra.Infrastructure.Hubs;
+using Orchestra.Infrastructure.Persistence;
 
 namespace Orchestra.Infrastructure.Services;
 
 public class NotificationService : INotificationService
 {
     private readonly IHubContext<NotificationHub> _hubContext;
+    private readonly AppDbContext _db;
     private readonly ILogger<NotificationService> _logger;
 
     public NotificationService(
         IHubContext<NotificationHub> hubContext,
+        AppDbContext db,
         ILogger<NotificationService> logger)
     {
         _hubContext = hubContext;
+        _db = db;
         _logger = logger;
     }
 
@@ -221,6 +227,7 @@ public class NotificationService : INotificationService
     public async Task NotifyAgentQuestionAskedAsync(
         Guid workspaceId,
         Guid questionId,
+        Guid? jobId = null,
         CancellationToken cancellationToken = default)
     {
         var groupName = $"workspace-{workspaceId}";
@@ -248,6 +255,106 @@ public class NotificationService : INotificationService
                 "Failed to dispatch AgentQuestionAsked notification. WorkspaceId={WorkspaceId} QuestionId={QuestionId}",
                 workspaceId,
                 questionId);
+        }
+
+        await TryDispatchGlobalQuestionNotificationAsync(workspaceId, questionId, jobId, cancellationToken);
+    }
+
+    public async Task NotifyAgentQuestionAnsweredAsync(
+        Guid workspaceId,
+        Guid questionId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var workspace = await _db.Workspaces
+                .FirstOrDefaultAsync(w => w.Id == workspaceId, cancellationToken);
+            if (workspace is null) return;
+
+            var userGroupName = $"user-{workspace.OwnerId}";
+            await _hubContext.Clients.Group(userGroupName)
+                .SendAsync("GlobalAgentQuestionResolved", new { questionId }, cancellationToken);
+
+            _logger.LogDebug(
+                "Dispatched GlobalAgentQuestionResolved. WorkspaceId={WorkspaceId} QuestionId={QuestionId}",
+                workspaceId, questionId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Failed to dispatch GlobalAgentQuestionResolved. WorkspaceId={WorkspaceId} QuestionId={QuestionId}",
+                workspaceId, questionId);
+        }
+    }
+
+    private async Task TryDispatchGlobalQuestionNotificationAsync(
+        Guid workspaceId,
+        Guid questionId,
+        Guid? jobId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var workspace = await _db.Workspaces
+                .FirstOrDefaultAsync(w => w.Id == workspaceId, cancellationToken);
+            if (workspace is null)
+                return;
+
+            var question = await _db.AgentQuestions
+                .FirstOrDefaultAsync(q => q.Id == questionId, cancellationToken);
+            if (question is null)
+                return;
+
+            string? ticketTitle = null;
+            Guid? ticketId = null;
+            string agentName = "Agent";
+
+            if (jobId.HasValue)
+            {
+                var job = await _db.Jobs
+                    .FirstOrDefaultAsync(j => j.Id == jobId.Value, cancellationToken);
+                if (job is not null)
+                {
+                    ticketTitle = job.TicketTitle;
+                    ticketId = job.TicketId;
+                    agentName = job.AgentName;
+                }
+            }
+
+            var camelCase = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+            };
+            var questionsJson = JsonSerializer.Serialize(
+                JsonSerializer.Deserialize<List<QuestionItem>>(question.QuestionsJson), camelCase);
+
+            var globalPayload = new
+            {
+                workspaceId,
+                workspaceName = workspace.Name,
+                questionId,
+                ticketId,
+                ticketTitle,
+                agentName,
+                questionsJson,
+                createdAt = question.CreatedAt
+            };
+
+            var userGroupName = $"user-{workspace.OwnerId}";
+            await _hubContext.Clients.Group(userGroupName)
+                .SendAsync("GlobalAgentQuestionAsked", globalPayload, cancellationToken);
+
+            _logger.LogDebug(
+                "Dispatched GlobalAgentQuestionAsked notification. WorkspaceId={WorkspaceId} QuestionId={QuestionId} OwnerId={OwnerId}",
+                workspaceId, questionId, workspace.OwnerId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Failed to dispatch GlobalAgentQuestionAsked notification. WorkspaceId={WorkspaceId} QuestionId={QuestionId}",
+                workspaceId, questionId);
         }
     }
 

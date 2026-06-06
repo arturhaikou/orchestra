@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { getWorkspaces } from '../services/workspaceService';
+import { logout } from '../services/authService';
 
 const PostLoginRedirect: React.FC = () => {
   const [redirectTo, setRedirectTo] = useState<string | null>(null);
@@ -17,8 +18,13 @@ const PostLoginRedirect: React.FC = () => {
         } else {
           setRedirectTo('/workspaces/new');
         }
-      } catch {
-        setRedirectTo('/workspaces/new');
+      } catch (error) {
+        if (error instanceof Error && error.message === 'UNAUTHORIZED') {
+          logout();
+          setRedirectTo('/login');
+        } else {
+          setRedirectTo('/workspaces/new');
+        }
       }
     };
     resolve();
