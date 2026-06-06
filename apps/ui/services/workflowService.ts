@@ -30,11 +30,16 @@ export const getWorkflowDefinition = async (id: string): Promise<WorkflowDefinit
 };
 
 export interface CreateWorkflowStepPayload {
+  clientId?: string;
   order: number;
-  agentId: string;
+  agentId?: string | null;
   instructionOverride?: string | null;
   passPreviousOutput: boolean;
   systemTools?: string[] | null;
+  type?: 'Agent' | 'Condition';
+  condition?: string | null;
+  trueNextClientId?: string | null;
+  falseNextClientId?: string | null;
 }
 
 export interface CreateWorkflowPayload {

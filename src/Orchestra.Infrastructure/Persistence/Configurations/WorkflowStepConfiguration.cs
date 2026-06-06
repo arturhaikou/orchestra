@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Orchestra.Domain.Entities;
+using Orchestra.Domain.Enums;
 
 namespace Orchestra.Infrastructure.Persistence.Configurations;
 
@@ -24,11 +25,12 @@ public class WorkflowStepConfiguration : IEntityTypeConfiguration<WorkflowStep>
             .IsRequired();
 
         builder.Property(s => s.AgentId)
-            .IsRequired();
+            .IsRequired(false);
 
         builder.HasOne<Agent>()
             .WithMany()
             .HasForeignKey(s => s.AgentId)
+            .IsRequired(false)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.Property(s => s.InstructionOverride)
@@ -37,6 +39,20 @@ public class WorkflowStepConfiguration : IEntityTypeConfiguration<WorkflowStep>
         builder.Property(s => s.PassPreviousOutput)
             .IsRequired()
             .HasDefaultValue(false);
+
+        builder.Property(s => s.StepType)
+            .IsRequired()
+            .HasDefaultValue(WorkflowStepType.Agent)
+            .HasConversion<int>();
+
+        builder.Property(s => s.Condition)
+            .IsRequired(false);
+
+        builder.Property(s => s.TrueNextStepId)
+            .IsRequired(false);
+
+        builder.Property(s => s.FalseNextStepId)
+            .IsRequired(false);
 
         builder.HasIndex(s => s.WorkflowDefinitionId)
             .HasDatabaseName("IX_WorkflowSteps_WorkflowDefinitionId");

@@ -1,4 +1,4 @@
-import { MarkerType } from 'reactflow';
+import { MarkerType } from '@xyflow/react';
 import { statusColors, priorityColors, colorTokensHex } from './src/tokens';
 
 export const STATUSES = {

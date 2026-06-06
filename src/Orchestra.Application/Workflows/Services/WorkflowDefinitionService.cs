@@ -2,6 +2,7 @@ using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Workflows.DTOs;
 using Orchestra.Application.Workflows.Interfaces;
 using Orchestra.Domain.Entities;
+using Orchestra.Domain.Enums;
 
 namespace Orchestra.Application.Workflows.Services;
 
@@ -111,12 +112,44 @@ public class WorkflowDefinitionService : IWorkflowDefinitionService
 
     private static List<WorkflowStep> BuildSteps(Guid definitionId, List<CreateWorkflowStepRequest> requests)
     {
-        return requests.Select(r => WorkflowStep.Create(
-            definitionId,
-            r.Order,
-            r.AgentId,
-            r.InstructionOverride,
-            r.PassPreviousOutput)).ToList();
+        // Build a clientId → Guid map so cross-references can be resolved as real step IDs.
+        var clientIdToGuid = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+        foreach (var r in requests)
+        {
+            if (!string.IsNullOrWhiteSpace(r.ClientId))
+                clientIdToGuid[r.ClientId] = Guid.NewGuid();
+        }
+
+        return requests.Select(r =>
+        {
+            var stepId = !string.IsNullOrWhiteSpace(r.ClientId) && clientIdToGuid.TryGetValue(r.ClientId, out var existingId)
+                ? existingId
+                : Guid.NewGuid();
+
+            var stepType = string.Equals(r.Type, "Condition", StringComparison.OrdinalIgnoreCase)
+                ? WorkflowStepType.Condition
+                : WorkflowStepType.Agent;
+
+            Guid? trueNextStepId = null;
+            if (!string.IsNullOrWhiteSpace(r.TrueNextClientId) && clientIdToGuid.TryGetValue(r.TrueNextClientId, out var trueId))
+                trueNextStepId = trueId;
+
+            Guid? falseNextStepId = null;
+            if (!string.IsNullOrWhiteSpace(r.FalseNextClientId) && clientIdToGuid.TryGetValue(r.FalseNextClientId, out var falseId))
+                falseNextStepId = falseId;
+
+            return WorkflowStep.Create(
+                stepId,
+                definitionId,
+                r.Order,
+                r.AgentId,
+                r.InstructionOverride,
+                r.PassPreviousOutput,
+                stepType,
+                r.Condition,
+                trueNextStepId,
+                falseNextStepId);
+        }).ToList();
     }
 
     private async Task SaveStepSystemToolsAsync(
@@ -137,7 +170,11 @@ public class WorkflowDefinitionService : IWorkflowDefinitionService
         Dictionary<Guid, List<string>> systemToolsMap,
         CancellationToken cancellationToken)
     {
-        var agentIds = steps.Select(s => s.AgentId).Distinct().ToList();
+        var agentIds = steps
+            .Where(s => s.AgentId.HasValue)
+            .Select(s => s.AgentId!.Value)
+            .Distinct()
+            .ToList();
         var agents = await LoadAgentsAsync(agentIds, cancellationToken);
 
         var stepDtos = steps.Select(s => new WorkflowStepDto(
@@ -145,10 +182,14 @@ public class WorkflowDefinitionService : IWorkflowDefinitionService
             s.WorkflowDefinitionId,
             s.Order,
             s.AgentId,
-            agents.TryGetValue(s.AgentId, out var a) ? a.Name : "Unknown",
+            s.AgentId.HasValue && agents.TryGetValue(s.AgentId.Value, out var a) ? a.Name : "Condition",
             s.InstructionOverride,
             s.PassPreviousOutput,
-            systemToolsMap.GetValueOrDefault(s.Id, []))).ToList();
+            systemToolsMap.GetValueOrDefault(s.Id, []),
+            s.StepType.ToString(),
+            s.Condition,
+            s.TrueNextStepId,
+            s.FalseNextStepId)).ToList();
 
         return new WorkflowDefinitionDto(
             definition.Id,
@@ -161,7 +202,7 @@ public class WorkflowDefinitionService : IWorkflowDefinitionService
     }
 
     private async Task<Dictionary<Guid, Agent>> LoadAgentsAsync(
-        List<Guid> agentIds,
+        IEnumerable<Guid> agentIds,
         CancellationToken cancellationToken)
     {
         var result = new Dictionary<Guid, Agent>();

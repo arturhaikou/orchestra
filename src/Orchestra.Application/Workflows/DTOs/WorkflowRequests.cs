@@ -9,10 +9,15 @@ public record CreateWorkflowDefinitionRequest(
 
 public record CreateWorkflowStepRequest(
     int Order,
-    Guid AgentId,
+    Guid? AgentId,
     string? InstructionOverride,
     bool PassPreviousOutput,
-    List<string>? SystemTools = null
+    List<string>? SystemTools = null,
+    string? ClientId = null,
+    string? Type = null,
+    string? Condition = null,
+    string? TrueNextClientId = null,
+    string? FalseNextClientId = null
 );
 
 public record UpdateWorkflowDefinitionRequest(

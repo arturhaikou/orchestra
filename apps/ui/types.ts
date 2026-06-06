@@ -261,11 +261,15 @@ export interface WorkflowStep {
   id: string;
   workflowDefinitionId: string;
   order: number;
-  agentId: string;
+  agentId?: string | null;
   agentName: string;
   instructionOverride?: string | null;
   passPreviousOutput: boolean;
   systemTools: string[];
+  stepType?: 'Agent' | 'Condition';
+  condition?: string | null;
+  trueNextStepId?: string | null;
+  falseNextStepId?: string | null;
 }
 
 export interface WorkflowDefinition {

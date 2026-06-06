@@ -1,3 +1,4 @@
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Orchestra.Application.Agents.Models;
 using Orchestra.Application.Agents.Services;
@@ -28,6 +29,8 @@ public class WorkflowExecutionEngine : IWorkflowExecutionEngine
     private readonly INotificationService _notificationService;
     private readonly ITicketIdParsingService _ticketIdParsingService;
     private readonly IWorkflowSystemToolRegistry _systemToolRegistry;
+    private readonly IWorkspaceAIProviderRepository _aiProviderRepository;
+    private readonly IChatClientResolver _chatClientResolver;
     private readonly ILogger<WorkflowExecutionEngine> _logger;
 
     public WorkflowExecutionEngine(
@@ -41,6 +44,8 @@ public class WorkflowExecutionEngine : IWorkflowExecutionEngine
         INotificationService notificationService,
         ITicketIdParsingService ticketIdParsingService,
         IWorkflowSystemToolRegistry systemToolRegistry,
+        IWorkspaceAIProviderRepository aiProviderRepository,
+        IChatClientResolver chatClientResolver,
         ILogger<WorkflowExecutionEngine> logger)
     {
         _executionRepository = executionRepository;
@@ -53,6 +58,8 @@ public class WorkflowExecutionEngine : IWorkflowExecutionEngine
         _notificationService = notificationService;
         _ticketIdParsingService = ticketIdParsingService;
         _systemToolRegistry = systemToolRegistry;
+        _aiProviderRepository = aiProviderRepository;
+        _chatClientResolver = chatClientResolver;
         _logger = logger;
     }
 
@@ -148,18 +155,41 @@ public class WorkflowExecutionEngine : IWorkflowExecutionEngine
                 WorkflowExecutionStatus.Completed),
             cancellationToken);
 
-        var nextStepIndex = stepExecution.StepIndex + 1;
+        var currentStep = steps.FirstOrDefault(s => s.Order == stepExecution.StepIndex);
+        Guid? nextStepId = currentStep?.TrueNextStepId;
 
-        if (nextStepIndex >= steps.Count)
+        // Fall back to linear order for Agent steps that have no explicit routing.
+        if (nextStepId == null && currentStep?.StepType != WorkflowStepType.Condition)
+        {
+            var nextStepIndex = stepExecution.StepIndex + 1;
+            if (nextStepIndex >= steps.Count)
+            {
+                await CompleteWorkflowAsync(workflowExecution, cancellationToken);
+                return;
+            }
+            workflowExecution.AdvanceToStep(nextStepIndex);
+            await _executionRepository.UpdateAsync(workflowExecution, cancellationToken);
+            await ExecuteStepAsync(workflowExecution, steps, nextStepIndex, previousOutput: output, cancellationToken);
+            return;
+        }
+
+        if (nextStepId == null)
         {
             await CompleteWorkflowAsync(workflowExecution, cancellationToken);
             return;
         }
 
-        workflowExecution.AdvanceToStep(nextStepIndex);
+        var nextStep = steps.FirstOrDefault(s => s.Id == nextStepId.Value);
+        if (nextStep == null)
+        {
+            await CompleteWorkflowAsync(workflowExecution, cancellationToken);
+            return;
+        }
+
+        workflowExecution.AdvanceToStep(nextStep.Order);
         await _executionRepository.UpdateAsync(workflowExecution, cancellationToken);
 
-        await ExecuteStepAsync(workflowExecution, steps, nextStepIndex, previousOutput: output, cancellationToken);
+        await ExecuteStepAsync(workflowExecution, steps, nextStep.Order, previousOutput: output, cancellationToken);
     }
 
     public async Task HandleJobWaitingForInputAsync(
@@ -228,14 +258,30 @@ public class WorkflowExecutionEngine : IWorkflowExecutionEngine
         string? previousOutput,
         CancellationToken cancellationToken)
     {
-        var step = steps[stepIndex];
+        var step = steps.FirstOrDefault(s => s.Order == stepIndex) ?? steps[stepIndex];
 
-        var agent = await _agentDataAccess.GetByIdAsync(step.AgentId, cancellationToken);
+        // Condition steps are evaluated inline — no agent job needed.
+        if (step.StepType == WorkflowStepType.Condition)
+        {
+            await ExecuteConditionStepAsync(workflowExecution, steps, step, previousOutput, cancellationToken);
+            return;
+        }
+
+        if (!step.AgentId.HasValue)
+        {
+            _logger.LogError(
+                "Agent step {StepIndex} has no AgentId; failing workflow {ExecutionId}",
+                stepIndex, workflowExecution.Id);
+            await FailWorkflowAsync(workflowExecution, cancellationToken);
+            return;
+        }
+
+        var agent = await _agentDataAccess.GetByIdAsync(step.AgentId.Value, cancellationToken);
         if (agent is null)
         {
             _logger.LogError(
                 "Agent {AgentId} for workflow step {StepIndex} not found; failing workflow {ExecutionId}",
-                step.AgentId, stepIndex, workflowExecution.Id);
+                step.AgentId.Value, stepIndex, workflowExecution.Id);
 
             await FailWorkflowAsync(workflowExecution, cancellationToken);
             return;
@@ -325,6 +371,103 @@ public class WorkflowExecutionEngine : IWorkflowExecutionEngine
             else
                 await HandleJobCompletedAsync(jobId.Value, responseText, cancellationToken);
         }
+    }
+
+    private async Task ExecuteConditionStepAsync(
+        WorkflowExecution workflowExecution,
+        List<WorkflowStep> steps,
+        WorkflowStep step,
+        string? previousOutput,
+        CancellationToken cancellationToken)
+    {
+        _logger.LogInformation(
+            "Evaluating condition step {StepId} in workflow execution {ExecutionId}",
+            step.Id, workflowExecution.Id);
+
+        var stepExecution = WorkflowStepExecution.Create(workflowExecution.Id, step.Order);
+        await _executionRepository.AddStepExecutionAsync(stepExecution, cancellationToken);
+
+        await _notificationService.NotifyWorkflowStepStartedAsync(
+            new WorkflowStepStartedNotification(
+                workflowExecution.WorkspaceId,
+                workflowExecution.Id,
+                workflowExecution.TicketId,
+                step.Order),
+            cancellationToken);
+
+        bool conditionResult;
+        try
+        {
+            conditionResult = await EvaluateConditionAsync(
+                workflowExecution.WorkspaceId,
+                step.Condition ?? string.Empty,
+                previousOutput,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Condition evaluation failed for step {StepId}", step.Id);
+            stepExecution.MarkFailed();
+            await _executionRepository.UpdateStepExecutionAsync(stepExecution, cancellationToken);
+            await FailWorkflowAsync(workflowExecution, cancellationToken);
+            return;
+        }
+
+        var branchResult = conditionResult ? "true" : "false";
+        stepExecution.MarkCompleted(branchResult);
+        await _executionRepository.UpdateStepExecutionAsync(stepExecution, cancellationToken);
+
+        await _notificationService.NotifyWorkflowStepCompletedAsync(
+            new WorkflowStepCompletedNotification(
+                workflowExecution.WorkspaceId,
+                workflowExecution.Id,
+                workflowExecution.TicketId,
+                step.Order,
+                WorkflowExecutionStatus.Completed),
+            cancellationToken);
+
+        var nextStepId = conditionResult ? step.TrueNextStepId : step.FalseNextStepId;
+        if (nextStepId == null)
+        {
+            await CompleteWorkflowAsync(workflowExecution, cancellationToken);
+            return;
+        }
+
+        var nextStep = steps.FirstOrDefault(s => s.Id == nextStepId.Value);
+        if (nextStep == null)
+        {
+            await CompleteWorkflowAsync(workflowExecution, cancellationToken);
+            return;
+        }
+
+        workflowExecution.AdvanceToStep(nextStep.Order);
+        await _executionRepository.UpdateAsync(workflowExecution, cancellationToken);
+
+        await ExecuteStepAsync(workflowExecution, steps, nextStep.Order, previousOutput, cancellationToken);
+    }
+
+    private async Task<bool> EvaluateConditionAsync(
+        Guid workspaceId,
+        string condition,
+        string? context,
+        CancellationToken cancellationToken)
+    {
+        var aiConfig = await _aiProviderRepository.GetByWorkspaceIdAsync(workspaceId, cancellationToken);
+        var modelId = aiConfig?.DefaultModelId
+            ?? throw new InvalidOperationException(
+                $"No default AI model configured for workspace {workspaceId}. Configure a default model in provider settings.");
+
+        var chatClient = await _chatClientResolver.ResolveAsync(workspaceId, modelId, cancellationToken);
+
+        var prompt = string.IsNullOrWhiteSpace(context)
+            ? $"Condition: {condition}\n\nAnswer YES or NO only."
+            : $"Previous output:\n{context}\n\nCondition: {condition}\n\nAnswer YES or NO only.";
+
+        var response = await chatClient.GetResponseAsync(
+            [new ChatMessage(ChatRole.User, prompt)],
+            cancellationToken: cancellationToken);
+
+        return response.Text.Contains("YES", StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task<AgentContextInput> BuildStepContextAsync(

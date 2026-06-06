@@ -4,9 +4,13 @@ public record WorkflowStepDto(
     Guid Id,
     Guid WorkflowDefinitionId,
     int Order,
-    Guid AgentId,
+    Guid? AgentId,
     string AgentName,
     string? InstructionOverride,
     bool PassPreviousOutput,
-    List<string> SystemTools
+    List<string> SystemTools,
+    string StepType = "Agent",
+    string? Condition = null,
+    Guid? TrueNextStepId = null,
+    Guid? FalseNextStepId = null
 );
