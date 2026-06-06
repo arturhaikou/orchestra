@@ -107,7 +107,7 @@ public sealed class GithubCopilotCliClient : IAiCliClient
 
         await using var session = await _copilotClient.CreateSessionAsync(config, cancellationToken);
 
-        using var _ = session.On(evt => HandleSessionEvent(evt, stepWriter, jobId, workspaceId, toolStartTimes, _logger));
+        using var _ = session.On(evt => HandleSessionEvent(evt, stepWriter, jobId, workspaceId, toolStartTimes, _logger, cancellationToken));
 
         var response = await session.SendAndWaitAsync(
             new MessageOptions { Prompt = prompt },
@@ -162,8 +162,12 @@ public sealed class GithubCopilotCliClient : IAiCliClient
         Guid jobId,
         Guid workspaceId,
         ConcurrentDictionary<string, (string ToolName, Stopwatch Timer)> toolStartTimes,
-        ILogger? logger)
+        ILogger? logger,
+        CancellationToken cancellationToken = default)
     {
+        if (cancellationToken.IsCancellationRequested)
+            return;
+
         switch (evt)
         {
             case ToolExecutionStartEvent startEvt:

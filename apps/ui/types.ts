@@ -200,7 +200,7 @@ export interface CreateAgentFromTemplateRequest {
   selectedOptionalToolMethodNames?: string[];
 }
 
-export type JobStatus = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'WaitingForInput';
+export type JobStatus = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'WaitingForInput' | 'Cancelled';
 export type JobTriggerType = 'Ticket' | 'ManualApi' | 'Cli';
 export type JobStepType =
   | 'AgentStarted'
@@ -282,7 +282,7 @@ export interface WorkflowDefinition {
   updatedAt?: string | null;
 }
 
-export type WorkflowExecutionStatus = 'Pending' | 'Running' | 'WaitingForInput' | 'Completed' | 'Failed';
+export type WorkflowExecutionStatus = 'Pending' | 'Running' | 'WaitingForInput' | 'Completed' | 'Failed' | 'Cancelled';
 
 export interface WorkflowStepExecution {
   id: string;

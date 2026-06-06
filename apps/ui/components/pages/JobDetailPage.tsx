@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Play, CheckCircle, XCircle, Wrench, MessageSquare, Zap, ChevronRight, ChevronDown, FileText } from 'lucide-react';
+import { ChevronLeft, Play, CheckCircle, XCircle, Wrench, MessageSquare, Zap, ChevronRight, ChevronDown, FileText, Square } from 'lucide-react';
 import { marked } from 'marked';
 import { JobStep, JobStepType } from '../../types';
+import { cancelJob } from '../../services/jobService';
 import { useJobDetail } from '../../hooks/useJobDetail';
 import { useSignalRReady } from '../../hooks/useSignalRReady';
 import { onJobStepAdded, onJobStatusChanged } from '../../services/signalRService';
@@ -152,6 +153,20 @@ const JobDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { job, isLoading, error, refetch } = useJobDetail(jobId!);
   const isSignalRReady = useSignalRReady();
+  const [cancelling, setCancelling] = useState(false);
+
+  const isStoppable = job?.status === 'Running' || job?.status === 'WaitingForInput';
+
+  const handleStop = async () => {
+    if (!job) return;
+    setCancelling(true);
+    try {
+      await cancelJob(job.id);
+      refetch();
+    } catch {
+      setCancelling(false);
+    }
+  };
 
   useEffect(() => {
     if (!job || !isSignalRReady) return;
@@ -183,7 +198,19 @@ const JobDetailPage: React.FC = () => {
           <h1 className="text-xl font-bold text-text">{job.agentName}</h1>
           {job.ticketTitle && <p className="text-textMuted text-sm mt-1">{job.ticketTitle}</p>}
         </div>
-        <JobStatusBadge status={job.status} />
+        <div className="flex items-center gap-3">
+          {isStoppable && (
+            <button
+              onClick={handleStop}
+              disabled={cancelling}
+              className="flex items-center gap-1.5 text-red-400 hover:text-red-300 text-sm font-medium disabled:opacity-50"
+            >
+              <Square className="w-4 h-4" />
+              {cancelling ? 'Stopping…' : 'Stop'}
+            </button>
+          )}
+          <JobStatusBadge status={job.status} />
+        </div>
       </div>
 
       <InitialContextSection initialPrompt={job.initialPrompt} />

@@ -30,6 +30,12 @@ public interface IJobService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Cancels a running or waiting job and all its active child jobs.
+    /// Returns false if the job is not found or is already in a terminal state.
+    /// </summary>
+    Task<bool> CancelJobAsync(Guid jobId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Creates a parent workflow job that tracks the overall state of a workflow execution.
     /// </summary>
     Task<Guid> CreateWorkflowJobAsync(

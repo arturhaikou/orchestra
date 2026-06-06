@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Orchestra.Application.Agents.DTOs;
 using Orchestra.Application.Common.Interfaces;
+using Orchestra.Application.Jobs.Services;
+using Orchestra.Domain.Enums;
 using StackExchange.Redis;
 
 namespace Orchestra.ApiService.Controllers;
@@ -14,7 +16,8 @@ namespace Orchestra.ApiService.Controllers;
 public class AgentQuestionsController(
     IAgentQuestionRepository questionRepository,
     IConnectionMultiplexer redis,
-    INotificationService notificationService) : ControllerBase
+    INotificationService notificationService,
+    IJobService jobService) : ControllerBase
 {
     [HttpGet("agent-questions/global-pending")]
     public async Task<IActionResult> GetGlobalPendingAsync(CancellationToken cancellationToken)
@@ -94,8 +97,12 @@ public class AgentQuestionsController(
         if (question is null)
             return NotFound();
 
-        if (question.Status != Orchestra.Domain.Enums.QuestionStatus.Pending)
+        if (question.Status != QuestionStatus.Pending)
             return Conflict("Question has already been answered.");
+
+        var job = await jobService.GetJobAsync(question.JobId, cancellationToken);
+        if (job is null || job.Status is JobStatus.Cancelled or JobStatus.Completed or JobStatus.Failed)
+            return Conflict("Job is no longer active.");
 
         var answersJson = JsonSerializer.Serialize(request.Answers);
         await questionRepository.SaveAnswerAsync(questionId, answersJson, cancellationToken);

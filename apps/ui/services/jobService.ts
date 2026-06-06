@@ -27,3 +27,11 @@ export const getJobDetail = async (jobId: string): Promise<JobDetail> => {
   if (!response.ok) throw new Error('Failed to fetch job detail');
   return response.json();
 };
+
+export const cancelJob = async (jobId: string): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/${jobId}/cancel`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok && response.status !== 409) throw new Error('Failed to cancel job');
+};

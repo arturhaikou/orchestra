@@ -58,4 +58,15 @@ public class AgentQuestionRepository(AppDbContext db) : IAgentQuestionRepository
         question.RecordAnswer(answersJson);
         await db.SaveChangesAsync(cancellationToken);
     }
+
+    public Task<List<AgentQuestion>> GetPendingByJobAsync(Guid jobId, CancellationToken cancellationToken = default)
+        => db.AgentQuestions
+            .Where(q => q.JobId == jobId && q.Status == QuestionStatus.Pending)
+            .ToListAsync(cancellationToken);
+
+    public async Task UpdateAsync(AgentQuestion question, CancellationToken cancellationToken = default)
+    {
+        db.AgentQuestions.Update(question);
+        await db.SaveChangesAsync(cancellationToken);
+    }
 }

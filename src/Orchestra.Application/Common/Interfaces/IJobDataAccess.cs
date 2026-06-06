@@ -21,4 +21,6 @@ public interface IJobDataAccess
     Task AddStepAsync(JobStep step, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<JobStep>> GetStepsByJobIdAsync(Guid jobId, CancellationToken cancellationToken = default);
     Task<int> GetMaxSequenceAsync(Guid jobId, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Job>> GetActiveChildJobsAsync(Guid parentJobId, CancellationToken cancellationToken = default);
 }

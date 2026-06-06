@@ -12,12 +12,18 @@ public class JobFunctionCallingMiddlewareHandler
     private readonly IJobStepWriter _stepWriter;
     private readonly Guid _jobId;
     private readonly Guid _workspaceId;
+    private readonly CancellationToken _jobCancellationToken;
 
-    public JobFunctionCallingMiddlewareHandler(IJobStepWriter stepWriter, Guid jobId, Guid workspaceId)
+    public JobFunctionCallingMiddlewareHandler(
+        IJobStepWriter stepWriter,
+        Guid jobId,
+        Guid workspaceId,
+        CancellationToken jobCancellationToken = default)
     {
         _stepWriter = stepWriter;
         _jobId = jobId;
         _workspaceId = workspaceId;
+        _jobCancellationToken = jobCancellationToken;
     }
 
     public async ValueTask<object?> HandleAsync(
@@ -26,6 +32,8 @@ public class JobFunctionCallingMiddlewareHandler
         Func<FunctionInvocationContext, CancellationToken, ValueTask<object?>> next,
         CancellationToken cancellationToken)
     {
+        _jobCancellationToken.ThrowIfCancellationRequested();
+
         var inputJson = JsonSerializer.Serialize(context.Arguments);
         await _stepWriter.WriteAsync(
             _jobId,
@@ -39,6 +47,8 @@ public class JobFunctionCallingMiddlewareHandler
         var sw = Stopwatch.StartNew();
         var result = await next(context, cancellationToken);
         sw.Stop();
+
+        _jobCancellationToken.ThrowIfCancellationRequested();
 
         var outputJson = JsonSerializer.Serialize(result);
         await _stepWriter.WriteAsync(

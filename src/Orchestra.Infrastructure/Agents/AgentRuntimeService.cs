@@ -36,6 +36,7 @@ public class AgentRuntimeService : IAgentRuntimeService
     private readonly IAgentSkillDataAccess _agentSkillDataAccess;
     private readonly IAgentSkillFolderDataAccess _agentSkillFolderDataAccess;
     private readonly IWorkflowSystemToolRegistry _systemToolRegistry;
+    private readonly IJobCancellationRegistry _cancellationRegistry;
 
     // Status GUID from seeding
     private static readonly Guid CompletedStatusId = Guid.Parse("88888888-8888-8888-8888-888888888888");
@@ -56,7 +57,8 @@ public class AgentRuntimeService : IAgentRuntimeService
         ITicketIdParsingService ticketIdParsingService,
         IAgentSkillDataAccess agentSkillDataAccess,
         IAgentSkillFolderDataAccess agentSkillFolderDataAccess,
-        IWorkflowSystemToolRegistry systemToolRegistry)
+        IWorkflowSystemToolRegistry systemToolRegistry,
+        IJobCancellationRegistry cancellationRegistry)
     {
         _chatClientResolver = chatClientResolver;
         _agentDataAccess = agentDataAccess;
@@ -74,6 +76,7 @@ public class AgentRuntimeService : IAgentRuntimeService
         _agentSkillDataAccess = agentSkillDataAccess;
         _agentSkillFolderDataAccess = agentSkillFolderDataAccess;
         _systemToolRegistry = systemToolRegistry;
+        _cancellationRegistry = cancellationRegistry;
     }
 
     /// <inheritdoc/>
@@ -93,17 +96,25 @@ public class AgentRuntimeService : IAgentRuntimeService
         if (jobContext is not null)
             jobId = await CreateAndStartJobAsync(jobContext, cancellationToken);
 
+        using var userCts = new CancellationTokenSource();
+        using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, userCts.Token);
+
+        if (jobId.HasValue)
+            _cancellationRegistry.Register(jobId.Value, userCts);
+
+        combinedCts.Token.ThrowIfCancellationRequested();
+
         try
         {
             string result;
             JobTrackingContext? jobTracking = null;
 
             if (IsCliAgent(agentEntity))
-                result = await ExecuteCliAgentAsync(agentEntity, contextInput.TextPrompt, jobId, jobContext?.WorkspaceId, cancellationToken);
+                result = await ExecuteCliAgentAsync(agentEntity, contextInput.TextPrompt, jobId, jobContext?.WorkspaceId, combinedCts.Token);
             else
             {
                 jobTracking = jobId.HasValue && jobContext?.WorkspaceId is not null
-                    ? new JobTrackingContext(_jobStepWriter, jobId.Value, jobContext.WorkspaceId, jobContext.WorkflowExecutionId)
+                    ? new JobTrackingContext(_jobStepWriter, jobId.Value, jobContext.WorkspaceId, jobContext.WorkflowExecutionId, combinedCts.Token)
                     : null;
 
                 result = await ExecuteChatAgentAsync(
@@ -115,7 +126,7 @@ public class AgentRuntimeService : IAgentRuntimeService
                     contextInput.Images,
                     jobTracking,
                     jobContext?.WorkflowSystemTools,
-                    cancellationToken);
+                    combinedCts.Token);
             }
 
             if (jobId.HasValue && jobContext is not null)
@@ -133,6 +144,12 @@ public class AgentRuntimeService : IAgentRuntimeService
 
             return (result, jobId);
         }
+        catch (OperationCanceledException) when (jobId.HasValue && userCts.IsCancellationRequested)
+        {
+            // Job was cancelled by user via CancelJobAsync — already marked Cancelled in DB.
+            // Terminal-state guard in UpdateJobStatusAsync prevents double-write.
+            return (string.Empty, jobId);
+        }
         catch (Exception ex)
         {
             if (jobId.HasValue)
@@ -140,8 +157,13 @@ public class AgentRuntimeService : IAgentRuntimeService
                     jobId.Value,
                     JobStatus.Failed,
                     errorMessage: ex.Message,
-                    cancellationToken: cancellationToken);
+                    cancellationToken: CancellationToken.None);
             throw;
+        }
+        finally
+        {
+            if (jobId.HasValue)
+                _cancellationRegistry.Unregister(jobId.Value);
         }
     }
 
@@ -349,7 +371,10 @@ public class AgentRuntimeService : IAgentRuntimeService
     {
         var job = await _jobDataAccess.GetByIdAsync(jobId, cancellationToken)
             ?? throw new InvalidOperationException($"Job {jobId} not found.");
-        
+
+        if (job.Status is JobStatus.Cancelled or JobStatus.Completed or JobStatus.Failed)
+            return;
+
         var ticketId = job.TicketId;
 
         var agentEntity = await _agentDataAccess.GetByIdAsync(job.AgentId, cancellationToken)
@@ -364,7 +389,13 @@ public class AgentRuntimeService : IAgentRuntimeService
         var maxSequence = await _jobDataAccess.GetMaxSequenceAsync(jobId, cancellationToken);
         _jobStepWriter.InitializeSequence(maxSequence);
 
-        var jobTracking = new JobTrackingContext(_jobStepWriter, jobId, job.WorkspaceId);
+        using var userCts = new CancellationTokenSource();
+        using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, userCts.Token);
+        _cancellationRegistry.Register(jobId, userCts);
+
+        combinedCts.Token.ThrowIfCancellationRequested();
+
+        var jobTracking = new JobTrackingContext(_jobStepWriter, jobId, job.WorkspaceId, job.WorkflowExecutionId, combinedCts.Token);
 
         var aiFunctions = await _toolRetrieverService.GetAgentToolsAsync(
             job.AgentId, agentEntity.Model, agentEntity.ProjectPrinciples,
@@ -403,7 +434,7 @@ public class AgentRuntimeService : IAgentRuntimeService
                 null,
                 jobTracking,
                 session: session,
-                cancellationToken: cancellationToken);
+                cancellationToken: combinedCts.Token);
 
             if (jobTracking.SuspendedQuestionId is not null)
                 await _jobService.SuspendJobAsync(
@@ -435,11 +466,19 @@ public class AgentRuntimeService : IAgentRuntimeService
                 }
             }
         }
+        catch (OperationCanceledException) when (userCts.IsCancellationRequested)
+        {
+            // Job was cancelled by user — already marked Cancelled in DB via CancelJobAsync.
+        }
         catch (Exception ex)
         {
             await _jobService.UpdateJobStatusAsync(
-                jobId, JobStatus.Failed, errorMessage: ex.Message, cancellationToken: cancellationToken);
+                jobId, JobStatus.Failed, errorMessage: ex.Message, cancellationToken: CancellationToken.None);
             throw;
+        }
+        finally
+        {
+            _cancellationRegistry.Unregister(jobId);
         }
     }
 

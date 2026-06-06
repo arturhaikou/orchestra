@@ -26,6 +26,9 @@ builder.AddInfrastructureServices();
 // Register database migration worker
 builder.Services.AddHostedService<DatabaseMigrationWorker>();
 
+// Subscribe to cross-process job cancellation signals published by the API
+builder.Services.AddHostedService<Orchestra.Infrastructure.Jobs.JobCancellationSubscriber>();
+
 // Register agent execution worker
 builder.Services.AddHostedService<AgentExecutionWorker>();
 

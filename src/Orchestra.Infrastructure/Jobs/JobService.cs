@@ -5,6 +5,7 @@ using Orchestra.Application.Tickets.Common;
 using Orchestra.Application.Tickets.DTOs;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
+using StackExchange.Redis;
 
 namespace Orchestra.Infrastructure.Jobs;
 
@@ -14,6 +15,11 @@ public class JobService : IJobService
     private readonly INotificationService _notificationService;
     private readonly ITicketDataAccess _ticketDataAccess;
     private readonly ITicketIdParsingService _ticketIdParsingService;
+    private readonly IJobCancellationRegistry _cancellationRegistry;
+    private readonly IAgentQuestionRepository _questionRepository;
+    private readonly IConnectionMultiplexer _redis;
+
+    private const string CancellationChannel = "orchestra:job-cancellations";
 
     // Status GUIDs from seeding
     private static readonly Guid ToDoStatusId = Guid.Parse("66666666-6666-6666-6666-666666666666");
@@ -23,12 +29,18 @@ public class JobService : IJobService
         IJobDataAccess jobDataAccess,
         INotificationService notificationService,
         ITicketDataAccess ticketDataAccess,
-        ITicketIdParsingService ticketIdParsingService)
+        ITicketIdParsingService ticketIdParsingService,
+        IJobCancellationRegistry cancellationRegistry,
+        IAgentQuestionRepository questionRepository,
+        IConnectionMultiplexer redis)
     {
         _jobDataAccess = jobDataAccess;
         _notificationService = notificationService;
         _ticketDataAccess = ticketDataAccess;
         _ticketIdParsingService = ticketIdParsingService;
+        _cancellationRegistry = cancellationRegistry;
+        _questionRepository = questionRepository;
+        _redis = redis;
     }
 
     public async Task<Guid> CreateJobAsync(CreateJobRequest request, CancellationToken cancellationToken = default)
@@ -64,6 +76,9 @@ public class JobService : IJobService
     {
         var job = await _jobDataAccess.GetByIdAsync(jobId, cancellationToken);
         if (job is null)
+            return;
+
+        if (job.Status is JobStatus.Cancelled or JobStatus.Completed or JobStatus.Failed)
             return;
 
         ApplyStatusTransition(job, status, finalResponse, errorMessage);
@@ -176,6 +191,9 @@ public class JobService : IJobService
             case JobStatus.WaitingForInput:
                 job.MarkWaitingForInput();
                 break;
+            case JobStatus.Cancelled:
+                job.MarkCancelled();
+                break;
         }
     }
 
@@ -236,6 +254,45 @@ public class JobService : IJobService
         CancellationToken cancellationToken = default)
     {
         await UpdateJobStatusAsync(jobId, JobStatus.WaitingForInput, cancellationToken: cancellationToken);
+    }
+
+    public async Task<bool> CancelJobAsync(Guid jobId, CancellationToken cancellationToken = default)
+    {
+        var job = await _jobDataAccess.GetByIdAsync(jobId, cancellationToken);
+        if (job is null)
+            return false;
+
+        if (job.Status is JobStatus.Cancelled or JobStatus.Completed or JobStatus.Failed)
+            return false;
+
+        await UpdateJobStatusAsync(jobId, JobStatus.Cancelled, cancellationToken: cancellationToken);
+        _cancellationRegistry.TryCancel(jobId);
+        await _redis.GetSubscriber().PublishAsync(RedisChannel.Literal(CancellationChannel), jobId.ToString());
+
+        var children = await _jobDataAccess.GetActiveChildJobsAsync(jobId, cancellationToken);
+        foreach (var child in children)
+        {
+            await UpdateJobStatusAsync(child.Id, JobStatus.Cancelled, cancellationToken: cancellationToken);
+            _cancellationRegistry.TryCancel(child.Id);
+            await _redis.GetSubscriber().PublishAsync(RedisChannel.Literal(CancellationChannel), child.Id.ToString());
+        }
+
+        await DismissPendingQuestionsAsync(jobId, cancellationToken);
+        foreach (var child in children)
+            await DismissPendingQuestionsAsync(child.Id, cancellationToken);
+
+        return true;
+    }
+
+    private async Task DismissPendingQuestionsAsync(Guid jobId, CancellationToken cancellationToken)
+    {
+        var questions = await _questionRepository.GetPendingByJobAsync(jobId, cancellationToken);
+        foreach (var q in questions)
+        {
+            q.MarkCancelled();
+            await _questionRepository.UpdateAsync(q, cancellationToken);
+            await _notificationService.NotifyAgentQuestionAnsweredAsync(q.WorkspaceId, q.Id, cancellationToken);
+        }
     }
 
     public async Task<Guid> CreateWorkflowJobAsync(

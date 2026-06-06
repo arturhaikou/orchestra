@@ -6,5 +6,6 @@ public enum WorkflowExecutionStatus
     Running = 1,
     WaitingForInput = 2,
     Completed = 3,
-    Failed = 4
+    Failed = 4,
+    Cancelled = 5
 }

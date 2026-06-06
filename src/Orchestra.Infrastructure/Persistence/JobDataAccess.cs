@@ -99,4 +99,13 @@ public class JobDataAccess : IJobDataAccess
             .Where(j => j.Status == status)
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<Job>> GetActiveChildJobsAsync(Guid parentJobId, CancellationToken cancellationToken = default)
+    {
+        return await _context.Jobs
+            .AsNoTracking()
+            .Where(j => j.ParentJobId == parentJobId &&
+                        (j.Status == JobStatus.Running || j.Status == JobStatus.WaitingForInput))
+            .ToListAsync(cancellationToken);
+    }
 }

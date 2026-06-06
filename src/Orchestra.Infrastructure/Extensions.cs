@@ -9,6 +9,7 @@ using Orchestra.Application.Integrations.Services;
 using Orchestra.Application.Workspaces.Services;
 using Orchestra.Application.Tickets.Services;
 using Orchestra.Application.Jobs.Services;
+using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Agents.Services;
 using Orchestra.Application.Agents.Templates;
 using Orchestra.Application.Tools.Services;
@@ -120,6 +121,7 @@ public static class Extensions
         builder.Services.AddScoped<ITicketService, TicketService>();
         builder.Services.AddScoped<IJobDataAccess, JobDataAccess>();
         builder.Services.AddScoped<IJobStepWriter, JobStepWriter>();
+        builder.Services.AddSingleton<IJobCancellationRegistry, JobCancellationRegistry>();
         builder.Services.AddScoped<IJobService, JobService>();
         builder.Services.AddScoped<IAgentQuestionRepository, AgentQuestionRepository>();
         builder.Services.AddScoped<IConversationSnapshotRepository, ConversationSnapshotRepository>();

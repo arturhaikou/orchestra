@@ -23,6 +23,8 @@ public class JobChatClientMiddlewareHandler
         IChatClient innerChatClient,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var response = await innerChatClient.GetResponseAsync(
             messages,
             options,

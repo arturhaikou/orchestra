@@ -99,6 +99,7 @@ const JobsPage: React.FC = () => {
                     job={job}
                     stepJobs={childrenByParent.get(job.id) ?? []}
                     workspaceId={workspaceId}
+                    onCancelled={refetch}
                   />
                 );
               }
@@ -108,6 +109,7 @@ const JobsPage: React.FC = () => {
                   job={job}
                   workspaceId={workspaceId}
                   liveSteps={liveStepsMap.get(job.id) ?? []}
+                  onCancelled={refetch}
                 />
               );
             })}

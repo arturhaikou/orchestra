@@ -6,5 +6,6 @@ public enum JobStatus
     Running = 1,
     Completed = 2,
     Failed = 3,
-    WaitingForInput = 4
+    WaitingForInput = 4,
+    Cancelled = 5
 }

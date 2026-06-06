@@ -72,6 +72,12 @@ public class Job
         Status = JobStatus.WaitingForInput;
     }
 
+    public void MarkCancelled()
+    {
+        Status = JobStatus.Cancelled;
+        CompletedAt = DateTime.UtcNow;
+    }
+
     public void SetParent(Guid parentJobId)
     {
         ParentJobId = parentJobId;

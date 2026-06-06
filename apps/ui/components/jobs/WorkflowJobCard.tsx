@@ -1,18 +1,34 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GitBranch, ChevronDown, ChevronRight } from 'lucide-react';
+import { GitBranch, ChevronDown, ChevronRight, Square } from 'lucide-react';
 import { JobSummary } from '../../types';
 import JobStatusBadge from './JobStatusBadge';
+import { cancelJob } from '../../services/jobService';
 
 interface Props {
   job: JobSummary;
   stepJobs: JobSummary[];
   workspaceId: string;
+  onCancelled?: () => void;
 }
 
-const WorkflowJobCard: React.FC<Props> = ({ job, stepJobs, workspaceId }) => {
+const WorkflowJobCard: React.FC<Props> = ({ job, stepJobs, workspaceId, onCancelled }) => {
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState(true);
+  const [cancelling, setCancelling] = useState(false);
+
+  const isStoppable = job.status === 'Running' || job.status === 'WaitingForInput';
+
+  const handleStop = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCancelling(true);
+    try {
+      await cancelJob(job.id);
+      onCancelled?.();
+    } catch {
+      setCancelling(false);
+    }
+  };
 
   const duration = job.completedAt && job.startedAt
     ? Math.round((new Date(job.completedAt).getTime() - new Date(job.startedAt).getTime()) / 1000)
@@ -38,6 +54,16 @@ const WorkflowJobCard: React.FC<Props> = ({ job, stepJobs, workspaceId }) => {
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0 ml-2">
+          {isStoppable && (
+            <button
+              onClick={handleStop}
+              disabled={cancelling}
+              className="flex items-center gap-1 text-red-400 hover:text-red-300 text-xs font-medium disabled:opacity-50"
+            >
+              <Square className="w-3 h-3" />
+              {cancelling ? 'Stopping…' : 'Stop'}
+            </button>
+          )}
           <JobStatusBadge status={job.status} />
           {expanded
             ? <ChevronDown className="w-4 h-4 text-textMuted" />

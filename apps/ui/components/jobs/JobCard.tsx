@@ -1,16 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Ticket, Terminal, Globe,
-  Play, MessageSquare, Wrench, CheckCircle, Zap, XCircle, Bot,
+  Play, MessageSquare, Wrench, CheckCircle, Zap, XCircle, Bot, Square,
 } from 'lucide-react';
 import { JobStep, JobStepType, JobSummary } from '../../types';
 import JobStatusBadge from './JobStatusBadge';
+import { cancelJob } from '../../services/jobService';
 
 interface Props {
   job: JobSummary;
   workspaceId: string;
   liveSteps?: JobStep[];
+  onCancelled?: () => void;
 }
 
 const triggerIcon: Record<string, React.ReactNode> = {
@@ -60,18 +62,32 @@ const stepLabel = (step: JobStep): string => {
   }
 };
 
-const JobCard: React.FC<Props> = ({ job, workspaceId, liveSteps = [] }) => {
+const JobCard: React.FC<Props> = ({ job, workspaceId, liveSteps = [], onCancelled }) => {
   const navigate = useNavigate();
+  const [cancelling, setCancelling] = useState(false);
 
   const duration = job.completedAt && job.startedAt
     ? Math.round((new Date(job.completedAt).getTime() - new Date(job.startedAt).getTime()) / 1000)
     : null;
+
+  const isStoppable = job.status === 'Running' || job.status === 'WaitingForInput';
 
   const handleCardClick = () => navigate(`/workspaces/${workspaceId}/jobs/${job.id}`);
 
   const handleView = (e: React.MouseEvent) => {
     e.stopPropagation();
     navigate(`/workspaces/${workspaceId}/jobs/${job.id}`);
+  };
+
+  const handleStop = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCancelling(true);
+    try {
+      await cancelJob(job.id);
+      onCancelled?.();
+    } catch {
+      setCancelling(false);
+    }
   };
 
   return (
@@ -107,6 +123,16 @@ const JobCard: React.FC<Props> = ({ job, workspaceId, liveSteps = [] }) => {
         </span>
         {duration !== null && <span>{duration}s</span>}
         <span className="ml-auto">{new Date(job.createdAt).toLocaleString()}</span>
+        {isStoppable && (
+          <button
+            onClick={handleStop}
+            disabled={cancelling}
+            className="flex items-center gap-1 text-red-400 hover:text-red-300 text-xs font-medium disabled:opacity-50"
+          >
+            <Square className="w-3 h-3" />
+            {cancelling ? 'Stopping…' : 'Stop'}
+          </button>
+        )}
         <button
           onClick={handleView}
           className="text-primary hover:underline text-xs font-medium"

@@ -45,4 +45,10 @@ public class AgentQuestion
         Status = Orchestra.Domain.Enums.QuestionStatus.Answered;
         AnsweredAt = DateTime.UtcNow;
     }
+
+    public void MarkCancelled()
+    {
+        Status = Orchestra.Domain.Enums.QuestionStatus.Cancelled;
+        AnsweredAt = DateTime.UtcNow;
+    }
 }

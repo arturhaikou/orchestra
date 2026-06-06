@@ -6,12 +6,14 @@ public class JobTrackingContext(
     IJobStepWriter stepWriter,
     Guid jobId,
     Guid workspaceId,
-    Guid? workflowExecutionId = null)
+    Guid? workflowExecutionId = null,
+    CancellationToken jobCancellationToken = default)
 {
     public IJobStepWriter StepWriter { get; } = stepWriter;
     public Guid JobId { get; } = jobId;
     public Guid WorkspaceId { get; } = workspaceId;
     public Guid? WorkflowExecutionId { get; } = workflowExecutionId;
+    public CancellationToken JobCancellationToken { get; } = jobCancellationToken;
 
     /// <summary>
     /// Set by AskQuestionsFunction when the agent asks a question.

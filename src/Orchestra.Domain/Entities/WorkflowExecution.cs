@@ -57,6 +57,12 @@ public class WorkflowExecution
         CompletedAt = DateTime.UtcNow;
     }
 
+    public void MarkCancelled()
+    {
+        Status = WorkflowExecutionStatus.Cancelled;
+        CompletedAt = DateTime.UtcNow;
+    }
+
     public void AssignWorkflowJob(Guid jobId)
     {
         WorkflowJobId = jobId;

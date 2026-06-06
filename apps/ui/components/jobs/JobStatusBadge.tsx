@@ -9,6 +9,7 @@ const config: Record<JobStatus, { label: string; className: string }> = {
   Completed:      { label: 'Completed',      className: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' },
   Failed:         { label: 'Failed',         className: 'bg-red-500/10 text-red-400 border border-red-500/20' },
   WaitingForInput: { label: 'Waiting Input',  className: 'bg-orange-500/10 text-orange-400 border border-orange-500/20' },
+  Cancelled:       { label: 'Cancelled',       className: 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20' },
 };
 
 const JobStatusBadge: React.FC<Props> = ({ status }) => {

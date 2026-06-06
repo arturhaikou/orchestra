@@ -169,6 +169,14 @@ public class AgentOrchestrationService : IAgentOrchestrationService
             if (jobId.HasValue)
             {
                 var job = await _jobService.GetJobAsync(jobId.Value, cancellationToken);
+                if (job?.Status == JobStatus.Cancelled)
+                {
+                    _logger.LogInformation(
+                        "Job {JobId} was cancelled; leaving ticket {TicketId} status unchanged",
+                        jobId.Value,
+                        ticketId);
+                    return AgentExecutionResult.Failure("Cancelled");
+                }
                 if (job?.Status == JobStatus.WaitingForInput)
                 {
                     shouldMarkCompleted = false;

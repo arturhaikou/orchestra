@@ -11,6 +11,7 @@ using Orchestra.Application.Workflows.DTOs;
 using Orchestra.Application.Workflows.Interfaces;
 using Orchestra.Domain.Entities;
 using Orchestra.Domain.Enums;
+using System.Collections.Generic;
 
 namespace Orchestra.Infrastructure.Workflows;
 
@@ -61,6 +62,36 @@ public class WorkflowExecutionEngine : IWorkflowExecutionEngine
         _aiProviderRepository = aiProviderRepository;
         _chatClientResolver = chatClientResolver;
         _logger = logger;
+    }
+
+    public async Task<bool> CancelWorkflowAsync(
+        Guid workflowExecutionId,
+        CancellationToken cancellationToken = default)
+    {
+        var execution = await _executionRepository.GetByIdAsync(workflowExecutionId, cancellationToken);
+        if (execution is null)
+            return false;
+
+        if (execution.Status is WorkflowExecutionStatus.Completed or
+            WorkflowExecutionStatus.Failed or
+            WorkflowExecutionStatus.Cancelled)
+            return false;
+
+        execution.MarkCancelled();
+        await _executionRepository.UpdateAsync(execution, cancellationToken);
+
+        await _notificationService.NotifyWorkflowExecutionStatusChangedAsync(
+            new WorkflowExecutionStatusChangedNotification(
+                execution.WorkspaceId,
+                execution.Id,
+                execution.TicketId,
+                WorkflowExecutionStatus.Cancelled),
+            cancellationToken);
+
+        if (execution.WorkflowJobId.HasValue)
+            await _jobService.CancelJobAsync(execution.WorkflowJobId.Value, cancellationToken);
+
+        return true;
     }
 
     public async Task StartWorkflowAsync(
@@ -144,6 +175,9 @@ public class WorkflowExecutionEngine : IWorkflowExecutionEngine
         var workflowExecution = await _executionRepository.GetByIdAsync(stepExecution.WorkflowExecutionId, cancellationToken);
         if (workflowExecution is null) return;
 
+        if (workflowExecution.Status == WorkflowExecutionStatus.Cancelled)
+            return;
+
         var steps = await _definitionRepository.GetStepsByDefinitionIdAsync(workflowExecution.WorkflowDefinitionId, cancellationToken);
 
         await _notificationService.NotifyWorkflowStepCompletedAsync(
@@ -204,6 +238,9 @@ public class WorkflowExecutionEngine : IWorkflowExecutionEngine
 
         var workflowExecution = await _executionRepository.GetByIdAsync(stepExecution.WorkflowExecutionId, cancellationToken);
         if (workflowExecution is null) return;
+
+        if (workflowExecution.Status == WorkflowExecutionStatus.Cancelled)
+            return;
 
         workflowExecution.MarkWaitingForInput();
         await _executionRepository.UpdateAsync(workflowExecution, cancellationToken);
@@ -366,7 +403,9 @@ public class WorkflowExecutionEngine : IWorkflowExecutionEngine
         if (!stepFailed && jobId.HasValue)
         {
             var finishedJob = await _jobService.GetJobAsync(jobId.Value, cancellationToken);
-            if (finishedJob?.Status == JobStatus.WaitingForInput)
+            if (finishedJob?.Status == JobStatus.Cancelled)
+                return; // workflow was cancelled — stop the step chain
+            else if (finishedJob?.Status == JobStatus.WaitingForInput)
                 await HandleJobWaitingForInputAsync(jobId.Value, cancellationToken);
             else
                 await HandleJobCompletedAsync(jobId.Value, responseText, cancellationToken);

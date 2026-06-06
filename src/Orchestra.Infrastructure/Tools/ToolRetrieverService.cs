@@ -582,6 +582,9 @@ public class ToolRetrieverService : IToolRetrieverService
 
         Func<string, CancellationToken, Task<string?>> trackedCall = async (message, ct) =>
         {
+            var jobCt = capturedJobTracking.JobCancellationToken;
+            jobCt.ThrowIfCancellationRequested();
+
             var callStepId = await capturedJobTracking.StepWriter.WriteAsync(
                 capturedJobTracking.JobId,
                 capturedJobTracking.WorkspaceId,
@@ -590,7 +593,7 @@ public class ToolRetrieverService : IToolRetrieverService
                 toolName: capturedSubAgent.Name,
                 agentId: capturedSubAgent.Id,
                 agentName: capturedSubAgent.Name,
-                cancellationToken: ct);
+                cancellationToken: jobCt);
 
             try
             {
@@ -603,7 +606,9 @@ public class ToolRetrieverService : IToolRetrieverService
                 var nestedJobTracking = new JobTrackingContext(
                     scopedWriter,
                     capturedJobTracking.JobId,
-                    capturedJobTracking.WorkspaceId);
+                    capturedJobTracking.WorkspaceId,
+                    capturedJobTracking.WorkflowExecutionId,
+                    jobCt);
 
                 var subAgentTools = await GetAgentToolsInternalAsync(
                     capturedSubAgentId,
@@ -611,7 +616,7 @@ public class ToolRetrieverService : IToolRetrieverService
                     capturedSubAgent.ProjectPrinciples,
                     capturedDepth,
                     nestedJobTracking,
-                    ct);
+                    jobCt);
 
                 var result = await _chatAgentRunner.RunAsync(
                     capturedChatClient,
@@ -620,7 +625,9 @@ public class ToolRetrieverService : IToolRetrieverService
                     message,
                     null,
                     nestedJobTracking,
-                    ct);
+                    cancellationToken: jobCt);
+
+                jobCt.ThrowIfCancellationRequested();
 
                 if (nestedJobTracking.SuspendedQuestionId.HasValue)
                 {
@@ -636,12 +643,15 @@ public class ToolRetrieverService : IToolRetrieverService
                     toolName: capturedSubAgent.Name,
                     agentId: capturedSubAgent.Id,
                     agentName: capturedSubAgent.Name,
-                    cancellationToken: ct);
+                    cancellationToken: jobCt);
 
                 return result;
             }
             catch (Exception ex)
             {
+                if (jobCt.IsCancellationRequested)
+                    throw new OperationCanceledException(jobCt);
+
                 await capturedJobTracking.StepWriter.WriteAsync(
                     capturedJobTracking.JobId,
                     capturedJobTracking.WorkspaceId,
@@ -651,7 +661,7 @@ public class ToolRetrieverService : IToolRetrieverService
                     agentId: capturedSubAgent.Id,
                     agentName: capturedSubAgent.Name,
                     isError: true,
-                    cancellationToken: ct);
+                    cancellationToken: jobCt);
                 throw;
             }
         };
@@ -672,6 +682,9 @@ public class ToolRetrieverService : IToolRetrieverService
 
         Func<string, CancellationToken, Task<string?>> trackedCall = async (message, ct) =>
         {
+            var jobCt = capturedJobTracking.JobCancellationToken;
+            jobCt.ThrowIfCancellationRequested();
+
             var callStepId = await capturedJobTracking.StepWriter.WriteAsync(
                 capturedJobTracking.JobId,
                 capturedJobTracking.WorkspaceId,
@@ -680,7 +693,7 @@ public class ToolRetrieverService : IToolRetrieverService
                 toolName: capturedSubAgent.Name,
                 agentId: capturedSubAgent.Id,
                 agentName: capturedSubAgent.Name,
-                cancellationToken: ct);
+                cancellationToken: jobCt);
 
             try
             {
@@ -691,16 +704,17 @@ public class ToolRetrieverService : IToolRetrieverService
                     capturedSubAgent.Name);
 
                 var client = capturedIsReadOnly
-                    ? await _cliClientFactory.CreateReadOnlyClientAsync(capturedSubAgent.AiCliIntegrationId!.Value, capturedSubAgent.Model, capturedSubAgent.ReasoningEffort, ct)
-                    : await _cliClientFactory.CreateClientAsync(capturedSubAgent.AiCliIntegrationId!.Value, capturedSubAgent.Model, capturedSubAgent.ReasoningEffort, ct);
+                    ? await _cliClientFactory.CreateReadOnlyClientAsync(capturedSubAgent.AiCliIntegrationId!.Value, capturedSubAgent.Model, capturedSubAgent.ReasoningEffort, jobCt)
+                    : await _cliClientFactory.CreateClientAsync(capturedSubAgent.AiCliIntegrationId!.Value, capturedSubAgent.Model, capturedSubAgent.ReasoningEffort, jobCt);
 
-                await using var _ = client;
+                await using var cliClient = client;
+                using var killOnCancel = jobCt.Register(() => _ = cliClient.DisposeAsync().AsTask());
 
-                var subAgentCustomTools = (await GetAgentToolsAsync(capturedSubAgent.Id, cancellationToken: ct)).ToList();
+                var subAgentCustomTools = (await GetAgentToolsAsync(capturedSubAgent.Id, cancellationToken: jobCt)).ToList();
 
-                var agentSkills = await _agentSkillDataAccess.GetSkillsByAgentIdAsync(capturedSubAgent.Id, ct);
+                var agentSkills = await _agentSkillDataAccess.GetSkillsByAgentIdAsync(capturedSubAgent.Id, jobCt);
                 var skillNames = agentSkills.Select(s => s.Name).ToList();
-                var agentSkillFolders = await _agentSkillFolderDataAccess.GetFoldersByAgentIdAsync(capturedSubAgent.Id, ct);
+                var agentSkillFolders = await _agentSkillFolderDataAccess.GetFoldersByAgentIdAsync(capturedSubAgent.Id, jobCt);
                 var skillFolderPaths = agentSkillFolders.Select(sf => sf.FolderPath).ToList();
 
                 var result = await client.RunWithTrackingAsync(
@@ -713,7 +727,9 @@ public class ToolRetrieverService : IToolRetrieverService
                     customTools: subAgentCustomTools.Count > 0 ? subAgentCustomTools : null,
                     skillDirectories: skillFolderPaths.Count > 0 ? skillFolderPaths : null,
                     skillNames: skillNames.Count > 0 ? skillNames : null,
-                    cancellationToken: ct);
+                    cancellationToken: jobCt);
+
+                jobCt.ThrowIfCancellationRequested();
 
                 await capturedJobTracking.StepWriter.WriteAsync(
                     capturedJobTracking.JobId,
@@ -723,12 +739,15 @@ public class ToolRetrieverService : IToolRetrieverService
                     toolName: capturedSubAgent.Name,
                     agentId: capturedSubAgent.Id,
                     agentName: capturedSubAgent.Name,
-                    cancellationToken: ct);
+                    cancellationToken: jobCt);
 
                 return result;
             }
             catch (Exception ex)
             {
+                if (jobCt.IsCancellationRequested)
+                    throw new OperationCanceledException(jobCt);
+
                 await capturedJobTracking.StepWriter.WriteAsync(
                     capturedJobTracking.JobId,
                     capturedJobTracking.WorkspaceId,
@@ -738,7 +757,7 @@ public class ToolRetrieverService : IToolRetrieverService
                     agentId: capturedSubAgent.Id,
                     agentName: capturedSubAgent.Name,
                     isError: true,
-                    cancellationToken: ct);
+                    cancellationToken: jobCt);
                 throw;
             }
         };

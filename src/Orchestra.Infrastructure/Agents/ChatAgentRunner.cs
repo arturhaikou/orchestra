@@ -120,7 +120,8 @@ public class ChatAgentRunner : IChatAgentRunner
             var funcMiddleware = new JobFunctionCallingMiddlewareHandler(
                 jobTracking.StepWriter,
                 jobTracking.JobId,
-                jobTracking.WorkspaceId);
+                jobTracking.WorkspaceId,
+                jobTracking.JobCancellationToken);
 
             var agentWithMiddleware = agent
                 .AsBuilder()

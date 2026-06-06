@@ -21,4 +21,8 @@ public interface IAgentQuestionRepository
         Guid questionId,
         string answersJson,
         CancellationToken cancellationToken = default);
+
+    Task<List<AgentQuestion>> GetPendingByJobAsync(Guid jobId, CancellationToken cancellationToken = default);
+
+    Task UpdateAsync(AgentQuestion question, CancellationToken cancellationToken = default);
 }
