@@ -19,6 +19,7 @@ const statusLabel: Record<string, string> = {
   WaitingForInput: 'Waiting for input',
   Completed: 'Completed',
   Failed: 'Failed',
+  Cancelled: 'Cancelled',
 };
 
 const statusColor: Record<string, string> = {
@@ -27,6 +28,7 @@ const statusColor: Record<string, string> = {
   WaitingForInput: 'text-yellow-400 border-yellow-400/40 bg-yellow-400/5',
   Completed: 'text-green-400 border-green-400/40 bg-green-400/5',
   Failed: 'text-red-400 border-red-400/40 bg-red-400/5',
+  Cancelled: 'text-textMuted border-border',
 };
 
 const StepStatusIcon: React.FC<{ status: string }> = ({ status }) => {
@@ -34,6 +36,7 @@ const StepStatusIcon: React.FC<{ status: string }> = ({ status }) => {
   if (status === 'Failed') return <XCircle className="w-4 h-4 text-red-400" />;
   if (status === 'Running') return <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />;
   if (status === 'WaitingForInput') return <Pause className="w-4 h-4 text-yellow-400" />;
+  if (status === 'Cancelled') return <XCircle className="w-4 h-4 text-textMuted" />;
   return <Clock className="w-4 h-4 text-textMuted" />;
 };
 
@@ -114,7 +117,9 @@ const WorkflowExecutionView: React.FC<WorkflowExecutionViewProps> = ({ ticketId,
   const getStepStatus = (stepIndex: number): string => {
     if (!execution) return 'Pending';
     const se = execution.stepExecutions.find(s => s.stepIndex === stepIndex);
-    return se?.status ?? 'Pending';
+    const status = se?.status ?? 'Pending';
+    if (status === 'Running' && execution.status === 'Cancelled') return 'Cancelled';
+    return status;
   };
 
   const overallStatus = execution?.status ?? 'Pending';

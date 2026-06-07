@@ -9,10 +9,20 @@ const getAuthHeaders = () => ({
 });
 
 const questionAnsweredHandlers = new Set<(questionId: string) => void>();
+const questionsRefreshHandlers = new Set<() => void>();
 
 export const onQuestionAnswered = (handler: (questionId: string) => void): (() => void) => {
   questionAnsweredHandlers.add(handler);
   return () => questionAnsweredHandlers.delete(handler);
+};
+
+export const onQuestionsRefreshNeeded = (handler: () => void): (() => void) => {
+  questionsRefreshHandlers.add(handler);
+  return () => questionsRefreshHandlers.delete(handler);
+};
+
+export const triggerQuestionsRefresh = (): void => {
+  questionsRefreshHandlers.forEach(h => h());
 };
 
 export const getPendingQuestions = async (workspaceId: string): Promise<AgentQuestion[]> => {

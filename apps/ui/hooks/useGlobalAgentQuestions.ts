@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { GlobalAgentQuestion } from '../types';
-import { getGlobalPendingQuestions, onQuestionAnswered } from '../services/agentQuestionService';
-import { onGlobalAgentQuestionAsked, onGlobalAgentQuestionResolved, GlobalAgentQuestionEvent } from '../services/signalRService';
+import { getGlobalPendingQuestions, onQuestionAnswered, onQuestionsRefreshNeeded } from '../services/agentQuestionService';
+import { onGlobalAgentQuestionAsked, onGlobalAgentQuestionResolved, onWorkflowExecutionStatusChanged, onJobStatusChanged, GlobalAgentQuestionEvent } from '../services/signalRService';
 
 export function useGlobalAgentQuestions() {
   const [questions, setQuestions] = useState<GlobalAgentQuestion[]>([]);
@@ -53,6 +53,22 @@ export function useGlobalAgentQuestions() {
   useEffect(() => {
     return onQuestionAnswered(removeQuestion);
   }, [removeQuestion]);
+
+  useEffect(() => {
+    return onQuestionsRefreshNeeded(() => fetchInitial());
+  }, [fetchInitial]);
+
+  useEffect(() => {
+    return onWorkflowExecutionStatusChanged((event) => {
+      if (event.status === 'Cancelled') fetchInitial();
+    });
+  }, [fetchInitial]);
+
+  useEffect(() => {
+    return onJobStatusChanged((data) => {
+      if (data.newStatus === 'Cancelled') fetchInitial();
+    });
+  }, [fetchInitial]);
 
   return { questions, totalCount: questions.length, removeQuestion };
 }

@@ -269,20 +269,21 @@ public class NotificationService : INotificationService
         {
             var workspace = await _db.Workspaces
                 .FirstOrDefaultAsync(w => w.Id == workspaceId, cancellationToken);
-            if (workspace is null) return;
+            if (workspace is null)
+                return;
 
             var userGroupName = $"user-{workspace.OwnerId}";
             await _hubContext.Clients.Group(userGroupName)
                 .SendAsync("GlobalAgentQuestionResolved", new { questionId }, cancellationToken);
 
-            _logger.LogDebug(
-                "Dispatched GlobalAgentQuestionResolved. WorkspaceId={WorkspaceId} QuestionId={QuestionId}",
-                workspaceId, questionId);
+            var workspaceGroupName = $"workspace-{workspaceId}";
+            await _hubContext.Clients.Group(workspaceGroupName)
+                .SendAsync("AgentQuestionResolved", new { workspaceId, questionId }, cancellationToken);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex,
-                "Failed to dispatch GlobalAgentQuestionResolved. WorkspaceId={WorkspaceId} QuestionId={QuestionId}",
+                "Failed to dispatch AgentQuestionAnswered notifications. WorkspaceId={WorkspaceId} QuestionId={QuestionId}",
                 workspaceId, questionId);
         }
     }

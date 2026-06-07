@@ -1,6 +1,7 @@
 
 import { JobDetail, JobStatus, PagedJobsResult } from '../types';
 import { getToken } from './authService';
+import { triggerQuestionsRefresh } from './agentQuestionService';
 
 const API_BASE_URL = `${import.meta.env.VITE_API_URL}/v1/jobs`;
 
@@ -34,4 +35,5 @@ export const cancelJob = async (jobId: string): Promise<void> => {
     headers: getAuthHeaders(),
   });
   if (!response.ok && response.status !== 409) throw new Error('Failed to cancel job');
+  triggerQuestionsRefresh();
 };

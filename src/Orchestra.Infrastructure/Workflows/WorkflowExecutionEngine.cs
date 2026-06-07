@@ -270,6 +270,9 @@ public class WorkflowExecutionEngine : IWorkflowExecutionEngine
         var workflowExecution = await _executionRepository.GetByIdAsync(stepExecution.WorkflowExecutionId, cancellationToken);
         if (workflowExecution is null) return;
 
+        if (workflowExecution.Status == WorkflowExecutionStatus.Cancelled)
+            return;
+
         workflowExecution.AdvanceToStep(workflowExecution.CurrentStepIndex);
         await _executionRepository.UpdateAsync(workflowExecution, cancellationToken);
 

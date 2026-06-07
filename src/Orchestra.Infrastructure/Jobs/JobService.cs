@@ -270,6 +270,7 @@ public class JobService : IJobService
         await _redis.GetSubscriber().PublishAsync(RedisChannel.Literal(CancellationChannel), jobId.ToString());
 
         var children = await _jobDataAccess.GetActiveChildJobsAsync(jobId, cancellationToken);
+
         foreach (var child in children)
         {
             await UpdateJobStatusAsync(child.Id, JobStatus.Cancelled, cancellationToken: cancellationToken);
@@ -291,7 +292,7 @@ public class JobService : IJobService
         {
             q.MarkCancelled();
             await _questionRepository.UpdateAsync(q, cancellationToken);
-            await _notificationService.NotifyAgentQuestionAnsweredAsync(q.WorkspaceId, q.Id, cancellationToken);
+            await _notificationService.NotifyAgentQuestionAnsweredAsync(q.WorkspaceId, q.Id, CancellationToken.None);
         }
     }
 

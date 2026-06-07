@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { AgentQuestion } from '../types';
-import { getPendingQuestions, onQuestionAnswered } from '../services/agentQuestionService';
-import { onAgentQuestionAsked, onAgentQuestionResolved } from '../services/signalRService';
+import { getPendingQuestions, onQuestionAnswered, onQuestionsRefreshNeeded } from '../services/agentQuestionService';
+import { onAgentQuestionAsked, onAgentQuestionResolved, onWorkflowExecutionStatusChanged, onJobStatusChanged } from '../services/signalRService';
 
 export function useAgentQuestions(workspaceId: string | undefined) {
   const [questions, setQuestions] = useState<AgentQuestion[]>([]);
@@ -27,9 +27,17 @@ export function useAgentQuestions(workspaceId: string | undefined) {
   useEffect(() => {
     const unsubAsked = onAgentQuestionAsked(() => refetch());
     const unsubResolved = onAgentQuestionResolved(() => refetch());
+    const unsubCancelled = onWorkflowExecutionStatusChanged((event) => {
+      if (event.status === 'Cancelled') refetch();
+    });
+    const unsubJobCancelled = onJobStatusChanged((data) => {
+      if (data.newStatus === 'Cancelled') refetch();
+    });
     return () => {
       unsubAsked();
       unsubResolved();
+      unsubCancelled();
+      unsubJobCancelled();
     };
   }, [refetch]);
 
@@ -38,6 +46,10 @@ export function useAgentQuestions(workspaceId: string | undefined) {
       setQuestions(prev => prev.filter(q => q.id !== questionId));
     });
   }, []);
+
+  useEffect(() => {
+    return onQuestionsRefreshNeeded(() => refetch());
+  }, [refetch]);
 
   return { questions, pendingCount: questions.length, isLoading, refetch };
 }
