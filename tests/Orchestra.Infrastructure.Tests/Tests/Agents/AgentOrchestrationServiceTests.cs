@@ -69,7 +69,7 @@ public class AgentOrchestrationServiceTests
         
         var jobId = Guid.NewGuid();
         _agentRuntimeService
-            .ExecuteAgentAsync(agentId, Arg.Any<AgentContextInput>(), agent.Model, agent.ProjectPrinciples, Arg.Any<JobContext?>(), Arg.Any<CancellationToken>())
+            .ExecuteAgentAsync(agentId, Arg.Any<AgentContextInput>(), agent.Model, agent.ProjectPrinciples, Arg.Any<JobContext?>(), Arg.Any<Func<Guid, Task>?>(), Arg.Any<CancellationToken>())
             .Returns(("response", jobId));
         
         _jobService
@@ -150,7 +150,7 @@ public class AgentOrchestrationServiceTests
             .BuildAgentContextWithIntegrationsAsync(ticket, agent, Arg.Any<CancellationToken>())
             .Returns(AgentContextInput.TextOnly("context prompt"));
         _agentRuntimeService
-            .ExecuteAgentAsync(agentId, Arg.Any<AgentContextInput>(), agent.Model, agent.ProjectPrinciples, Arg.Any<JobContext?>(), Arg.Any<CancellationToken>())
+            .ExecuteAgentAsync(agentId, Arg.Any<AgentContextInput>(), agent.Model, agent.ProjectPrinciples, Arg.Any<JobContext?>(), Arg.Any<Func<Guid, Task>?>(), Arg.Any<CancellationToken>())
             .ThrowsAsync(new Exception("AI execution failed"));
 
         await _sut.ExecuteAgentForTicketAsync(ticketId);
@@ -202,7 +202,7 @@ public class AgentOrchestrationServiceTests
 
         var jobId = Guid.NewGuid();
         _agentRuntimeService
-            .ExecuteAgentAsync(agentId, Arg.Any<AgentContextInput>(), agent.Model, agent.ProjectPrinciples, Arg.Any<JobContext?>(), Arg.Any<CancellationToken>())
+            .ExecuteAgentAsync(agentId, Arg.Any<AgentContextInput>(), agent.Model, agent.ProjectPrinciples, Arg.Any<JobContext?>(), Arg.Any<Func<Guid, Task>?>(), Arg.Any<CancellationToken>())
             .Returns(("response", jobId));
 
         _jobService

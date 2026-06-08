@@ -158,7 +158,7 @@ public class AgentOrchestrationService : IAgentOrchestrationService
                 agentEntity.Model,
                 agentEntity.ProjectPrinciples,
                 jobContext,
-                cancellationToken);
+                cancellationToken: cancellationToken);
 
             _logger.LogInformation(
                 "Agent execution completed successfully for ticket {TicketId}",

@@ -52,6 +52,7 @@ public class AgentOrchestrationServiceModelRoutingTests
                 Arg.Any<string?>(),
                 Arg.Any<string?>(),
                 Arg.Any<JobContext?>(),
+                Arg.Any<Func<Guid, Task>?>(),
                 Arg.Any<CancellationToken>())
             .Returns(("Agent response", jobId));
 
@@ -139,6 +140,7 @@ public class AgentOrchestrationServiceModelRoutingTests
             agentModel,
             Arg.Any<string?>(),
             Arg.Any<JobContext?>(),
+            Arg.Any<Func<Guid, Task>?>(),
             Arg.Any<CancellationToken>());
     }
 
@@ -182,6 +184,7 @@ public class AgentOrchestrationServiceModelRoutingTests
             null,
             Arg.Any<string?>(),
             Arg.Any<JobContext?>(),
+            Arg.Any<Func<Guid, Task>?>(),
             Arg.Any<CancellationToken>());
     }
 }

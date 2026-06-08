@@ -62,6 +62,7 @@ public class WorkflowExecutionService : IWorkflowExecutionService
             execution.CurrentStepIndex,
             execution.StartedAt,
             execution.CompletedAt,
-            stepDtos);
+            stepDtos,
+            execution.WorkflowJobId);
     }
 }

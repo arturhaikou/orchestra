@@ -39,10 +39,13 @@ const WorkflowJobCard: React.FC<Props> = ({ job, stepJobs, workspaceId, onCancel
   );
 
   return (
-    <div className="bg-surface border border-border border-l-4 border-l-indigo-500/60 rounded-xl p-4 flex flex-col gap-3">
+    <div
+      className="bg-surface border border-border border-l-4 border-l-indigo-500/60 rounded-xl p-4 flex flex-col gap-3 cursor-pointer hover:border-indigo-400/50 transition-colors"
+      onClick={() => job.workflowExecutionId && navigate(`/workspaces/${workspaceId}/workflow-executions/${job.workflowExecutionId}`)}
+    >
       <div
-        className="flex justify-between items-start cursor-pointer"
-        onClick={() => setExpanded(e => !e)}
+        className="flex justify-between items-start"
+        onClick={e => { e.stopPropagation(); setExpanded(ex => !ex); }}
       >
         <div className="flex items-center gap-2 min-w-0">
           <GitBranch className="w-4 h-4 text-indigo-400 shrink-0" />
@@ -77,7 +80,7 @@ const WorkflowJobCard: React.FC<Props> = ({ job, stepJobs, workspaceId, onCancel
             <div
               key={step.id}
               className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-surfaceHighlight cursor-pointer transition-colors"
-              onClick={() => navigate(`/workspaces/${workspaceId}/jobs/${step.id}`)}
+              onClick={e => { e.stopPropagation(); navigate(`/workspaces/${workspaceId}/jobs/${step.id}`); }}
             >
               <span className="text-[11px] text-textMuted w-4 shrink-0 text-center font-mono">{idx + 1}</span>
               <span className="text-xs text-text flex-1 truncate">{step.agentName}</span>

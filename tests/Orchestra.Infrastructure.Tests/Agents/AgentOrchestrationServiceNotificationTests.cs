@@ -44,6 +44,7 @@ public class AgentOrchestrationServiceNotificationTests
                 Arg.Any<string?>(),
                 Arg.Any<string?>(),
                 Arg.Any<JobContext?>(),
+                Arg.Any<Func<Guid, Task>?>(),
                 Arg.Any<CancellationToken>())
             .Returns(("Agent response", jobId));
 
@@ -151,6 +152,7 @@ public class AgentOrchestrationServiceNotificationTests
                 Arg.Any<string?>(),
                 Arg.Any<string?>(),
                 Arg.Any<JobContext?>(),
+                Arg.Any<Func<Guid, Task>?>(),
                 Arg.Any<CancellationToken>())
             .ThrowsAsync(new InvalidOperationException("LLM timeout"));
 

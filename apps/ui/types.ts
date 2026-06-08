@@ -305,6 +305,7 @@ export interface WorkflowExecution {
   startedAt: string;
   completedAt?: string | null;
   stepExecutions: WorkflowStepExecution[];
+  workflowJobId?: string | null;
 }
 
 /** @deprecated Use WorkflowDefinition instead */

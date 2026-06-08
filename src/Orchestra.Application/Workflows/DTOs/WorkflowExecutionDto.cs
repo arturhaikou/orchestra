@@ -11,5 +11,6 @@ public record WorkflowExecutionDto(
     int CurrentStepIndex,
     DateTime StartedAt,
     DateTime? CompletedAt,
-    List<WorkflowStepExecutionDto> StepExecutions
+    List<WorkflowStepExecutionDto> StepExecutions,
+    Guid? WorkflowJobId
 );

@@ -27,6 +27,7 @@ import SkillFolderEditPage from './components/pages/SkillFolderEditPage';
 import JobsPage from './components/pages/JobsPage';
 import JobDetailPage from './components/pages/JobDetailPage';
 import WorkflowsPage from './components/pages/WorkflowsPage';
+import WorkflowExecutionPage from './components/pages/WorkflowExecutionPage';
 import Integrations from './components/Integrations';
 import TicketList from './components/TicketList';
 import AgentsList from './components/AgentsList';
@@ -159,6 +160,7 @@ const App: React.FC = () => {
           <Route path="skill-folders" element={<Navigate to="../skills" replace />} />
           <Route path="jobs" element={<JobsPage />} />
           <Route path="jobs/:jobId" element={<JobDetailPage />} />
+          <Route path="workflow-executions/:executionId" element={<WorkflowExecutionPage />} />
           <Route path="workflows" element={<WorkflowsPage />} />
           <Route path="mcp-servers/new" element={<CreateMcpServerPage />} />
           <Route path="mcp-servers/:serverId/edit" element={<EditMcpServerPage />} />

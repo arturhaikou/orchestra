@@ -24,6 +24,14 @@ public record WorkflowExecutionStatusChangedNotification(
     WorkflowExecutionStatus Status
 );
 
+public record WorkflowStepJobAssignedNotification(
+    Guid WorkspaceId,
+    Guid WorkflowExecutionId,
+    Guid TicketId,
+    int StepIndex,
+    Guid JobId
+);
+
 public record WorkflowTicketSwitchedNotification(
     Guid WorkspaceId,
     Guid WorkflowExecutionId,

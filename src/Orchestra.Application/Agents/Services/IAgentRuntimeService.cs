@@ -37,6 +37,7 @@ public interface IAgentRuntimeService
         string? agentModel = null,
         string? projectPrinciples = null,
         JobContext? jobContext = null,
+        Func<Guid, Task>? onJobCreated = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>

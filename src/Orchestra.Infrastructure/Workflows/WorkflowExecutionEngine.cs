@@ -377,16 +377,23 @@ public class WorkflowExecutionEngine : IWorkflowExecutionEngine
                 agent.Model,
                 agent.ProjectPrinciples,
                 jobContext,
+                onJobCreated: async id =>
+                {
+                    stepExecution.AssignJob(id);
+                    await _executionRepository.UpdateStepExecutionAsync(stepExecution, cancellationToken);
+                    await _notificationService.NotifyWorkflowStepJobAssignedAsync(
+                        new WorkflowStepJobAssignedNotification(
+                            workflowExecution.WorkspaceId,
+                            workflowExecution.Id,
+                            workflowExecution.TicketId,
+                            stepIndex,
+                            id),
+                        cancellationToken);
+                },
                 cancellationToken);
 
             responseText = text;
             jobId = createdJobId;
-
-            if (jobId.HasValue)
-            {
-                stepExecution.AssignJob(jobId.Value);
-                await _executionRepository.UpdateStepExecutionAsync(stepExecution, cancellationToken);
-            }
         }
         catch (Exception ex)
         {

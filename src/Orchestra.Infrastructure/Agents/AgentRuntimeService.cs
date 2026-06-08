@@ -86,6 +86,7 @@ public class AgentRuntimeService : IAgentRuntimeService
         string? agentModel = null,
         string? projectPrinciples = null,
         JobContext? jobContext = null,
+        Func<Guid, Task>? onJobCreated = null,
         CancellationToken cancellationToken = default)
     {
         var agentEntity = await _agentDataAccess.GetByIdAsync(agentId, cancellationToken);
@@ -94,7 +95,11 @@ public class AgentRuntimeService : IAgentRuntimeService
 
         Guid? jobId = null;
         if (jobContext is not null)
+        {
             jobId = await CreateAndStartJobAsync(jobContext, cancellationToken);
+            if (onJobCreated != null && jobId.HasValue)
+                await onJobCreated(jobId.Value);
+        }
 
         using var userCts = new CancellationTokenSource();
         using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, userCts.Token);

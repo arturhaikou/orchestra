@@ -463,6 +463,42 @@ public class NotificationService : INotificationService
         }
     }
 
+    public async Task NotifyWorkflowStepJobAssignedAsync(
+        WorkflowStepJobAssignedNotification notification,
+        CancellationToken cancellationToken = default)
+    {
+        var groupName = $"workspace-{notification.WorkspaceId}";
+
+        var payload = new
+        {
+            workflowExecutionId = notification.WorkflowExecutionId,
+            ticketId = notification.TicketId,
+            stepIndex = notification.StepIndex,
+            jobId = notification.JobId
+        };
+
+        try
+        {
+            await _hubContext.Clients.Group(groupName)
+                .SendAsync("WorkflowStepJobAssigned", payload, cancellationToken);
+
+            _logger.LogDebug(
+                "Dispatched WorkflowStepJobAssigned. WorkspaceId={WorkspaceId} ExecutionId={ExecutionId} StepIndex={StepIndex} JobId={JobId}",
+                notification.WorkspaceId,
+                notification.WorkflowExecutionId,
+                notification.StepIndex,
+                notification.JobId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Failed to dispatch WorkflowStepJobAssigned. WorkspaceId={WorkspaceId} ExecutionId={ExecutionId}",
+                notification.WorkspaceId,
+                notification.WorkflowExecutionId);
+        }
+    }
+
     public async Task NotifyWorkflowTicketSwitchedAsync(
         WorkflowTicketSwitchedNotification notification,
         CancellationToken cancellationToken = default)
