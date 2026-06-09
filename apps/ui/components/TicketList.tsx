@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bot, Sparkles, RefreshCw, X, Send, Loader2, MessageSquare, Plus, Save, Database, Globe, Workflow as WorkflowIcon, Flag, Activity, ChevronDown, Clock, ChevronRight, Layers, Smile, Meh, Frown, ExternalLink, Zap, Trash2, AlertTriangle, User, Github, Gitlab } from 'lucide-react';
+import { Bot, Sparkles, RefreshCw, X, Send, Loader2, MessageSquare, Plus, Save, Database, Globe, Workflow as WorkflowIcon, Flag, Activity, ChevronDown, Clock, ChevronRight, Layers, Smile, Meh, Frown, ExternalLink, Zap, Trash2, AlertTriangle, User } from 'lucide-react';
+import { SiGithub, SiGitlab, SiJira } from '@icons-pack/react-simple-icons';
 import ModalErrorBanner from './ModalErrorBanner';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { marked, Renderer } from 'marked';
@@ -26,19 +27,19 @@ const getProviderInfo = (source: string): ProviderInfo => {
   
   if (sourceUpper.includes('JIRA')) {
     return {
-      icon: <Layers className="w-4 h-4" />,
+      icon: <SiJira size={16} color="#0052CC" />,
       name: 'Jira',
       color: 'text-blue-500'
     };
   } else if (sourceUpper.includes('GITHUB')) {
     return {
-      icon: <Github className="w-4 h-4" />,
+      icon: <SiGithub size={16} color="#E8E8E8" />,
       name: 'GitHub',
       color: 'text-gray-400'
     };
   } else if (sourceUpper.includes('GITLAB')) {
     return {
-      icon: <Gitlab className="w-4 h-4" />,
+      icon: <SiGitlab size={16} color="#FC6D26" />,
       name: 'GitLab',
       color: 'text-orange-500'
     };

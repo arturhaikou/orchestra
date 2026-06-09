@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pencil, Terminal, Trash2, FolderOpen } from 'lucide-react';
+import { SiGithubcopilot, SiAnthropic, SiGooglegemini } from '@icons-pack/react-simple-icons';
 import { AiCliIntegration, AiCliProviderType } from '../../types';
 
 interface CliIntegrationCardProps {
@@ -15,6 +16,12 @@ const providerLabel: Record<AiCliProviderType, string> = {
   [AiCliProviderType.GEMINI]: 'Gemini',
 };
 
+const PROVIDER_ICONS: Record<AiCliProviderType, React.ReactElement> = {
+  [AiCliProviderType.GITHUB_COPILOT]: <SiGithubcopilot size={18} color="#000000" />,
+  [AiCliProviderType.CLAUDE]: <SiAnthropic size={18} color="#D4A574" />,
+  [AiCliProviderType.GEMINI]: <SiGooglegemini size={18} color="#8E75B2" />,
+};
+
 const CliIntegrationCard: React.FC<CliIntegrationCardProps> = ({
   integration,
   onEdit,
@@ -25,7 +32,7 @@ const CliIntegrationCard: React.FC<CliIntegrationCardProps> = ({
 
     <div className="flex items-start gap-3 px-3.5 pt-3.5 pb-2.5">
       <div className="w-9 h-9 rounded-lg bg-surfaceHighlight border border-border/50 flex items-center justify-center shrink-0">
-        <Terminal className="w-4 h-4 text-primary" />
+        {PROVIDER_ICONS[integration.provider] ?? <Terminal className="w-4 h-4 text-primary" />}
       </div>
       <div className="flex-1 min-w-0 pt-0.5">
         <span

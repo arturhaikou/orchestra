@@ -35,6 +35,7 @@ var copilotruntime = builder.AddNodeApp("copilotruntime", "../../apps/copilotkit
     .WaitFor(api);
 
 var ui = builder.AddViteApp("ui", "../../apps/ui")
+    .WithEndpoint("http", endpoint => endpoint.Port = 3002)
     .WithReference(api)
     .WithReference(copilotruntime)
     .WaitFor(api)

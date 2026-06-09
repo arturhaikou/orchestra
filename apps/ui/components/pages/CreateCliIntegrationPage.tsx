@@ -1,6 +1,7 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import { AlertTriangle, Loader2 } from 'lucide-react';
+import { SiGithubcopilot } from '@icons-pack/react-simple-icons';
 import { useCliIntegrationForm } from '../../hooks/useCliIntegrationForm';
 import { FolderPickerInput } from '../../components/cli/FolderPickerInput';
 
@@ -32,7 +33,7 @@ const CreateCliIntegrationPage: React.FC = () => {
           <div className="space-y-2">
             <label className="text-[10px] font-bold text-textMuted uppercase tracking-widest">Provider</label>
             <div className="inline-flex items-center gap-2 px-3 py-2 bg-surfaceHighlight border border-border rounded-lg text-sm text-text">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <SiGithubcopilot size={16} color="#E8E8E8" />
               GitHub Copilot
             </div>
             <p className="text-xs text-textMuted">Additional providers coming soon.</p>

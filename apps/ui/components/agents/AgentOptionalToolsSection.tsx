@@ -1,5 +1,5 @@
 import React from 'react';
-import { GitBranch, GitMerge } from 'lucide-react';
+import { SiGithub, SiGitlab } from '@icons-pack/react-simple-icons';
 import { OptionalToolDto } from '../../types';
 
 interface Props {
@@ -9,9 +9,9 @@ interface Props {
   readonly?: boolean;
 }
 
-const PROVIDER_ICONS: Record<string, React.ElementType> = {
-  GITHUB: GitBranch,
-  GITLAB: GitMerge,
+const PROVIDER_ICONS: Record<string, (props: { size?: number; className?: string }) => React.ReactElement> = {
+  GITHUB: ({ size = 18 }) => <SiGithub size={size} color="currentColor" />,
+  GITLAB: ({ size = 18 }) => <SiGitlab size={size} color="currentColor" />,
 };
 
 const AgentOptionalToolsSection: React.FC<Props> = ({
@@ -50,7 +50,7 @@ const AgentOptionalToolsSection: React.FC<Props> = ({
       <div className="flex flex-wrap gap-2">
         {Array.from(toolsByProvider.entries()).map(([provider, tools]) => {
           const selectedCount = tools.filter(t => selectedMethodNames.includes(t.methodName)).length;
-          const ProviderIcon = PROVIDER_ICONS[provider] ?? GitBranch;
+          const ProviderIcon = PROVIDER_ICONS[provider] ?? (({ size = 18 }) => <SiGithub size={size} color="currentColor" />);
 
           return (
             <div

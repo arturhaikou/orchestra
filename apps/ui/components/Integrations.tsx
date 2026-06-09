@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Layers, GitBranch, Gitlab, Database, Globe, Loader2, Trash2, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Plus, Layers, GitBranch, Database, Globe, Loader2, Trash2, AlertTriangle, RefreshCw } from 'lucide-react';
+import { SiGithub, SiGitlab, SiJira, SiConfluence } from '@icons-pack/react-simple-icons';
 import { Integration, IntegrationType } from '../types';
 import { getIntegrations, deleteIntegration } from '../services/integrationService';
 import { useParams, useNavigate, Link } from 'react-router-dom';
@@ -62,10 +63,10 @@ const Integrations: React.FC = () => {
 
   const renderIcon = (providerName: string) => {
     switch (providerName) {
-      case 'jira': return <Layers className="w-5 h-5 text-indigo-500" />;
-      case 'confluence': return <Database className="w-5 h-5 text-blue-400" />;
-      case 'github': return <GitBranch className="w-5 h-5 text-orange-500" />;
-      case 'gitlab': return <Gitlab className="w-5 h-5 text-orange-500" />;
+      case 'jira': return <SiJira size={20} color="#0052CC" />;
+      case 'confluence': return <SiConfluence size={20} color="#1868DB" />;
+      case 'github': return <SiGithub size={20} color="#E8E8E8" />;
+      case 'gitlab': return <SiGitlab size={20} color="#FC6D26" />;
       default: return <Globe className="w-5 h-5 text-zinc-600" />;
     }
   };
