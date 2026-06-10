@@ -37,6 +37,7 @@ import WorkspaceModals from './components/WorkspaceModals/WorkspaceModals';
 import Toast from './components/Toast';
 import { Workspace } from './types';
 import { getToken, logout } from './services/authService';
+import { getWorkspaces } from './services/workspaceService';
 import AuthGuard from './components/AuthGuard';
 import WorkspaceLayout from './components/WorkspaceLayout';
 import PostLoginRedirect from './components/PostLoginRedirect';
@@ -199,10 +200,28 @@ const App: React.FC = () => {
           setIsDeleteModalOpen(false);
           setWorkspaceInAction(null);
         }}
-        onWorkspaceDeleted={(id) => {
+        onWorkspaceDeleted={async (id) => {
           setIsDeleteModalOpen(false);
           setWorkspaceInAction(null);
-          navigate('/workspaces/new');
+          
+          try {
+            // Fetch remaining workspaces after deletion
+            const remainingWorkspaces = await getWorkspaces();
+            
+            if (remainingWorkspaces.length > 0) {
+              // Redirect to first available workspace
+              const firstWorkspace = remainingWorkspaces[0];
+              localStorage.setItem('nexus_active_workspace', firstWorkspace.id);
+              navigate(`/workspaces/${firstWorkspace.id}/tickets`);
+            } else {
+              // No workspaces remaining, redirect to creation flow
+              navigate('/workspaces/new');
+            }
+          } catch (error) {
+            console.error('Failed to fetch remaining workspaces after deletion:', error);
+            // Fallback to creation flow on error
+            navigate('/workspaces/new');
+          }
         }}
         onToast={(message, type) => {
           setAppToast({ message, type });
