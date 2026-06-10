@@ -20,7 +20,7 @@ const TransportTypeSelector: React.FC<TransportTypeSelectorProps> = ({
   <div
     role="group"
     aria-label="Transport type"
-    className="inline-flex bg-raised border border-border rounded-md p-0.5 gap-0.5 mb-5"
+    className="inline-flex bg-surfaceHighlight border border-border rounded-md p-0.5 gap-0.5 mb-5"
   >
     {TRANSPORT_OPTIONS.map((option) => (
       <button

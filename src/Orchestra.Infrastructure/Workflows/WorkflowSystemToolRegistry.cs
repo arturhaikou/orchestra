@@ -1,6 +1,6 @@
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Jobs.DTOs;
 using Orchestra.Application.Workflows.Interfaces;
 using Orchestra.Infrastructure.Tools.WorkflowTools;
@@ -9,20 +9,12 @@ namespace Orchestra.Infrastructure.Workflows;
 
 public class WorkflowSystemToolRegistry : IWorkflowSystemToolRegistry
 {
-    private readonly IWorkflowExecutionRepository _executionRepository;
-    private readonly ITicketDataAccess _ticketDataAccess;
-    private readonly INotificationService _notificationService;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILoggerFactory _loggerFactory;
 
-    public WorkflowSystemToolRegistry(
-        IWorkflowExecutionRepository executionRepository,
-        ITicketDataAccess ticketDataAccess,
-        INotificationService notificationService,
-        ILoggerFactory loggerFactory)
+    public WorkflowSystemToolRegistry(IServiceScopeFactory scopeFactory, ILoggerFactory loggerFactory)
     {
-        _executionRepository = executionRepository;
-        _ticketDataAccess = ticketDataAccess;
-        _notificationService = notificationService;
+        _scopeFactory = scopeFactory;
         _loggerFactory = loggerFactory;
     }
 
@@ -34,9 +26,7 @@ public class WorkflowSystemToolRegistry : IWorkflowSystemToolRegistry
         {
             "switch_workflow_ticket" => SwitchWorkflowTicketFunction.Create(
                 jobTracking,
-                _executionRepository,
-                _ticketDataAccess,
-                _notificationService,
+                _scopeFactory,
                 _loggerFactory.CreateLogger<WorkflowSystemToolRegistry>()),
             _ => null
         };

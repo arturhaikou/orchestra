@@ -61,8 +61,6 @@ public class ToolRetrieverServiceMcpTests
             _cliClientFactory,
             Substitute.For<IAgentSkillDataAccess>(),
             Substitute.For<IAgentSkillFolderDataAccess>(),
-            Substitute.For<IAgentQuestionRepository>(),
-            Substitute.For<INotificationService>(),
             _logger);
     }
 

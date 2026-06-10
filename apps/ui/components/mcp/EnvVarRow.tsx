@@ -39,7 +39,7 @@ const EnvVarRow: React.FC<EnvVarRowProps> = ({
             aria-label={`Environment variable key ${index}`}
             onChange={e => onChange(index, { key: e.target.value })}
             onBlur={() => onKeyBlur(index)}
-            className={`w-full bg-raised border text-text text-sm font-mono rounded-md
+            className={`w-full bg-surfaceHighlight border text-text text-sm font-mono rounded-md
                         px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/40
                         focus:border-primary transition-colors disabled:opacity-45
                         disabled:cursor-not-allowed ${hasKeyError ? 'border-red-500' : 'border-border'}`}
@@ -55,7 +55,7 @@ const EnvVarRow: React.FC<EnvVarRowProps> = ({
           aria-label={`Environment variable value ${index}`}
           onChange={e => onChange(index, { value: e.target.value })}
           onFocus={handleValueFocus}
-          className="flex-1 bg-raised border border-border text-text text-sm rounded-md
+          className="flex-1 bg-surfaceHighlight border border-border text-text text-sm rounded-md
                      px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/40
                      focus:border-primary transition-colors disabled:opacity-45
                      disabled:cursor-not-allowed"

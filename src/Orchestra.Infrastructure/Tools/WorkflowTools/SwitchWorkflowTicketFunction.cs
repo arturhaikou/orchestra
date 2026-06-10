@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Jobs.DTOs;
@@ -13,9 +14,7 @@ public static class SwitchWorkflowTicketFunction
 {
     public static AIFunction Create(
         JobTrackingContext jobTracking,
-        IWorkflowExecutionRepository executionRepository,
-        ITicketDataAccess ticketDataAccess,
-        INotificationService notificationService,
+        IServiceScopeFactory scopeFactory,
         ILogger logger)
     {
         return AIFunctionFactory.Create(
@@ -31,6 +30,11 @@ public static class SwitchWorkflowTicketFunction
 
                 if (!Guid.TryParse(integrationId, out var integrationGuid))
                     return $"Error: '{integrationId}' is not a valid integration ID.";
+
+                await using var scope = scopeFactory.CreateAsyncScope();
+                var executionRepository = scope.ServiceProvider.GetRequiredService<IWorkflowExecutionRepository>();
+                var ticketDataAccess = scope.ServiceProvider.GetRequiredService<ITicketDataAccess>();
+                var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
 
                 var execution = await executionRepository.GetByIdAsync(
                     jobTracking.WorkflowExecutionId.Value, cancellationToken);

@@ -12,16 +12,9 @@ interface AgentChatModalProps {
 }
 
 const AgentChatModal: React.FC<AgentChatModalProps> = ({ agent, workspaceId, onClose }) => {
-  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-      onClick={handleBackdropClick}
     >
       <div className="bg-surface border border-border rounded-xl shadow-2xl flex flex-col w-full max-w-2xl h-[80vh] mx-4 overflow-hidden">
         {/* Header */}

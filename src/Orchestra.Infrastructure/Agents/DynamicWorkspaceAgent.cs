@@ -144,7 +144,7 @@ public sealed class DynamicWorkspaceAgent : AIAgent
                 .Select(s => new AgentInlineSkill(new AgentSkillFrontmatter(s.Name, s.Description), s.Instructions))
                 .ToArray();
 
-            var builder = new AgentSkillsProviderBuilder().UseSkills(inlineSkills);
+            var builder = new AgentSkillsProviderBuilder().UseFileScriptRunner((_, script, args, sp, ct) => SkillScriptRunner.RunScriptAsync(script.FullPath, args, ct)).UseSkills(inlineSkills);
 
             foreach (var folderPath in context.SkillFolderPaths ?? [])
             {

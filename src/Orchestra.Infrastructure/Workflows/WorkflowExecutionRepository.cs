@@ -18,12 +18,14 @@ public class WorkflowExecutionRepository : IWorkflowExecutionRepository
     public async Task<WorkflowExecution?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await _context.WorkflowExecutions
+            .AsNoTracking()
             .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
     }
 
     public async Task<WorkflowExecution?> GetActiveByTicketIdAsync(Guid ticketId, CancellationToken cancellationToken = default)
     {
         return await _context.WorkflowExecutions
+            .AsNoTracking()
             .Where(e => e.TicketId == ticketId
                      && e.Status != WorkflowExecutionStatus.Completed
                      && e.Status != WorkflowExecutionStatus.Failed)
@@ -34,6 +36,7 @@ public class WorkflowExecutionRepository : IWorkflowExecutionRepository
     public async Task<List<WorkflowExecution>> GetByTicketIdAsync(Guid ticketId, CancellationToken cancellationToken = default)
     {
         return await _context.WorkflowExecutions
+            .AsNoTracking()
             .Where(e => e.TicketId == ticketId)
             .OrderByDescending(e => e.StartedAt)
             .ToListAsync(cancellationToken);

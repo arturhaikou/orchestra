@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Text.Json;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orchestra.Application.Agents.DTOs;
 using Orchestra.Application.Common.Interfaces;
@@ -14,8 +15,7 @@ public static class AskQuestionsFunction
     public static AIFunction Create(
         JobTrackingContext jobTracking,
         Guid agentId,
-        IAgentQuestionRepository questionRepository,
-        INotificationService notificationService,
+        IServiceScopeFactory scopeFactory,
         ILogger logger)
     {
         return AIFunctionFactory.Create(
@@ -29,6 +29,10 @@ public static class AskQuestionsFunction
                 QuestionItem[] questions,
                 CancellationToken cancellationToken) =>
             {
+                await using var scope = scopeFactory.CreateAsyncScope();
+                var questionRepository = scope.ServiceProvider.GetRequiredService<IAgentQuestionRepository>();
+                var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
+
                 var questionsJson = JsonSerializer.Serialize(questions);
 
                 var agentQuestion = AgentQuestion.Create(

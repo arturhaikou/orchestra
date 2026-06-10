@@ -97,10 +97,7 @@ const AddSkillsModal: React.FC<AddSkillsModalProps> = ({
       aria-label="Select skills"
     >
       {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onDiscard}
-      />
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
 
       {/* Modal panel */}
       <div className="relative z-10 w-full max-w-2xl bg-surface border border-border rounded-xl shadow-2xl flex flex-col max-h-[80vh]">

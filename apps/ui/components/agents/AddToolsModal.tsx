@@ -176,7 +176,6 @@ const AddToolsModal: React.FC<AddToolsModalProps> = ({
   return createPortal(
     <div
       className="fixed inset-0 z-50 flex flex-col bg-black/60 backdrop-blur-sm"
-      onClick={(e) => { if (e.target === e.currentTarget) handleDiscard(); }}
       data-testid="modal-backdrop"
     >
       <div

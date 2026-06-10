@@ -32,7 +32,7 @@ const ServerIdentitySection: React.FC<ServerIdentitySectionProps> = ({
         value={serverName}
         onChange={(e) => onChange(e.target.value)}
         disabled={isDisabled}
-        className="w-full bg-raised border border-border text-text text-sm rounded-md px-3 py-2.5
+        className="w-full bg-surfaceHighlight border border-border text-text text-sm rounded-md px-3 py-2.5
                    focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary
                    transition-colors disabled:opacity-45 disabled:cursor-not-allowed"
       />

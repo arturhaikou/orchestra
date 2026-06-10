@@ -1,4 +1,5 @@
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Reflection;
 using Microsoft.Agents.AI;
@@ -39,8 +40,6 @@ public class ToolRetrieverService : IToolRetrieverService
     private readonly IAiCliClientFactory _cliClientFactory;
     private readonly IAgentSkillDataAccess _agentSkillDataAccess;
     private readonly IAgentSkillFolderDataAccess _agentSkillFolderDataAccess;
-    private readonly IAgentQuestionRepository _agentQuestionRepository;
-    private readonly INotificationService _notificationService;
     private readonly ILogger<ToolRetrieverService> _logger;
 
     private const string ReviewPullRequestActionName = "review_pull_request";
@@ -77,8 +76,6 @@ public class ToolRetrieverService : IToolRetrieverService
         IAiCliClientFactory cliClientFactory,
         IAgentSkillDataAccess agentSkillDataAccess,
         IAgentSkillFolderDataAccess agentSkillFolderDataAccess,
-        IAgentQuestionRepository agentQuestionRepository,
-        INotificationService notificationService,
         ILogger<ToolRetrieverService> logger)
     {
         _serviceProvider = serviceProvider;
@@ -98,8 +95,6 @@ public class ToolRetrieverService : IToolRetrieverService
         _cliClientFactory = cliClientFactory;
         _agentSkillDataAccess = agentSkillDataAccess;
         _agentSkillFolderDataAccess = agentSkillFolderDataAccess;
-        _agentQuestionRepository = agentQuestionRepository;
-        _notificationService = notificationService;
         _logger = logger;
     }
 
@@ -159,8 +154,7 @@ public class ToolRetrieverService : IToolRetrieverService
             var askQuestionsTool = AskQuestionsFunction.Create(
                 jobTracking,
                 agentId,
-                _agentQuestionRepository,
-                _notificationService,
+                _serviceProvider.GetRequiredService<IServiceScopeFactory>(),
                 _logger);
 
             allFunctions.Add(askQuestionsTool);
@@ -949,9 +943,8 @@ public class ToolRetrieverService : IToolRetrieverService
             return null;
         }
 
-        // Step 2: Resolve service instance from DI
-        var serviceInstance = _serviceProvider.GetService(serviceInterfaceType);
-        if (serviceInstance == null)
+        // Step 2: Verify service is registered
+        if (_serviceProvider.GetService(serviceInterfaceType) == null)
         {
             _logger.LogWarning(
                 "Failed to resolve service for type: {ServiceType}. Ensure it is registered in DI.",
@@ -972,10 +965,13 @@ public class ToolRetrieverService : IToolRetrieverService
             return null;
         }
 
-        // Step 4: Create AIFunction using AIFunctionFactory
+        // Step 4: Create AIFunction via a per-invocation scope proxy so that concurrent
+        // tool calls each get their own AppDbContext and never share the same instance.
         try
         {
-            return AIFunctionFactory.Create(method, serviceInstance);
+            var scopeFactory = _serviceProvider.GetRequiredService<IServiceScopeFactory>();
+            var proxy = ScopedToolProxy.Create(scopeFactory, serviceInterfaceType);
+            return AIFunctionFactory.Create(method, proxy);
         }
         catch (Exception ex)
         {
@@ -1000,8 +996,7 @@ public class ToolRetrieverService : IToolRetrieverService
             return null;
         }
 
-        var serviceInstance = _serviceProvider.GetService(serviceInterfaceType);
-        if (serviceInstance == null)
+        if (_serviceProvider.GetService(serviceInterfaceType) == null)
         {
             _logger.LogWarning(
                 "Failed to resolve service for type: {ServiceType}.",
@@ -1013,15 +1008,18 @@ public class ToolRetrieverService : IToolRetrieverService
         // mutable parameters by reference.
         var capturedModel = modelIdentifier;
         var capturedPrinciples = projectPrinciples;
+        var capturedScopeFactory = _serviceProvider.GetRequiredService<IServiceScopeFactory>();
 
         if (serviceInterfaceType == typeof(IGitHubToolService))
         {
-            var service = (IGitHubToolService)serviceInstance;
-
             Func<string, string, string, Task<ReviewToolResult>> closure =
-                (workspaceId, integrationId, pullNumber) =>
-                    service.ReviewPullRequestAsync(
+                async (workspaceId, integrationId, pullNumber) =>
+                {
+                    await using var scope = capturedScopeFactory.CreateAsyncScope();
+                    var service = scope.ServiceProvider.GetRequiredService<IGitHubToolService>();
+                    return await service.ReviewPullRequestAsync(
                         workspaceId, integrationId, pullNumber, capturedModel, capturedPrinciples);
+                };
 
             return AIFunctionFactory.Create(
                 closure,
@@ -1031,12 +1029,14 @@ public class ToolRetrieverService : IToolRetrieverService
 
         if (serviceInterfaceType == typeof(IGitLabToolService))
         {
-            var service = (IGitLabToolService)serviceInstance;
-
             Func<string, string, string, Task<ReviewToolResult>> closure =
-                (workspaceId, integrationId, mrIid) =>
-                    service.ReviewMergeRequestAsync(
+                async (workspaceId, integrationId, mrIid) =>
+                {
+                    await using var scope = capturedScopeFactory.CreateAsyncScope();
+                    var service = scope.ServiceProvider.GetRequiredService<IGitLabToolService>();
+                    return await service.ReviewMergeRequestAsync(
                         workspaceId, integrationId, mrIid, capturedModel, capturedPrinciples);
+                };
 
             return AIFunctionFactory.Create(
                 closure,

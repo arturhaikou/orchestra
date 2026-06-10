@@ -217,7 +217,6 @@ const DeployBuiltInAgentModal: React.FC<DeployBuiltInAgentModalProps> = ({
   return (
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-      onClick={(e) => { if (e.target === e.currentTarget && !isDeploying) onClose(); }}
       role="dialog"
       aria-modal="true"
       aria-label={`Deploy ${template.name}`}

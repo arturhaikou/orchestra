@@ -65,7 +65,6 @@ const DeployMethodDialog: React.FC<DeployMethodDialogProps> = ({
   return (
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-      onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="deploy-dialog-title"
@@ -73,7 +72,6 @@ const DeployMethodDialog: React.FC<DeployMethodDialogProps> = ({
       <div
         ref={dialogRef}
         className="bg-surface border border-border w-full max-w-md rounded-xl shadow-2xl overflow-hidden animate-scale-in"
-        onClick={(e) => e.stopPropagation()}
       >
         <DialogHeader onClose={onClose} />
         <p className="px-6 text-sm text-textMuted">

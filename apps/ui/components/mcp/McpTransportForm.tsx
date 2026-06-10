@@ -146,7 +146,7 @@ const McpTransportForm: React.FC<McpTransportFormProps> = ({ workspaceId, onSucc
           value={name}
           onChange={e => setName(e.target.value)}
           required
-          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:border-primary"
+          className="w-full bg-surfaceHighlight border border-border rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:border-primary"
         />
       </div>
 
@@ -164,7 +164,7 @@ const McpTransportForm: React.FC<McpTransportFormProps> = ({ workspaceId, onSucc
               className={`flex-1 py-2 text-sm font-semibold transition-colors ${
                 transport === t
                   ? 'bg-primary/10 border-primary/40 text-primary'
-                  : 'text-textMuted hover:text-text bg-background'
+                  : 'text-textMuted hover:text-text bg-surfaceHighlight'
               }`}
             >
               {t === 'HTTP' ? 'HTTP' : 'stdio'}
@@ -186,7 +186,7 @@ const McpTransportForm: React.FC<McpTransportFormProps> = ({ workspaceId, onSucc
               onChange={e => { setEndpointUrl(e.target.value); setUrlError(''); }}
               required
               aria-label="Endpoint URL"
-              className={`w-full bg-background border rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:border-primary ${urlError ? 'border-red-500' : 'border-border'}`}
+              className={`w-full bg-surfaceHighlight border rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:border-primary ${urlError ? 'border-red-500' : 'border-border'}`}
             />
             {urlError && <p className="text-xs text-red-400 mt-1">{urlError}</p>}
           </div>
@@ -200,7 +200,7 @@ const McpTransportForm: React.FC<McpTransportFormProps> = ({ workspaceId, onSucc
               aria-label="Auth type"
               value={authType}
               onChange={e => setAuthType(e.target.value as AuthType)}
-              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:border-primary"
+              className="w-full bg-surfaceHighlight border border-border rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:border-primary"
             >
               <option value="API_KEY">API Key</option>
               <option value="NONE">None</option>
@@ -218,7 +218,7 @@ const McpTransportForm: React.FC<McpTransportFormProps> = ({ workspaceId, onSucc
                 value={apiKey}
                 onChange={e => setApiKey(e.target.value)}
                 aria-label="API Key"
-                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:border-primary"
+                className="w-full bg-surfaceHighlight border border-border rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:border-primary"
               />
             </div>
           )}
@@ -238,7 +238,7 @@ const McpTransportForm: React.FC<McpTransportFormProps> = ({ workspaceId, onSucc
               onChange={e => { setCommand(e.target.value); setCommandError(''); }}
               required
               aria-label="Command"
-              className={`w-full bg-background border rounded-lg px-3 py-2 text-sm font-mono text-text focus:outline-none focus:border-primary ${commandError ? 'border-red-500' : 'border-border'}`}
+              className={`w-full bg-surfaceHighlight border rounded-lg px-3 py-2 text-sm font-mono text-text focus:outline-none focus:border-primary ${commandError ? 'border-red-500' : 'border-border'}`}
             />
             {commandError && <p className="text-xs text-red-400 mt-1">{commandError}</p>}
           </div>
@@ -256,7 +256,7 @@ const McpTransportForm: React.FC<McpTransportFormProps> = ({ workspaceId, onSucc
                     value={arg}
                     onChange={e => setArgs(prev => prev.map((a, idx) => idx === i ? e.target.value : a))}
                     aria-label={`Argument ${i}`}
-                    className="flex-1 bg-background border border-border rounded-lg px-3 py-1.5 text-sm font-mono text-text focus:outline-none focus:border-primary"
+                    className="flex-1 bg-surfaceHighlight border border-border rounded-lg px-3 py-1.5 text-sm font-mono text-text focus:outline-none focus:border-primary"
                   />
                   <button
                     type="button"
@@ -291,7 +291,7 @@ const McpTransportForm: React.FC<McpTransportFormProps> = ({ workspaceId, onSucc
                     onChange={e => setEnvVars(prev => prev.map((v, idx) => idx === i ? { ...v, key: e.target.value } : v))}
                     placeholder="KEY"
                     aria-label={`Environment variable key ${i}`}
-                    className="flex-1 bg-background border border-border rounded-lg px-3 py-1.5 text-sm font-mono text-text focus:outline-none focus:border-primary"
+                    className="flex-1 bg-surfaceHighlight border border-border rounded-lg px-3 py-1.5 text-sm font-mono text-text focus:outline-none focus:border-primary"
                   />
                   <input
                     type="password"
@@ -299,7 +299,7 @@ const McpTransportForm: React.FC<McpTransportFormProps> = ({ workspaceId, onSucc
                     onChange={e => setEnvVars(prev => prev.map((v, idx) => idx === i ? { ...v, value: e.target.value } : v))}
                     placeholder="value"
                     aria-label={`Environment variable value ${i}`}
-                    className="flex-1 bg-background border border-border rounded-lg px-3 py-1.5 text-sm text-text focus:outline-none focus:border-primary"
+                    className="flex-1 bg-surfaceHighlight border border-border rounded-lg px-3 py-1.5 text-sm text-text focus:outline-none focus:border-primary"
                   />
                   <button
                     type="button"

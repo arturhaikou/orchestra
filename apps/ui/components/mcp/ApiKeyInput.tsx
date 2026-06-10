@@ -46,7 +46,7 @@ const ApiKeyInput: React.FC<ApiKeyInputProps> = ({
           maxLength={4096}
           disabled={isDisabled}
           placeholder={placeholder}
-          className={`w-full bg-raised border text-text text-sm rounded-md px-3 py-2.5 pr-10
+          className={`w-full bg-surfaceHighlight border text-text text-sm rounded-md px-3 py-2.5 pr-10
                       focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary
                       transition-colors disabled:opacity-45 disabled:cursor-not-allowed
                       ${showError ? 'border-red-400' : 'border-border'}`}

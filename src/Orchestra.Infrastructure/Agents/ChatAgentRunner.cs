@@ -71,7 +71,7 @@ public class ChatAgentRunner : IChatAgentRunner
                     s.Instructions))
                 .ToArray();
 
-            var builder = new AgentSkillsProviderBuilder().UseSkills(inlineSkills);
+            var builder = new AgentSkillsProviderBuilder().UseFileScriptRunner((_, script, args, sp, ct) => SkillScriptRunner.RunScriptAsync(script.FullPath, args, ct)).UseSkills(inlineSkills);
 
             foreach (var folder in skillFolders)
             {

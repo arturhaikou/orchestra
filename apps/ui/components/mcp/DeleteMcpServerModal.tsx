@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { McpServer } from '../../types';
 
@@ -62,20 +62,11 @@ const DeleteMcpServerModal: React.FC<DeleteMcpServerModalProps> = ({
     }
   };
 
-  const handleBackdropClick = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      if (isDeleting) return;
-      if (e.target === e.currentTarget) onCancel();
-    },
-    [isDeleting, onCancel],
-  );
-
   if (!server) return null;
 
   return (
     <div
       className="fixed inset-0 bg-black/60 backdrop-blur-[2px] flex items-center justify-center z-[200]"
-      onClick={handleBackdropClick}
     >
       <div
         ref={modalRef}

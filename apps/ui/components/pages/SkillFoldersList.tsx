@@ -134,10 +134,7 @@ const SkillFoldersList: React.FC = () => {
           role="dialog"
           aria-modal="true"
         >
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={handleCancelDelete}
-          />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
           <div className="relative z-10 w-full max-w-md bg-surface border border-border rounded-xl shadow-2xl p-6 space-y-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0">

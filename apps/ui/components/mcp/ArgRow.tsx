@@ -51,7 +51,7 @@ const ArgRow: React.FC<ArgRowProps> = ({
           aria-label={`Argument ${index}`}
           onChange={e => onChange(index, e.target.value)}
           onBlur={() => onBlur(index)}
-          className={`flex-1 bg-raised border text-text text-sm font-mono rounded-md px-3 py-1.5
+          className={`flex-1 bg-surfaceHighlight border text-text text-sm font-mono rounded-md px-3 py-1.5
                       focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary
                       transition-colors disabled:opacity-45 disabled:cursor-not-allowed
                       ${hasError ? 'border-red-500' : 'border-border'}`}

@@ -797,13 +797,11 @@ const TicketList: React.FC<TicketListProps> = () => {
 
       {/* Ticket Details Modal */}
       {selectedTicket && (
-        <div 
+        <div
           className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm animate-fade-in"
-          onClick={() => { setUpdateError(null); setSelectedTicket(null); }}
         >
-          <div 
+          <div
             className="bg-surface border border-border w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden flex flex-col h-[95vh] sm:h-[90vh] animate-scale-in"
-            onClick={e => e.stopPropagation()}
           >
             {/* Modal Header */}
             <div className="px-4 md:px-6 py-4 border-b border-border flex justify-between items-start bg-surfaceHighlight/30 shrink-0">

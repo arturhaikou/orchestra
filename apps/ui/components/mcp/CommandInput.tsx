@@ -27,7 +27,7 @@ const CommandInput: React.FC<CommandInputProps> = ({
         aria-label="Command"
         onChange={e => onChange(e.target.value)}
         onBlur={onBlur}
-        className={`w-full bg-raised border text-text text-sm font-mono rounded-md px-3 py-2.5
+        className={`w-full bg-surfaceHighlight border text-text text-sm font-mono rounded-md px-3 py-2.5
                     focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary
                     transition-colors disabled:opacity-45 disabled:cursor-not-allowed
                     ${hasError ? 'border-red-500' : 'border-border'}`}
