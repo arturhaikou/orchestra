@@ -37,6 +37,7 @@ import WorkspaceModals from './components/WorkspaceModals/WorkspaceModals';
 import Toast from './components/Toast';
 import { Workspace } from './types';
 import { getToken, logout } from './services/authService';
+import { getWorkspaces } from './services/workspaceService';
 import AuthGuard from './components/AuthGuard';
 import WorkspaceLayout from './components/WorkspaceLayout';
 import PostLoginRedirect from './components/PostLoginRedirect';
@@ -199,10 +200,21 @@ const App: React.FC = () => {
           setIsDeleteModalOpen(false);
           setWorkspaceInAction(null);
         }}
-        onWorkspaceDeleted={(id) => {
+        onWorkspaceDeleted={async (id) => {
           setIsDeleteModalOpen(false);
           setWorkspaceInAction(null);
-          navigate('/workspaces/new');
+          
+          try {
+            const remaining = await getWorkspaces();
+            if (remaining && remaining.length > 0) {
+              navigate(`/workspaces/${remaining[0].id}/tickets`);
+            } else {
+              navigate('/workspaces/new');
+            }
+          } catch (error) {
+            console.error('Failed to fetch remaining workspaces:', error);
+            navigate('/workspaces/new');
+          }
         }}
         onToast={(message, type) => {
           setAppToast({ message, type });
