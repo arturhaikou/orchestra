@@ -5,7 +5,7 @@ import ModalErrorBanner from './ModalErrorBanner';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { marked, Renderer } from 'marked';
 import { Ticket, TicketPriority, TicketStatus, Comment, WorkflowDefinition, Agent, TicketStatusChangedEvent } from '../types';
-import { onTicketStatusChanged, onReconnected } from '../services/signalRService';
+import { onTicketStatusChanged, onReconnected, onWorkflowTicketSwitched, WorkflowTicketSwitchedEvent } from '../services/signalRService';
 import { addComment, updateTicket, getTickets, getTicketById, convertToExternal, deleteTicket, getTicketStatuses, getTicketPriorities, generateSummary } from '../services/ticketService';
 import { getWorkflowDefinitions } from '../services/workflowService';
 import { getUser } from '../services/authService';
@@ -273,12 +273,31 @@ const TicketList: React.FC<TicketListProps> = () => {
       showStatusChangeToast(event.newStatus);
     };
 
+    const handleWorkflowTicketSwitched = (event: WorkflowTicketSwitchedEvent) => {
+      setTickets(prev => {
+        const hasNewTicket = prev.some(t => t.id === event.newTicketId);
+        if (!hasNewTicket) {
+          loadInitialTickets();
+          return prev;
+        }
+        return prev.map(t =>
+          t.id === event.newTicketId
+            ? { ...t, assignedWorkflowId: event.workflowId }
+            : t
+        );
+      });
+      setSuccessToast(`Workflow switched to ticket "${event.externalTicketKey}"`);
+      setTimeout(() => setSuccessToast(null), 5000);
+    };
+
     const unsubscribeTicketStatus = onTicketStatusChanged(handleTicketStatusChanged);
     const unsubscribeReconnected = onReconnected(loadInitialTickets);
+    const unsubscribeWorkflowSwitched = onWorkflowTicketSwitched(handleWorkflowTicketSwitched);
 
     return () => {
       unsubscribeTicketStatus();
       unsubscribeReconnected();
+      unsubscribeWorkflowSwitched();
     };
   }, [workspaceId]);
 

@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orchestra.Application.Common.Interfaces;
 using Orchestra.Application.Jobs.DTOs;
+using Orchestra.Application.Tickets.DTOs;
 using Orchestra.Application.Workflows.DTOs;
 using Orchestra.Application.Workflows.Interfaces;
 using Orchestra.Domain.Entities;
@@ -35,6 +36,7 @@ public static class SwitchWorkflowTicketFunction
                 var executionRepository = scope.ServiceProvider.GetRequiredService<IWorkflowExecutionRepository>();
                 var ticketDataAccess = scope.ServiceProvider.GetRequiredService<ITicketDataAccess>();
                 var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
+                var ticketIdParsingService = scope.ServiceProvider.GetRequiredService<ITicketIdParsingService>();
 
                 var execution = await executionRepository.GetByIdAsync(
                     jobTracking.WorkflowExecutionId.Value, cancellationToken);
@@ -61,10 +63,32 @@ public static class SwitchWorkflowTicketFunction
                 execution.SwitchActiveTicket(ticket.Id);
                 await executionRepository.UpdateAsync(execution, cancellationToken);
 
+                // Transition old ticket → Completed
+                var previousTicket = await ticketDataAccess.GetTicketByIdAsync(previousTicketId, cancellationToken);
+                if (previousTicket is not null)
+                {
+                    previousTicket.UpdateStatus(Guid.Parse("88888888-8888-8888-8888-888888888888"));
+                    await ticketDataAccess.UpdateTicketAsync(previousTicket, cancellationToken);
+                    var prevCompositeId = BuildNotificationTicketId(previousTicket, ticketIdParsingService);
+                    await notificationService.NotifyTicketStatusChangedAsync(
+                        new TicketStatusChangedNotification(execution.WorkspaceId, prevCompositeId, "Completed", "In Progress"),
+                        cancellationToken);
+                }
+
+                // Assign workflow + transition new ticket → In Progress
+                ticket.UpdateAssignments(ticket.AssignedAgentId, null, execution.WorkflowDefinitionId, execution.WorkspaceId);
+                ticket.UpdateStatus(Guid.Parse("77777777-7777-7777-7777-777777777777"));
+                await ticketDataAccess.UpdateTicketAsync(ticket, cancellationToken);
+                var newCompositeId = BuildNotificationTicketId(ticket, ticketIdParsingService);
+                await notificationService.NotifyTicketStatusChangedAsync(
+                    new TicketStatusChangedNotification(execution.WorkspaceId, newCompositeId, "In Progress", "To Do"),
+                    cancellationToken);
+
                 await notificationService.NotifyWorkflowTicketSwitchedAsync(
                     new WorkflowTicketSwitchedNotification(
                         WorkspaceId: execution.WorkspaceId,
                         WorkflowExecutionId: execution.Id,
+                        WorkflowId: execution.WorkflowDefinitionId,
                         PreviousTicketId: previousTicketId,
                         NewTicketId: ticket.Id,
                         ExternalTicketKey: externalTicketKey),
@@ -83,4 +107,9 @@ public static class SwitchWorkflowTicketFunction
                 "to make all subsequent workflow steps work on the newly created ticket instead of the original one. " +
                 "Pass the external issue key (e.g. 'PROJ-123') and the integration ID.");
     }
+
+    private static string BuildNotificationTicketId(Ticket ticket, ITicketIdParsingService svc) =>
+        ticket.IntegrationId.HasValue && !string.IsNullOrEmpty(ticket.ExternalTicketId)
+            ? svc.BuildCompositeId(ticket.IntegrationId.Value, ticket.ExternalTicketId)
+            : ticket.Id.ToString();
 }

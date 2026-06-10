@@ -565,8 +565,8 @@ public class WorkflowExecutionEngine : IWorkflowExecutionEngine
         workflowExecution.MarkCompleted();
         await _executionRepository.UpdateAsync(workflowExecution, cancellationToken);
 
-        // Update associated ticket status to Completed
-        await UpdateTicketCompletedAsync(workflowExecution.TicketId, cancellationToken);
+        // Update associated ticket status to Completed (use active ticket if switched)
+        await UpdateTicketCompletedAsync(workflowExecution.ActiveTicketId ?? workflowExecution.TicketId, cancellationToken);
 
         if (workflowExecution.WorkflowJobId.HasValue)
             await _jobService.UpdateJobStatusAsync(
@@ -592,8 +592,9 @@ public class WorkflowExecutionEngine : IWorkflowExecutionEngine
     {
         workflowExecution.MarkFailed();
         await _executionRepository.UpdateAsync(workflowExecution, cancellationToken);
-        // Update associated ticket status to Completed
-        await UpdateTicketCompletedAsync(workflowExecution.TicketId, cancellationToken);
+        var effectiveTicketId = workflowExecution.ActiveTicketId ?? workflowExecution.TicketId;
+        // Update associated ticket status to Completed (use active ticket if switched)
+        await UpdateTicketCompletedAsync(effectiveTicketId, cancellationToken);
         if (workflowExecution.WorkflowJobId.HasValue)
             await _jobService.UpdateJobStatusAsync(
                 workflowExecution.WorkflowJobId.Value,
@@ -609,7 +610,7 @@ public class WorkflowExecutionEngine : IWorkflowExecutionEngine
                 WorkflowExecutionStatus.Failed),
             cancellationToken);
 
-        await RevertTicketToDoAsync(workflowExecution.TicketId, cancellationToken);
+        await RevertTicketToDoAsync(effectiveTicketId, cancellationToken);
     }
 
     private async Task RevertTicketToDoAsync(Guid ticketId, CancellationToken cancellationToken)

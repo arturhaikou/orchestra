@@ -35,6 +35,7 @@ public record WorkflowStepJobAssignedNotification(
 public record WorkflowTicketSwitchedNotification(
     Guid WorkspaceId,
     Guid WorkflowExecutionId,
+    Guid WorkflowId,
     Guid PreviousTicketId,
     Guid NewTicketId,
     string ExternalTicketKey

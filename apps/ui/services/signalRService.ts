@@ -271,6 +271,7 @@ export interface WorkflowStepJobAssignedEvent {
 export interface WorkflowTicketSwitchedEvent {
   workspaceId: string;
   workflowExecutionId: string;
+  workflowId: string;
   previousTicketId: string;
   newTicketId: string;
   externalTicketKey: string;

@@ -50,6 +50,11 @@ public class WorkflowExecutionRepository : IWorkflowExecutionRepository
 
     public async Task UpdateAsync(WorkflowExecution execution, CancellationToken cancellationToken = default)
     {
+        var tracked = _context.ChangeTracker.Entries<WorkflowExecution>()
+            .FirstOrDefault(e => e.Entity.Id == execution.Id);
+        if (tracked is not null)
+            tracked.State = EntityState.Detached;
+
         _context.WorkflowExecutions.Update(execution);
         await _context.SaveChangesAsync(cancellationToken);
     }

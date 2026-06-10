@@ -508,6 +508,7 @@ public class NotificationService : INotificationService
         var payload = new
         {
             workflowExecutionId = notification.WorkflowExecutionId,
+            workflowId = notification.WorkflowId,
             previousTicketId = notification.PreviousTicketId,
             newTicketId = notification.NewTicketId,
             externalTicketKey = notification.ExternalTicketKey

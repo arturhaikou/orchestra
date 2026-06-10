@@ -388,15 +388,16 @@ public class GitHubApiClient : IGitHubApiClient
                 cancellationToken);
             var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
 
-            // GitHub rejects REQUEST_CHANGES when the token owner is the PR author.
+            // GitHub rejects REQUEST_CHANGES and APPROVE when the token owner is the PR author.
             // Fall back to COMMENT so the review body and inline findings are still posted.
             if (response.StatusCode == System.Net.HttpStatusCode.UnprocessableEntity
-                && string.Equals(reviewEvent, "REQUEST_CHANGES", StringComparison.OrdinalIgnoreCase)
+                && (string.Equals(reviewEvent, "REQUEST_CHANGES", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(reviewEvent, "APPROVE", StringComparison.OrdinalIgnoreCase))
                 && responseContent.Contains("own pull request", StringComparison.OrdinalIgnoreCase))
             {
                 _logger.LogWarning(
-                    "GitHub rejected REQUEST_CHANGES on own pull request {PrNumber}; retrying as COMMENT.",
-                    prNumber);
+                    "GitHub rejected {ReviewEvent} on own pull request {PrNumber}; retrying as COMMENT.",
+                    reviewEvent, prNumber);
                 response = await _httpClient.PostAsync(
                     url,
                     BuildReviewRequestContent("COMMENT", body, comments),
