@@ -207,19 +207,29 @@ const App: React.FC = () => {
           try {
             // Fetch remaining workspaces after deletion
             const remainingWorkspaces = await getWorkspaces();
+            console.log('Remaining workspaces after delete:', remainingWorkspaces);
+            console.log('Remaining workspaces count:', remainingWorkspaces?.length ?? 0);
             
-            if (remainingWorkspaces.length > 0) {
-              // Redirect to first available workspace
+            // Use explicit null-coalescing to avoid falsy-value confusion
+            const workspaceCount = remainingWorkspaces?.length ?? 0;
+            
+            if (workspaceCount > 0) {
+              // Redirect to first available workspace (alphabetically ordered from API)
               const firstWorkspace = remainingWorkspaces[0];
+              console.log('Redirecting to first remaining workspace:', firstWorkspace.id, firstWorkspace.name);
               localStorage.setItem('nexus_active_workspace', firstWorkspace.id);
               navigate(`/workspaces/${firstWorkspace.id}/tickets`);
             } else {
               // No workspaces remaining, redirect to creation flow
+              console.log('No remaining workspaces, redirecting to workspace creation');
+              localStorage.removeItem('nexus_active_workspace');
               navigate('/workspaces/new');
             }
           } catch (error) {
             console.error('Failed to fetch remaining workspaces after deletion:', error);
-            // Fallback to creation flow on error
+            // Fallback to creation flow on error - this is a fetch error, not "no workspaces"
+            console.log('Fetch error occurred, falling back to workspace creation');
+            localStorage.removeItem('nexus_active_workspace');
             navigate('/workspaces/new');
           }
         }}
