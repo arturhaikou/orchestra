@@ -7,9 +7,10 @@ import { Workspace } from '../../types';
 
 vi.mock('../../services/workspaceService', () => ({
   deleteWorkspace: vi.fn(),
+  getWorkspaces: vi.fn(),
 }));
 
-const { deleteWorkspace } = await import('../../services/workspaceService');
+const { deleteWorkspace, getWorkspaces } = await import('../../services/workspaceService');
 
 const mockWorkspace: Workspace = {
   id: 'ws-1',
@@ -107,5 +108,103 @@ describe('WorkspaceModals - Save and Close Behavior', () => {
   it('should not render modal when isDeleteModalOpen is false', () => {
     render(<WorkspaceModals {...defaultProps} isDeleteModalOpen={false} />);
     expect(screen.queryByText(/Test Workspace/)).not.toBeInTheDocument();
+  });
+});
+
+describe('Workspace Deletion Redirect Logic (App-level)', () => {
+  const mockWorkspace1: Workspace = {
+    id: 'ws-1',
+    name: 'Workspace 1',
+    isAiSummarizationEnabled: false,
+    isCustomerSatisfactionAnalysisEnabled: false,
+    ownerId: 'user-1',
+  };
+
+  const mockWorkspace2: Workspace = {
+    id: 'ws-2',
+    name: 'Workspace 2',
+    isAiSummarizationEnabled: false,
+    isCustomerSatisfactionAnalysisEnabled: false,
+    ownerId: 'user-1',
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it('should redirect to first remaining workspace when multiple workspaces exist after deletion', async () => {
+    const onWorkspaceDeleted = vi.fn();
+    const defaultProps = {
+      isDeleteModalOpen: true,
+      workspaceInAction: mockWorkspace1,
+      onDeleteModalClose: vi.fn(),
+      onWorkspaceDeleted,
+      onToast: vi.fn(),
+    };
+
+    (deleteWorkspace as ReturnType<typeof vi.fn>).mockResolvedValueOnce(undefined);
+    (getWorkspaces as ReturnType<typeof vi.fn>).mockResolvedValueOnce([mockWorkspace2]);
+
+    const user = userEvent.setup();
+    render(<WorkspaceModals {...defaultProps} />);
+
+    const confirmButton = screen.getByRole('button', { name: /confirm/i });
+    await user.click(confirmButton);
+
+    await waitFor(() => {
+      expect(deleteWorkspace).toHaveBeenCalledWith('ws-1');
+      expect(onWorkspaceDeleted).toHaveBeenCalledWith('ws-1');
+    });
+  });
+
+  it('should redirect to workspace creation when no workspaces remain after deletion', async () => {
+    const onWorkspaceDeleted = vi.fn();
+    const defaultProps = {
+      isDeleteModalOpen: true,
+      workspaceInAction: mockWorkspace1,
+      onDeleteModalClose: vi.fn(),
+      onWorkspaceDeleted,
+      onToast: vi.fn(),
+    };
+
+    (deleteWorkspace as ReturnType<typeof vi.fn>).mockResolvedValueOnce(undefined);
+    (getWorkspaces as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+
+    const user = userEvent.setup();
+    render(<WorkspaceModals {...defaultProps} />);
+
+    const confirmButton = screen.getByRole('button', { name: /confirm/i });
+    await user.click(confirmButton);
+
+    await waitFor(() => {
+      expect(deleteWorkspace).toHaveBeenCalledWith('ws-1');
+      expect(onWorkspaceDeleted).toHaveBeenCalledWith('ws-1');
+    });
+  });
+
+  it('should fall back to workspace creation if getWorkspaces fails', async () => {
+    const onWorkspaceDeleted = vi.fn();
+    const defaultProps = {
+      isDeleteModalOpen: true,
+      workspaceInAction: mockWorkspace1,
+      onDeleteModalClose: vi.fn(),
+      onWorkspaceDeleted,
+      onToast: vi.fn(),
+    };
+
+    (deleteWorkspace as ReturnType<typeof vi.fn>).mockResolvedValueOnce(undefined);
+    (getWorkspaces as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('API Error'));
+
+    const user = userEvent.setup();
+    render(<WorkspaceModals {...defaultProps} />);
+
+    const confirmButton = screen.getByRole('button', { name: /confirm/i });
+    await user.click(confirmButton);
+
+    await waitFor(() => {
+      expect(deleteWorkspace).toHaveBeenCalledWith('ws-1');
+      expect(onWorkspaceDeleted).toHaveBeenCalledWith('ws-1');
+    });
   });
 });
