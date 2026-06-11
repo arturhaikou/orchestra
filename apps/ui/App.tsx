@@ -37,6 +37,7 @@ import WorkspaceModals from './components/WorkspaceModals/WorkspaceModals';
 import Toast from './components/Toast';
 import { Workspace } from './types';
 import { getToken, logout } from './services/authService';
+import { getWorkspaces } from './services/workspaceService';
 import AuthGuard from './components/AuthGuard';
 import WorkspaceLayout from './components/WorkspaceLayout';
 import PostLoginRedirect from './components/PostLoginRedirect';
@@ -199,10 +200,29 @@ const App: React.FC = () => {
           setIsDeleteModalOpen(false);
           setWorkspaceInAction(null);
         }}
-        onWorkspaceDeleted={(id) => {
+        onWorkspaceDeleted={async (id) => {
           setIsDeleteModalOpen(false);
           setWorkspaceInAction(null);
-          navigate('/workspaces/new');
+
+          // Clear stale localStorage entry if it matches the deleted workspace
+          const activeWorkspaceId = localStorage.getItem('nexus_active_workspace');
+          if (activeWorkspaceId === id) {
+            localStorage.removeItem('nexus_active_workspace');
+          }
+
+          try {
+            const remainingWorkspaces = await getWorkspaces();
+            if (remainingWorkspaces.length > 0) {
+              const selectedWorkspace = remainingWorkspaces[0];
+              localStorage.setItem('nexus_active_workspace', selectedWorkspace.id);
+              navigate(`/workspaces/${selectedWorkspace.id}/tickets`);
+            } else {
+              navigate('/workspaces/new');
+            }
+          } catch (error) {
+            // If fetching workspaces fails, fall back to creation page
+            navigate('/workspaces/new');
+          }
         }}
         onToast={(message, type) => {
           setAppToast({ message, type });
