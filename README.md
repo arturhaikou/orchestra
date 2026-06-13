@@ -162,7 +162,7 @@ Orchestra is a distributed application orchestrated by **.NET Aspire 9**:
 ### Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
-- [.NET Aspire workload](https://learn.microsoft.com/dotnet/aspire/fundamentals/setup-tooling) — install via `dotnet workload install aspire`
+- [Aspire](https://aspire.dev/get-started/prerequisites/) — see prerequisites
 - [Docker](https://www.docker.com/) or [Podman](https://podman.io/) (required for PostgreSQL and Redis containers)
 - [Node.js](https://nodejs.org/) v22+
 - An **Azure OpenAI** resource with a deployed model, or a running **Ollama** instance
