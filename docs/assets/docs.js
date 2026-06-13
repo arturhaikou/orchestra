@@ -183,6 +183,13 @@
       if (i === activeIdx) stage.classList.add('active');
       else if (i < activeIdx) stage.classList.add('done');
     });
+    var vis = document.querySelector('.workflow-vis');
+    var progress = document.querySelector('.workflow-progress');
+    if (progress && vis) {
+      // Track runs from left:56px to right:56px (center-to-center of first/last icons)
+      var trackWidth = vis.offsetWidth - 112;
+      progress.style.width = ((activeIdx / 3) * Math.max(0, trackWidth)) + 'px';
+    }
   }
 
   // ── Init ─────────────────────────────────────────────────────

@@ -266,7 +266,8 @@ strong { color: rgb(var(--text)); }
   background: linear-gradient(to right, rgb(var(--accent-purple)), rgb(var(--accent-cyan)), rgb(var(--accent-emerald)));
   box-shadow: 0 0 10px rgba(var(--accent-cyan), 0.5);
   z-index: 1;
-  width: 66%;
+  width: 0%;
+  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .workflow-stage {
   display: flex;
