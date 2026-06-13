@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ticket Management — Orchestra Docs</title>
+  <meta name="description" content="Unified ticket management across Jira, GitHub, and GitLab in Orchestra." />
+  <link rel="icon" href="../assets/orchestra_logo.png" />
+  <link rel="stylesheet" href="../assets/docs.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <a href="../index.html" class="navbar-brand">
+      <img src="../assets/orchestra_logo.png" alt="Orchestra" />
+      Orchestra <span style="color:rgba(148,163,184,0.6);font-weight:400;font-size:0.8rem;margin-left:0.25rem">Docs</span>
+    </a>
+    <ul class="navbar-links" id="nav-links">
+      <li><a href="../getting-started.html">Getting Started</a></li>
+      <li><a href="../architecture.html">Architecture</a></li>
+      <li><a href="agents.html" class="active">Features</a></li>
+      <li><a href="https://github.com/arturhaikou/orchestra" target="_blank" rel="noopener">GitHub ↗</a></li>
+    </ul>
+    <div class="hamburger" id="hamburger"><span></span><span></span><span></span></div>
+  </nav>
+
+  <div class="page-wrapper">
+    <div class="docs-layout">
+      <aside class="docs-sidebar">
+        <h5>Features</h5>
+        <ul>
+          <li><a href="agents.html">AI Agents</a></li>
+          <li><a href="integrations.html">Integrations &amp; MCP</a></li>
+          <li><a href="tickets.html" class="active">Ticket Management</a></li>
+          <li><a href="workflows.html">Workflows</a></li>
+          <li><a href="skills.html">Skills &amp; Tools</a></li>
+          <li><a href="jobs.html">Background Jobs</a></li>
+        </ul>
+        <h5 style="margin-top:1.5rem">On this page</h5>
+        <ul>
+          <li><a href="#overview">Overview</a></li>
+          <li><a href="#unified-view">Unified View</a></li>
+          <li><a href="#statuses">Statuses &amp; Priorities</a></li>
+          <li><a href="#assigning-agents">Assigning Agents</a></li>
+          <li><a href="#adf-rendering">ADF Content</a></li>
+        </ul>
+      </aside>
+
+      <main class="docs-content">
+        <div class="section-label">Features</div>
+        <h1 id="overview">Ticket Management</h1>
+        <p class="page-desc">
+          Orchestra aggregates issues and tickets from all connected platforms — Jira, GitHub, and GitLab — into a single unified view. Work happens in one place regardless of which tracker it originated from.
+        </p>
+
+        <div class="screenshot-frame">
+          <img src="../assets/screenshots/tickets.png" alt="Tickets page" loading="lazy" />
+          <div class="screenshot-caption">The Tickets view — unified issue list across all connected integrations</div>
+        </div>
+
+        <h2 id="unified-view" style="margin-top:2.5rem">Unified View</h2>
+        <p>Tickets from all workspace integrations appear in the same list. Each ticket is enriched with its source platform metadata while being normalized to a consistent Orchestra model.</p>
+
+        <div class="table-wrap" style="margin-top:1rem;margin-bottom:2rem;">
+          <table>
+            <thead>
+              <tr><th>Field</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Title</strong></td><td>Issue or ticket summary from the source tracker</td></tr>
+              <tr><td><strong>Status</strong></td><td>Normalized status — Open, In Progress, Review, Done, Blocked</td></tr>
+              <tr><td><strong>Priority</strong></td><td>Normalized priority — Low, Medium, High, Critical</td></tr>
+              <tr><td><strong>Source</strong></td><td>Origin platform (Jira / GitHub / GitLab) with external link</td></tr>
+              <tr><td><strong>Assigned Agent</strong></td><td>Which Orchestra agent is executing on this ticket (if any)</td></tr>
+              <tr><td><strong>External ID</strong></td><td>The ID in the source tracker (e.g., <code>PROJ-123</code>, <code>#456</code>)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 id="statuses" style="margin-top:2.5rem">Statuses &amp; Priorities</h2>
+        <p>Orchestra maps each tracker's native states to a common set of statuses and priorities:</p>
+
+        <div class="feature-grid feature-grid-2" style="margin-top:1rem;margin-bottom:2rem;">
+          <div>
+            <h3 style="margin-bottom:0.75rem;font-size:1rem;">Statuses</h3>
+            <div style="display:flex;flex-direction:column;gap:0.5rem;">
+              <div style="display:flex;align-items:center;gap:0.75rem;"><span class="badge badge-indigo">Open</span><span style="font-size:0.875rem;color:rgb(var(--text-muted));">New, unstarted ticket</span></div>
+              <div style="display:flex;align-items:center;gap:0.75rem;"><span class="badge badge-cyan">In Progress</span><span style="font-size:0.875rem;color:rgb(var(--text-muted));">Actively being worked on</span></div>
+              <div style="display:flex;align-items:center;gap:0.75rem;"><span class="badge badge-purple">Review</span><span style="font-size:0.875rem;color:rgb(var(--text-muted));">Awaiting code review or approval</span></div>
+              <div style="display:flex;align-items:center;gap:0.75rem;"><span class="badge badge-emerald">Done</span><span style="font-size:0.875rem;color:rgb(var(--text-muted));">Completed successfully</span></div>
+              <div style="display:flex;align-items:center;gap:0.75rem;"><span class="badge" style="background:rgba(239,68,68,0.12);color:rgb(239,68,68);border:1px solid rgba(239,68,68,0.3);">Blocked</span><span style="font-size:0.875rem;color:rgb(var(--text-muted));">Waiting on a dependency</span></div>
+            </div>
+          </div>
+          <div>
+            <h3 style="margin-bottom:0.75rem;font-size:1rem;">Priorities</h3>
+            <div style="display:flex;flex-direction:column;gap:0.5rem;">
+              <div style="display:flex;align-items:center;gap:0.75rem;"><span class="badge badge-emerald">Low</span><span style="font-size:0.875rem;color:rgb(var(--text-muted));">Nice-to-have, non-urgent</span></div>
+              <div style="display:flex;align-items:center;gap:0.75rem;"><span class="badge badge-cyan">Medium</span><span style="font-size:0.875rem;color:rgb(var(--text-muted));">Standard priority</span></div>
+              <div style="display:flex;align-items:center;gap:0.75rem;"><span class="badge badge-yellow">High</span><span style="font-size:0.875rem;color:rgb(var(--text-muted));">Important, schedule soon</span></div>
+              <div style="display:flex;align-items:center;gap:0.75rem;"><span class="badge" style="background:rgba(239,68,68,0.12);color:rgb(239,68,68);border:1px solid rgba(239,68,68,0.3);">Critical</span><span style="font-size:0.875rem;color:rgb(var(--text-muted));">Urgent, needs immediate attention</span></div>
+            </div>
+          </div>
+        </div>
+
+        <h2 id="assigning-agents" style="margin-top:2.5rem">Assigning Agents to Tickets</h2>
+        <p>Once an agent is deployed in your workspace, you can assign it to any ticket. Orchestra creates a background Job that the Worker service picks up and executes asynchronously.</p>
+
+        <div class="steps" style="margin-top:1rem;margin-bottom:2rem;">
+          <div class="step">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <div class="step-title">Open a ticket</div>
+              <p class="step-desc">Click any ticket in the list to open its detail view. The full ticket description (including ADF-rendered content for Jira) is displayed.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <div class="step-title">Assign an agent</div>
+              <p class="step-desc">In the ticket detail, select an agent from the workspace's deployed agent list and click <em>Start</em>.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-number">3</div>
+            <div class="step-content">
+              <div class="step-title">Monitor execution</div>
+              <p class="step-desc">Navigate to <strong>Jobs</strong> to watch the execution in real time — each step, tool call, and sub-agent interaction is visible.</p>
+            </div>
+          </div>
+        </div>
+
+        <h2 id="adf-rendering" style="margin-top:2.5rem">Atlassian Document Format (ADF)</h2>
+        <p>
+          Jira uses ADF for rich ticket descriptions — code blocks, mentions, tables, and media. Orchestra's dedicated <strong>ADF Generator</strong> microservice handles bidirectional conversion, ensuring Jira content is rendered accurately in the UI and that agent output can be written back to Jira in valid ADF.
+        </p>
+
+        <div class="alert alert-tip">
+          <span class="alert-icon">💡</span>
+          <div>
+            <p><strong>Automatic:</strong> ADF conversion is fully transparent. When you open a Jira ticket, Orchestra fetches the raw ADF, converts it to HTML, and renders it natively. No configuration required.</p>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <footer>
+      <p>
+        <strong style="color:rgb(var(--text))">Orchestra</strong> · AI SDLC Automation Platform ·
+        <a href="https://github.com/arturhaikou/orchestra" target="_blank" rel="noopener">GitHub</a>
+      </p>
+    </footer>
+  </div>
+  <script src="../assets/docs.js"></script>
+</body>
+</html>

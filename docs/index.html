@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orchestra — Documentation</title>
+  <meta name="description" content="Official documentation for Orchestra — the AI SDLC Automation Platform for modern engineering teams." />
+  <link rel="icon" href="assets/orchestra_logo.png" />
+  <link rel="stylesheet" href="assets/docs.css" />
+  <style>
+    /* Index-specific overrides */
+    .hero { min-height: 100vh; padding-top: 60px; }
+    .hero-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      font-size: clamp(3rem, 8vw, 6rem);
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      line-height: 1.05;
+      margin-bottom: 1.5rem;
+    }
+    #word-carousel {
+      display: inline-block;
+      min-width: 240px;
+      text-align: center;
+      height: 1.05em;
+      overflow: hidden;
+      vertical-align: bottom;
+    }
+    #word-carousel span {
+      display: block;
+    }
+    .features-strip {
+      background: rgb(var(--surface));
+      border-top: 1px solid rgba(var(--border), 1);
+      border-bottom: 1px solid rgba(var(--border), 1);
+      padding: 4rem 1.5rem;
+    }
+    .docs-nav-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 1.25rem;
+      margin-top: 2rem;
+    }
+    .docs-nav-card {
+      background: rgb(var(--surface));
+      border: 1px solid rgba(var(--border), 1);
+      border-radius: 12px;
+      padding: 1.5rem;
+      text-decoration: none;
+      transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+      display: block;
+    }
+    .docs-nav-card:hover {
+      border-color: rgba(var(--primary), 0.5);
+      box-shadow: 0 6px 28px rgba(var(--primary), 0.1);
+      transform: translateY(-3px);
+    }
+    .docs-nav-card .card-icon { font-size: 2rem; margin-bottom: 0.75rem; display: block; }
+    .docs-nav-card .card-title { font-size: 1rem; font-weight: 700; color: rgb(var(--text)); margin-bottom: 0.4rem; }
+    .docs-nav-card .card-desc { font-size: 0.85rem; color: rgb(var(--text-muted)); margin: 0; }
+    .docs-nav-card .card-arrow { margin-top: 1rem; color: rgb(var(--primary)); font-size: 0.85rem; font-weight: 600; }
+
+    .tech-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      justify-content: center;
+      margin-top: 1.5rem;
+    }
+    .tech-chip {
+      background: rgba(var(--surface-highlight), 1);
+      border: 1px solid rgba(var(--border), 1);
+      border-radius: 20px;
+      padding: 0.3rem 0.85rem;
+      font-size: 0.8rem;
+      color: rgb(var(--text-muted));
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <!-- ── Navbar ─────────────────────────────────────── -->
+  <nav class="navbar">
+    <a href="index.html" class="navbar-brand">
+      <img src="assets/orchestra_logo.png" alt="Orchestra" />
+      Orchestra <span style="color:rgba(148,163,184,0.6);font-weight:400;font-size:0.8rem;margin-left:0.25rem">Docs</span>
+    </a>
+    <ul class="navbar-links" id="nav-links">
+      <li><a href="getting-started.html">Getting Started</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+      <li><a href="features/agents.html">Features</a></li>
+      <li><a href="https://github.com/arturhaikou/orchestra" target="_blank" rel="noopener">GitHub ↗</a></li>
+    </ul>
+    <div class="hamburger" id="hamburger" aria-label="Toggle menu">
+      <span></span><span></span><span></span>
+    </div>
+  </nav>
+
+  <div class="page-wrapper">
+
+    <!-- ── Hero ──────────────────────────────────────── -->
+    <section class="hero">
+      <div class="hero-bg-blob hero-bg-blob-1"></div>
+      <div class="hero-bg-blob hero-bg-blob-2"></div>
+
+      <div class="hero-content">
+        <div class="animate-fade-in-up">
+          <img src="assets/orchestra_logo.png" alt="Orchestra Logo" class="hero-logo" />
+        </div>
+
+        <div class="animate-fade-in-up delay-100">
+          <div class="hero-badge">A.S.A.P. — AI SDLC Automation Platform</div>
+        </div>
+
+        <div class="animate-fade-in-up delay-200">
+          <div class="hero-title-row">
+            <span>We</span>
+            <span id="word-carousel" aria-live="polite"></span>
+            <span>Code.</span>
+          </div>
+        </div>
+
+        <div class="animate-fade-in-up delay-300">
+          <p class="hero-subtitle">
+            Orchestra is a sleek, invisible layer of AI intelligence that turns your requirements into deployments seamlessly.
+          </p>
+        </div>
+
+        <div class="hero-cta-group animate-fade-in-up delay-400">
+          <a href="getting-started.html" class="btn-primary">Explore Docs</a>
+          <a href="https://github.com/arturhaikou/orchestra" class="btn-secondary" target="_blank" rel="noopener">View on GitHub</a>
+        </div>
+
+        <!-- Workflow Visualization -->
+        <div class="workflow-vis" aria-hidden="true">
+          <div class="workflow-stage active" data-idx="0">
+            <div class="workflow-icon">🤖</div>
+            <div class="workflow-label">Product Manager AI</div>
+          </div>
+          <div class="workflow-stage" data-idx="1">
+            <div class="workflow-icon">💻</div>
+            <div class="workflow-label">Developer AI</div>
+          </div>
+          <div class="workflow-stage" data-idx="2">
+            <div class="workflow-icon">🛡️</div>
+            <div class="workflow-label">QA Auto-Tester AI</div>
+          </div>
+          <div class="workflow-stage" data-idx="3">
+            <div class="workflow-icon">🚀</div>
+            <div class="workflow-label">DevOps AI</div>
+          </div>
+          <div class="workflow-progress"></div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="divider" />
+
+    <!-- ── What is Orchestra ─────────────────────────── -->
+    <section class="section" style="padding-bottom:2rem;">
+      <div class="section-header">
+        <div class="section-label">What is Orchestra?</div>
+        <h2 class="section-title">The conductor of your entire SDLC</h2>
+        <p class="section-subtitle">
+          Modern engineering teams face fragmented AI tooling. Orchestra solves this with a unified AI automation layer across Jira, GitHub, and GitLab — configure once, automate everything.
+        </p>
+      </div>
+
+      <div class="table-wrap" data-reveal>
+        <table>
+          <thead>
+            <tr>
+              <th>Layer</th>
+              <th>Role</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>🎻 The Instruments</strong></td><td>Connect your trackers (Jira, GitHub, GitLab) into a single unified view</td></tr>
+            <tr><td><strong>🎵 The Musicians</strong></td><td>Autonomous AI agents assigned to specific ticket types — code, review, or search</td></tr>
+            <tr><td><strong>📜 The Sheet Music</strong></td><td>Configurable workflows with triggers, conditions, and agent handoffs</td></tr>
+            <tr><td><strong>🎼 The Conductor</strong></td><td>You — overseeing the entire lifecycle from a single dashboard</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── Screenshot ───────────────────────────────── -->
+    <section class="section-sm" style="max-width:1140px;margin:0 auto;padding:0 1.5rem 4rem;">
+      <div class="screenshot-frame" data-reveal>
+        <img src="assets/screenshots/welcome.png" alt="Orchestra welcome screen" loading="lazy" />
+        <div class="screenshot-caption">Orchestra — the welcome experience</div>
+      </div>
+    </section>
+
+    <!-- ── Features strip ───────────────────────────── -->
+    <div class="features-strip">
+      <div class="section-header">
+        <div class="section-label">Key Capabilities</div>
+        <h2 class="section-title">Everything you need to automate your SDLC</h2>
+      </div>
+      <div style="max-width:1140px;margin:0 auto;">
+        <div class="feature-grid" data-reveal>
+          <div class="card">
+            <span class="card-icon">🎫</span>
+            <div class="card-title">Unified Ticket Management</div>
+            <p class="card-desc">Aggregate issues from Jira, GitHub, and GitLab in a single interface with real-time sync.</p>
+          </div>
+          <div class="card">
+            <span class="card-icon">🤖</span>
+            <div class="card-title">AI Agent System</div>
+            <p class="card-desc">Create autonomous agents with custom instructions, tools, and skills. Three built-in templates to start immediately.</p>
+          </div>
+          <div class="card">
+            <span class="card-icon">🔌</span>
+            <div class="card-title">MCP Server Management</div>
+            <p class="card-desc">Register Model Context Protocol servers as tool sources. Supports stdio and HTTP transport with auto-discovery.</p>
+          </div>
+          <div class="card">
+            <span class="card-icon">⚡</span>
+            <div class="card-title">GitHub Copilot CLI</div>
+            <p class="card-desc">Connect GitHub Copilot directly as the agent execution runtime with configurable reasoning effort.</p>
+          </div>
+          <div class="card">
+            <span class="card-icon">🔀</span>
+            <div class="card-title">Visual Workflow Builder</div>
+            <p class="card-desc">Design multi-step automated workflows with triggers, conditional branching, and agent handoffs.</p>
+          </div>
+          <div class="card">
+            <span class="card-icon">📊</span>
+            <div class="card-title">Real-time Job Tracking</div>
+            <p class="card-desc">All agent work runs asynchronously. Monitor execution progress via live SignalR job updates.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Doc navigation cards ─────────────────────── -->
+    <section class="section">
+      <div class="section-header">
+        <div class="section-label">Documentation</div>
+        <h2 class="section-title">Explore the docs</h2>
+        <p class="section-subtitle">Everything you need to install, configure, and get the most from Orchestra.</p>
+      </div>
+
+      <div class="docs-nav-cards" data-reveal>
+        <a href="getting-started.html" class="docs-nav-card">
+          <span class="card-icon">🚀</span>
+          <div class="card-title">Getting Started</div>
+          <p class="card-desc">Prerequisites, quick start guide, and initial configuration.</p>
+          <div class="card-arrow">Get started →</div>
+        </a>
+        <a href="architecture.html" class="docs-nav-card">
+          <span class="card-icon">🏗️</span>
+          <div class="card-title">Architecture</div>
+          <p class="card-desc">System diagram, service breakdown, tech stack, and data flow.</p>
+          <div class="card-arrow">Explore →</div>
+        </a>
+        <a href="features/agents.html" class="docs-nav-card">
+          <span class="card-icon">🤖</span>
+          <div class="card-title">AI Agents</div>
+          <p class="card-desc">Create, configure, and deploy autonomous AI teammates.</p>
+          <div class="card-arrow">Learn more →</div>
+        </a>
+        <a href="features/integrations.html" class="docs-nav-card">
+          <span class="card-icon">🔌</span>
+          <div class="card-title">Integrations & MCP</div>
+          <p class="card-desc">Connect Jira, GitHub, GitLab, and MCP servers as tool sources.</p>
+          <div class="card-arrow">Learn more →</div>
+        </a>
+        <a href="features/tickets.html" class="docs-nav-card">
+          <span class="card-icon">🎫</span>
+          <div class="card-title">Ticket Management</div>
+          <p class="card-desc">Unified view of all your issues across platforms.</p>
+          <div class="card-arrow">Learn more →</div>
+        </a>
+        <a href="features/workflows.html" class="docs-nav-card">
+          <span class="card-icon">🔀</span>
+          <div class="card-title">Workflows</div>
+          <p class="card-desc">Visual multi-step automation with triggers and agent handoffs.</p>
+          <div class="card-arrow">Learn more →</div>
+        </a>
+        <a href="features/skills.html" class="docs-nav-card">
+          <span class="card-icon">📚</span>
+          <div class="card-title">Skills & Tools</div>
+          <p class="card-desc">Reusable instruction sets and tool configurations for agents.</p>
+          <div class="card-arrow">Learn more →</div>
+        </a>
+        <a href="features/jobs.html" class="docs-nav-card">
+          <span class="card-icon">⚙️</span>
+          <div class="card-title">Background Jobs</div>
+          <p class="card-desc">Async execution, real-time status, session recovery.</p>
+          <div class="card-arrow">Learn more →</div>
+        </a>
+      </div>
+    </section>
+
+    <!-- ── Tech stack ────────────────────────────────── -->
+    <section style="padding:0 1.5rem 5rem;text-align:center;">
+      <p style="font-size:0.75rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:rgb(var(--text-muted));margin-bottom:0.75rem;">Built with</p>
+      <div class="tech-row">
+        <span class="tech-chip">.NET 10</span>
+        <span class="tech-chip">.NET Aspire</span>
+        <span class="tech-chip">React 19</span>
+        <span class="tech-chip">TypeScript</span>
+        <span class="tech-chip">PostgreSQL</span>
+        <span class="tech-chip">Redis</span>
+        <span class="tech-chip">SignalR</span>
+        <span class="tech-chip">Azure OpenAI</span>
+        <span class="tech-chip">Ollama</span>
+        <span class="tech-chip">MCP</span>
+        <span class="tech-chip">Entity Framework Core</span>
+        <span class="tech-chip">Tailwind CSS</span>
+      </div>
+    </section>
+
+    <!-- ── Footer ────────────────────────────────────── -->
+    <footer>
+      <p>
+        <strong style="color:rgb(var(--text))">Orchestra</strong> · AI SDLC Automation Platform ·
+        <a href="https://github.com/arturhaikou/orchestra" target="_blank" rel="noopener">GitHub</a> ·
+        <a href="https://github.com/arturhaikou/orchestra/issues" target="_blank" rel="noopener">Report an Issue</a>
+      </p>
+      <p style="margin-top:0.5rem;font-size:0.75rem;">Built with <a href="https://github.com/arturhaikou/spec-workflow" target="_blank" rel="noopener">spec-workflow</a></p>
+    </footer>
+  </div>
+
+  <script src="assets/docs.js"></script>
+</body>
+</html>

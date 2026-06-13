@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Agents — Orchestra Docs</title>
+  <meta name="description" content="Create, configure, and deploy autonomous AI agents in Orchestra." />
+  <link rel="icon" href="../assets/orchestra_logo.png" />
+  <link rel="stylesheet" href="../assets/docs.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <a href="../index.html" class="navbar-brand">
+      <img src="../assets/orchestra_logo.png" alt="Orchestra" />
+      Orchestra <span style="color:rgba(148,163,184,0.6);font-weight:400;font-size:0.8rem;margin-left:0.25rem">Docs</span>
+    </a>
+    <ul class="navbar-links" id="nav-links">
+      <li><a href="../getting-started.html">Getting Started</a></li>
+      <li><a href="../architecture.html">Architecture</a></li>
+      <li><a href="agents.html" class="active">Features</a></li>
+      <li><a href="https://github.com/arturhaikou/orchestra" target="_blank" rel="noopener">GitHub ↗</a></li>
+    </ul>
+    <div class="hamburger" id="hamburger"><span></span><span></span><span></span></div>
+  </nav>
+
+  <div class="page-wrapper">
+    <div class="docs-layout">
+      <aside class="docs-sidebar">
+        <h5>Features</h5>
+        <ul>
+          <li><a href="agents.html" class="active">AI Agents</a></li>
+          <li><a href="integrations.html">Integrations &amp; MCP</a></li>
+          <li><a href="tickets.html">Ticket Management</a></li>
+          <li><a href="workflows.html">Workflows</a></li>
+          <li><a href="skills.html">Skills &amp; Tools</a></li>
+          <li><a href="jobs.html">Background Jobs</a></li>
+        </ul>
+        <h5 style="margin-top:1.5rem">On this page</h5>
+        <ul>
+          <li><a href="#overview">Overview</a></li>
+          <li><a href="#built-in-templates">Built-in Templates</a></li>
+          <li><a href="#create-agent">Creating an Agent</a></li>
+          <li><a href="#tool-authorization">Tool Authorization</a></li>
+          <li><a href="#custom-instructions">Custom Instructions</a></li>
+          <li><a href="#model-selection">Model Selection</a></li>
+        </ul>
+      </aside>
+
+      <main class="docs-content">
+        <div class="section-label">Features</div>
+        <h1 id="overview">AI Agents</h1>
+        <p class="page-desc">
+          Orchestra AI agents are autonomous teammates deployed within a workspace. Each agent has a defined role, authorized tools, custom instructions, and optionally a model override. Agents execute tasks asynchronously via the background Worker service.
+        </p>
+
+        <div class="screenshot-frame">
+          <img src="../assets/screenshots/agents.png" alt="AI Agents page" loading="lazy" />
+          <div class="screenshot-caption">The AI Teammates page — deploy and manage autonomous agents</div>
+        </div>
+
+        <!-- Built-in templates -->
+        <h2 id="built-in-templates" style="margin-top:2.5rem">Built-in Agent Templates</h2>
+        <p>Orchestra ships three production-ready templates to get you started immediately:</p>
+
+        <div class="feature-grid" style="margin-top:1rem;margin-bottom:2rem;">
+          <div class="card" style="border-color:rgba(168,85,247,0.3);">
+            <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;">
+              <span class="badge badge-purple">Built-in</span>
+            </div>
+            <div class="card-title">🔍 Code Review Agent</div>
+            <p class="card-desc">Automated PR/MR analysis via GitHub or GitLab. Operates in read-only mode — reviews diffs, comments on quality, style, and security issues.</p>
+            <ul style="margin-top:0.75rem;font-size:0.85rem;">
+              <li>Read-only repository access</li>
+              <li>PR diff analysis</li>
+              <li>Automated comment generation</li>
+            </ul>
+          </div>
+          <div class="card" style="border-color:rgba(34,211,238,0.3);">
+            <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;">
+              <span class="badge badge-cyan">Built-in</span>
+            </div>
+            <div class="card-title">🔎 Agentic Search Agent</div>
+            <p class="card-desc">Deep codebase exploration and summarization. Uses read-only CLI access to traverse repositories and answer complex technical questions.</p>
+            <ul style="margin-top:0.75rem;font-size:0.85rem;">
+              <li>Read-only CLI access</li>
+              <li>Codebase exploration</li>
+              <li>Technical summarization</li>
+            </ul>
+          </div>
+          <div class="card" style="border-color:rgba(16,185,129,0.3);">
+            <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;">
+              <span class="badge badge-emerald">Built-in</span>
+            </div>
+            <div class="card-title">💻 Coding Agent</div>
+            <p class="card-desc">End-to-end implementation with full read/write access. Handles feature development, bug fixes, and refactoring tasks from ticket to commit.</p>
+            <ul style="margin-top:0.75rem;font-size:0.85rem;">
+              <li>Full read/write CLI access</li>
+              <li>File creation and editing</li>
+              <li>End-to-end implementation</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="alert alert-tip">
+          <span class="alert-icon">💡</span>
+          <div>
+            <p><strong>Template versioning:</strong> Built-in agents track a <code>TemplateVersion</code> at creation time. When the template is updated in a new Orchestra release, you can re-deploy to get the latest instructions while keeping your existing tool authorizations.</p>
+          </div>
+        </div>
+
+        <!-- Creating an agent -->
+        <h2 id="create-agent" style="margin-top:2.5rem">Creating an Agent</h2>
+        <p>Navigate to <strong>Agents</strong> in the workspace sidebar and click <em>Deploy Agent</em>. You'll be presented with two paths:</p>
+
+        <div class="steps" style="margin-top:1rem;margin-bottom:2rem;">
+          <div class="step">
+            <div class="step-number">A</div>
+            <div class="step-content">
+              <div class="step-title">Use a Built-in Template</div>
+              <p class="step-desc">Browse the template catalogue. Templates come pre-configured with appropriate tools and instructions. Some fields are locked to preserve template integrity.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-number">B</div>
+            <div class="step-content">
+              <div class="step-title">Create from Scratch</div>
+              <p class="step-desc">Define a custom agent with a name, role, capabilities, custom instructions, and manually select tool authorizations from the full tool library.</p>
+            </div>
+          </div>
+        </div>
+
+        <h3 style="margin-top:1.5rem;margin-bottom:0.75rem;">Agent form fields</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Field</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Name</strong></td><td>Display name for the agent (e.g., "Senior Code Reviewer")</td></tr>
+              <tr><td><strong>Role</strong></td><td>Short role description used in system prompts (e.g., "Senior Software Engineer")</td></tr>
+              <tr><td><strong>Capabilities</strong></td><td>Comma-separated tag list (e.g., <code>code-review</code>, <code>typescript</code>). Used for filtering.</td></tr>
+              <tr><td><strong>Custom Instructions</strong></td><td>Free-form system instructions for the agent's behavior (mutually exclusive with Project Principles)</td></tr>
+              <tr><td><strong>Project Principles</strong></td><td>Code review-specific instructions — code standards, review focus areas (mutually exclusive with Custom Instructions)</td></tr>
+              <tr><td><strong>Model Override</strong></td><td>Optional: override the workspace default model for this specific agent</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Tool Authorization -->
+        <h2 id="tool-authorization" style="margin-top:2.5rem">Tool Authorization</h2>
+        <p>
+          Orchestra enforces <strong>granular tool authorization</strong> at the <em>ToolAction</em> level. Each tool (e.g., "GitHub Integration") contains multiple actions (e.g., "Create Issue", "List Pull Requests"). Agents only have access to the specific actions you authorize.
+        </p>
+
+        <div class="feature-grid feature-grid-2" style="margin-top:1rem;margin-bottom:1.5rem;">
+          <div class="card">
+            <div class="card-title">🔧 Native Tools</div>
+            <p class="card-desc">Built-in integrations: GitHub, Jira, GitLab. Actions are predefined and use reflection-based invocation in the backend.</p>
+          </div>
+          <div class="card">
+            <div class="card-title">⚡ MCP Tools</div>
+            <p class="card-desc">Tools discovered from connected MCP servers. Appear alongside native tools in the tool picker with a distinct MCP badge.</p>
+          </div>
+        </div>
+
+        <h3 style="margin-top:1.5rem;margin-bottom:0.75rem;">Danger Level Classification</h3>
+        <p>Every tool action carries a danger level to prevent unintended destructive operations:</p>
+
+        <div class="feature-grid" style="margin-top:0.75rem;margin-bottom:2rem;">
+          <div class="card" style="border-color:rgba(16,185,129,0.3);">
+            <span class="badge badge-emerald" style="margin-bottom:0.75rem;">Safe</span>
+            <p class="card-desc">Read-only operations — list, get, search. No side effects.</p>
+          </div>
+          <div class="card" style="border-color:rgba(234,179,8,0.3);">
+            <span class="badge badge-yellow" style="margin-bottom:0.75rem;">Moderate</span>
+            <p class="card-desc">State-modifying but reversible — create issue, post comment, update status.</p>
+          </div>
+          <div class="card" style="border-color:rgba(239,68,68,0.3);">
+            <span class="badge" style="background:rgba(239,68,68,0.12);color:rgb(239,68,68);border:1px solid rgba(239,68,68,0.3);margin-bottom:0.75rem;">Destructive</span>
+            <p class="card-desc">Irreversible operations — delete branch, force push, drop data.</p>
+          </div>
+        </div>
+
+        <!-- Custom Instructions -->
+        <h2 id="custom-instructions" style="margin-top:2.5rem">Custom Instructions vs Project Principles</h2>
+
+        <div class="alert alert-info">
+          <span class="alert-icon">ℹ️</span>
+          <div>
+            <p><strong>Mutually exclusive:</strong> An agent uses either <em>Custom Instructions</em> or <em>Project Principles</em> — never both. The correct field is automatically selected based on whether any code review tool actions are authorized.</p>
+          </div>
+        </div>
+
+        <div class="table-wrap" style="margin-top:1rem;">
+          <table>
+            <thead>
+              <tr><th>Field</th><th>Use When</th><th>Example Content</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Custom Instructions</strong></td>
+                <td>General-purpose agents (coding, search, triage)</td>
+                <td>Coding style preferences, technology constraints, response format requirements</td>
+              </tr>
+              <tr>
+                <td><strong>Project Principles</strong></td>
+                <td>Code review agents</td>
+                <td>SOLID enforcement, naming conventions, security rules, test coverage requirements</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Model Selection -->
+        <h2 id="model-selection" style="margin-top:2.5rem">Model Selection</h2>
+        <p>
+          By default, agents use the workspace's configured AI provider model. You can override this per-agent to use a different model for cost/quality trade-offs:
+        </p>
+        <ul style="margin-top:0.75rem;">
+          <li><strong>Azure OpenAI:</strong> Select from deployed models in your Azure resource</li>
+          <li><strong>Ollama:</strong> Select from models discovered via <code>ollama list</code></li>
+          <li><strong>GitHub Copilot:</strong> Configure reasoning effort level (low / medium / high) per CLI integration</li>
+        </ul>
+      </main>
+    </div>
+
+    <footer>
+      <p>
+        <strong style="color:rgb(var(--text))">Orchestra</strong> · AI SDLC Automation Platform ·
+        <a href="https://github.com/arturhaikou/orchestra" target="_blank" rel="noopener">GitHub</a> ·
+        <a href="https://github.com/arturhaikou/orchestra/issues" target="_blank" rel="noopener">Report an Issue</a>
+      </p>
+    </footer>
+  </div>
+  <script src="../assets/docs.js"></script>
+</body>
+</html>

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Background Jobs — Orchestra Docs</title>
+  <meta name="description" content="Async agent execution, real-time job tracking, and session recovery in Orchestra." />
+  <link rel="icon" href="../assets/orchestra_logo.png" />
+  <link rel="stylesheet" href="../assets/docs.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <a href="../index.html" class="navbar-brand">
+      <img src="../assets/orchestra_logo.png" alt="Orchestra" />
+      Orchestra <span style="color:rgba(148,163,184,0.6);font-weight:400;font-size:0.8rem;margin-left:0.25rem">Docs</span>
+    </a>
+    <ul class="navbar-links" id="nav-links">
+      <li><a href="../getting-started.html">Getting Started</a></li>
+      <li><a href="../architecture.html">Architecture</a></li>
+      <li><a href="agents.html" class="active">Features</a></li>
+      <li><a href="https://github.com/arturhaikou/orchestra" target="_blank" rel="noopener">GitHub ↗</a></li>
+    </ul>
+    <div class="hamburger" id="hamburger"><span></span><span></span><span></span></div>
+  </nav>
+
+  <div class="page-wrapper">
+    <div class="docs-layout">
+      <aside class="docs-sidebar">
+        <h5>Features</h5>
+        <ul>
+          <li><a href="agents.html">AI Agents</a></li>
+          <li><a href="integrations.html">Integrations &amp; MCP</a></li>
+          <li><a href="tickets.html">Ticket Management</a></li>
+          <li><a href="workflows.html">Workflows</a></li>
+          <li><a href="skills.html">Skills &amp; Tools</a></li>
+          <li><a href="jobs.html" class="active">Background Jobs</a></li>
+        </ul>
+        <h5 style="margin-top:1.5rem">On this page</h5>
+        <ul>
+          <li><a href="#overview">Overview</a></li>
+          <li><a href="#job-lifecycle">Job Lifecycle</a></li>
+          <li><a href="#realtime-updates">Real-time Updates</a></li>
+          <li><a href="#session-recovery">Session Recovery</a></li>
+          <li><a href="#sub-agents">Sub-agent Visualization</a></li>
+        </ul>
+      </aside>
+
+      <main class="docs-content">
+        <div class="section-label">Features</div>
+        <h1 id="overview">Background Jobs</h1>
+        <p class="page-desc">
+          All agent work in Orchestra runs asynchronously via the dedicated <strong>.NET Worker service</strong>. The Jobs view provides real-time visibility into execution status, sub-agent interactions, tool calls, and output — with automatic session recovery after service restarts.
+        </p>
+
+        <div class="screenshot-frame">
+          <img src="../assets/screenshots/jobs.png" alt="Jobs page" loading="lazy" />
+          <div class="screenshot-caption">The Jobs view — real-time execution monitoring for all agent activity</div>
+        </div>
+
+        <h2 id="job-lifecycle" style="margin-top:2.5rem">Job Lifecycle</h2>
+        <p>Every agent assignment creates a Job. Jobs transition through a well-defined set of states:</p>
+
+        <div class="table-wrap" style="margin-top:1rem;margin-bottom:2rem;">
+          <table>
+            <thead>
+              <tr><th>Status</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="badge badge-indigo">Queued</span></td>
+                <td>Job created and waiting in the queue for the Worker to pick it up</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-cyan">Running</span></td>
+                <td>Worker is actively executing the agent. Tool calls and sub-agent interactions are happening now.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-purple">Waiting</span></td>
+                <td>Agent is paused, waiting for an external response (e.g., a CLI sub-agent to complete)</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-emerald">Completed</span></td>
+                <td>Agent finished successfully. Output and all interaction logs are persisted.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-yellow">Cancelled</span></td>
+                <td>User or system cancelled the job before completion</td>
+              </tr>
+              <tr>
+                <td><span class="badge" style="background:rgba(239,68,68,0.12);color:rgb(239,68,68);border:1px solid rgba(239,68,68,0.3);">Failed</span></td>
+                <td>Agent encountered an unrecoverable error. Error details and stack trace are available in the job detail view.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 id="realtime-updates" style="margin-top:2.5rem">Real-time Updates via SignalR</h2>
+        <p>
+          The UI connects to the API via <strong>SignalR WebSockets</strong>. The Worker publishes events to <strong>Redis</strong>, which the API relays to subscribed clients. This means job status updates appear in the browser <em>without refreshing</em>.
+        </p>
+
+        <div class="feature-grid feature-grid-2" style="margin-top:1rem;margin-bottom:2rem;">
+          <div class="card">
+            <span class="card-icon">📡</span>
+            <div class="card-title">Live status streaming</div>
+            <p class="card-desc">Job status transitions (Queued → Running → Completed) are streamed to the UI in real time as the Worker progresses.</p>
+          </div>
+          <div class="card">
+            <span class="card-icon">🔔</span>
+            <div class="card-title">Toast notifications</div>
+            <p class="card-desc">When a job completes or fails, a toast notification appears in the UI — even if you're on a different page within the workspace.</p>
+          </div>
+          <div class="card">
+            <span class="card-icon">🔗</span>
+            <div class="card-title">Connection indicator</div>
+            <p class="card-desc">The header shows a live connection status indicator. A green dot means real-time updates are active; reconnection is automatic.</p>
+          </div>
+          <div class="card">
+            <span class="card-icon">⚖️</span>
+            <div class="card-title">Redis backplane</div>
+            <p class="card-desc">Redis acts as the SignalR scale-out backplane, allowing the API and Worker to publish/subscribe to events independently.</p>
+          </div>
+        </div>
+
+        <h2 id="session-recovery" style="margin-top:2.5rem">Session Recovery</h2>
+        <p>
+          If the Worker service restarts while jobs are running (e.g., during a deployment), Orchestra automatically resumes interrupted jobs on startup. The Worker scans for any jobs in <em>Running</em> or <em>Waiting</em> state and re-queues them.
+        </p>
+
+        <div class="alert alert-tip">
+          <span class="alert-icon">💡</span>
+          <div>
+            <p><strong>Resilient by default:</strong> No manual intervention is needed after a service restart. Jobs are persisted in PostgreSQL, so in-progress work is never silently lost — it resumes automatically.</p>
+          </div>
+        </div>
+
+        <h2 id="sub-agents" style="margin-top:2.5rem">Sub-agent Visualization</h2>
+        <p>
+          Agents can spawn sub-agents during execution (e.g., the Coding Agent may invoke a search sub-agent to explore the codebase before writing code). Each sub-agent interaction is tracked separately and displayed in the job detail view as a nested execution tree.
+        </p>
+
+        <div class="feature-grid" style="margin-top:1rem;">
+          <div class="card">
+            <span class="card-icon">🌳</span>
+            <div class="card-title">Nested execution tree</div>
+            <p class="card-desc">The job detail shows the full hierarchy of agent → sub-agent interactions, each with its own status, input context, and output.</p>
+          </div>
+          <div class="card">
+            <span class="card-icon">🔧</span>
+            <div class="card-title">Tool call logging</div>
+            <p class="card-desc">Every tool invocation is logged with the input parameters and response, giving you full auditability of what the agent did and why.</p>
+          </div>
+          <div class="card">
+            <span class="card-icon">📝</span>
+            <div class="card-title">Output capture</div>
+            <p class="card-desc">Final agent output — code, comments, analysis — is stored per job and viewable in the detail panel after execution completes.</p>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <footer>
+      <p>
+        <strong style="color:rgb(var(--text))">Orchestra</strong> · AI SDLC Automation Platform ·
+        <a href="https://github.com/arturhaikou/orchestra" target="_blank" rel="noopener">GitHub</a>
+      </p>
+    </footer>
+  </div>
+  <script src="../assets/docs.js"></script>
+</body>
+</html>

@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Architecture — Orchestra Docs</title>
+  <meta name="description" content="Orchestra system architecture, service breakdown, data flow, and technology stack." />
+  <link rel="icon" href="assets/orchestra_logo.png" />
+  <link rel="stylesheet" href="assets/docs.css" />
+</head>
+<body>
+  <!-- ── Navbar ─────────────────────────────────────── -->
+  <nav class="navbar">
+    <a href="index.html" class="navbar-brand">
+      <img src="assets/orchestra_logo.png" alt="Orchestra" />
+      Orchestra <span style="color:rgba(148,163,184,0.6);font-weight:400;font-size:0.8rem;margin-left:0.25rem">Docs</span>
+    </a>
+    <ul class="navbar-links" id="nav-links">
+      <li><a href="getting-started.html">Getting Started</a></li>
+      <li><a href="architecture.html" class="active">Architecture</a></li>
+      <li><a href="features/agents.html">Features</a></li>
+      <li><a href="https://github.com/arturhaikou/orchestra" target="_blank" rel="noopener">GitHub ↗</a></li>
+    </ul>
+    <div class="hamburger" id="hamburger"><span></span><span></span><span></span></div>
+  </nav>
+
+  <div class="page-wrapper">
+    <div class="docs-layout">
+
+      <!-- ── Sidebar ─────────────────────────────── -->
+      <aside class="docs-sidebar">
+        <h5>On this page</h5>
+        <ul>
+          <li><a href="#overview">Overview</a></li>
+          <li><a href="#system-diagram">System Diagram</a></li>
+          <li><a href="#services">Service Breakdown</a></li>
+          <li><a href="#data-flow">Data Flow</a></li>
+          <li><a href="#tech-stack">Tech Stack</a></li>
+          <li><a href="#clean-architecture">Clean Architecture</a></li>
+          <li><a href="#database">Database Schema</a></li>
+        </ul>
+        <h5 style="margin-top:1.5rem">Other docs</h5>
+        <ul>
+          <li><a href="getting-started.html">Getting Started</a></li>
+          <li><a href="features/agents.html">AI Agents</a></li>
+          <li><a href="features/integrations.html">Integrations</a></li>
+          <li><a href="features/tickets.html">Tickets</a></li>
+          <li><a href="features/workflows.html">Workflows</a></li>
+          <li><a href="features/skills.html">Skills &amp; Tools</a></li>
+          <li><a href="features/jobs.html">Jobs</a></li>
+        </ul>
+      </aside>
+
+      <!-- ── Content ──────────────────────────────── -->
+      <main class="docs-content">
+        <div class="section-label">Documentation</div>
+        <h1 id="overview">Architecture</h1>
+        <p class="page-desc">
+          Orchestra is a distributed application orchestrated by <strong>.NET Aspire 9</strong>. It consists of five services, two infrastructure dependencies, and communicates with external third-party platforms via REST and MCP protocols.
+        </p>
+
+        <!-- System Diagram -->
+        <h2 id="system-diagram">System Diagram</h2>
+        <p>The following diagram shows how all Orchestra services and dependencies connect at runtime:</p>
+
+        <div class="arch-diagram" style="margin-top:1rem;margin-bottom:2rem;">┌─────────────────────────── .NET Aspire Orchestrator ─────────────────────────────┐
+│                                                                                    │
+│  ┌──────────────────┐   ┌─────────────────────┐   ┌──────────────────────────┐   │
+│  │   React 19 UI    │   │  CopilotKit Runtime  │   │     ADF Generator        │   │
+│  │   (Port 3002)    │   │     (Port 3001)       │   │     (Port 3300)          │   │
+│  └────────┬─────────┘   └──────────┬──────────┘   └────────────┬─────────────┘   │
+│           │                        │                            │                  │
+│           └────────────────────────┴────────────────────────────┘                  │
+│                                         │                                          │
+│  ┌──────────────────────────────────────▼───────────────────────────────────────┐ │
+│  │                    .NET 10 API Service  (Port 3000)                          │ │
+│  │          REST Controllers · Clean Architecture · SignalR Hubs               │ │
+│  └──────────────────────────────────────┬───────────────────────────────────────┘ │
+│                                         │                                          │
+│  ┌──────────────────────────────────────▼───────────────────────────────────────┐ │
+│  │                    .NET Worker Service (Background)                          │ │
+│  │       Agent Execution · DB Migrations · Job Resume · Session Recovery       │ │
+│  └──────────┬──────────────────────────────────────────────────┬───────────────┘ │
+│             │                                                    │                 │
+│  ┌──────────▼──────────┐                          ┌─────────────▼──────────────┐  │
+│  │     PostgreSQL       │                          │           Redis             │  │
+│  │  (Primary Database)  │                          │  (SignalR Backplane)        │  │
+│  └─────────────────────┘                          └────────────────────────────┘  │
+│                                                                                    │
+│  External:  Jira · GitHub · GitLab · Azure OpenAI · Ollama · MCP Servers          │
+│             GitHub Copilot CLI                                                     │
+└────────────────────────────────────────────────────────────────────────────────────┘</div>
+
+        <!-- Service Breakdown -->
+        <h2 id="services" style="margin-top:2.5rem">Service Breakdown</h2>
+        <p>Each service has a distinct responsibility and communicates over well-defined boundaries:</p>
+
+        <div class="table-wrap" style="margin-top:1rem;margin-bottom:2rem;">
+          <table>
+            <thead>
+              <tr><th>Service</th><th>Port</th><th>Responsibility</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>React 19 UI</strong></td>
+                <td><code>3002</code></td>
+                <td>Conductor's dashboard — agents, tickets, workflows, jobs, MCP, CLI integrations, and skills management</td>
+              </tr>
+              <tr>
+                <td><strong>CopilotKit Runtime</strong></td>
+                <td><code>3001</code></td>
+                <td>Node.js agentic UI communication layer powering the embedded AI assistant widget</td>
+              </tr>
+              <tr>
+                <td><strong>ADF Generator</strong></td>
+                <td><code>3300</code></td>
+                <td>Node.js microservice for bidirectional Atlassian Document Format (ADF) conversion</td>
+              </tr>
+              <tr>
+                <td><strong>.NET 10 API</strong></td>
+                <td><code>3000</code></td>
+                <td>Core business logic via Clean Architecture — REST controllers, SignalR hubs, JWT auth, encryption</td>
+              </tr>
+              <tr>
+                <td><strong>.NET Worker</strong></td>
+                <td>—</td>
+                <td>Background agent execution, DB migrations on startup, job orchestration, session recovery after restarts</td>
+              </tr>
+              <tr>
+                <td><strong>PostgreSQL</strong></td>
+                <td><code>5432</code></td>
+                <td>Primary relational store via Entity Framework Core — all workspace, agent, ticket, and integration data</td>
+              </tr>
+              <tr>
+                <td><strong>Redis</strong></td>
+                <td><code>6379</code></td>
+                <td>SignalR scale-out backplane enabling real-time pub/sub between API and Worker services</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Data Flow -->
+        <h2 id="data-flow" style="margin-top:2.5rem">Key Data Flows</h2>
+
+        <h3 style="margin-top:1.75rem;margin-bottom:0.75rem;">Agent Execution Flow</h3>
+        <div class="steps">
+          <div class="step">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <div class="step-title">Ticket assigned to agent</div>
+              <p class="step-desc">User assigns a ticket to an agent in the UI. The API creates a background Job record in PostgreSQL.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <div class="step-title">Worker picks up the job</div>
+              <p class="step-desc">The .NET Worker service polls for pending jobs and begins executing the agent with its configured tools and instructions.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-number">3</div>
+            <div class="step-content">
+              <div class="step-title">Real-time status updates</div>
+              <p class="step-desc">As the agent works, the Worker publishes events to Redis. The API relays these via SignalR WebSocket to the connected UI.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-number">4</div>
+            <div class="step-content">
+              <div class="step-title">Tool invocation</div>
+              <p class="step-desc">Agents call tools based on their authorized ToolAction list — either native integrations (via reflection) or MCP servers (via HTTP/stdio).</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-number">5</div>
+            <div class="step-content">
+              <div class="step-title">Job completion</div>
+              <p class="step-desc">The Worker marks the job complete. Sub-agent interactions and execution logs are persisted. The UI updates in real time.</p>
+            </div>
+          </div>
+        </div>
+
+        <h3 style="margin-top:2rem;margin-bottom:0.75rem;">MCP Tool Registration Flow</h3>
+        <div class="steps">
+          <div class="step">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <div class="step-title">User adds MCP server</div>
+              <p class="step-desc">User submits an MCP server form with transport type (HTTP or stdio), endpoint, and auth credentials.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <div class="step-title">Connection validated</div>
+              <p class="step-desc">API calls <code>POST /v1/integrations/mcp/discover</code> to test the connection and list available tools.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-number">3</div>
+            <div class="step-content">
+              <div class="step-title">Tools seeded to catalog</div>
+              <p class="step-desc">On success, <code>McpToolSeedingService</code> creates <code>ToolCategory</code> and <code>ToolAction</code> records — one per discovered tool.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-number">4</div>
+            <div class="step-content">
+              <div class="step-title">Tools available to agents</div>
+              <p class="step-desc">Agents can now authorize these MCP tools via the agent form's tool authorization panel, referencing tools by ID.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tech Stack -->
+        <h2 id="tech-stack" style="margin-top:2.5rem">Tech Stack</h2>
+
+        <div class="table-wrap" style="margin-top:1rem;margin-bottom:2rem;">
+          <table>
+            <thead>
+              <tr><th>Category</th><th>Technologies</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Backend</strong></td><td>.NET 10, .NET Aspire 9, Entity Framework Core</td></tr>
+              <tr><td><strong>Frontend</strong></td><td>React 19, Vite, TypeScript, Tailwind CSS, React Flow, Recharts</td></tr>
+              <tr><td><strong>Database</strong></td><td>PostgreSQL (EF Core migrations)</td></tr>
+              <tr><td><strong>Cache / Real-Time</strong></td><td>Redis, SignalR (WebSockets)</td></tr>
+              <tr><td><strong>AI Runtime</strong></td><td>Microsoft Agents Framework, Azure OpenAI, Ollama</td></tr>
+              <tr><td><strong>Authentication</strong></td><td>JWT Bearer, bcrypt password hashing</td></tr>
+              <tr><td><strong>Integration Protocol</strong></td><td>Model Context Protocol (MCP) — stdio &amp; HTTP transports</td></tr>
+              <tr><td><strong>Node.js Services</strong></td><td>CopilotKit Runtime, ADF Generator (Express)</td></tr>
+              <tr><td><strong>Orchestration</strong></td><td>.NET Aspire AppHost with service discovery</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Clean Architecture -->
+        <h2 id="clean-architecture" style="margin-top:2.5rem">Clean Architecture Layers</h2>
+        <p>The <code>Orchestra.ApiService</code> and <code>Orchestra.Worker</code> follow Clean Architecture with strict dependency rules:</p>
+
+        <div class="feature-grid feature-grid-2" style="margin-top:1rem;margin-bottom:2rem;">
+          <div class="card">
+            <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;">
+              <span class="badge badge-purple">Domain</span>
+            </div>
+            <div class="card-title">Orchestra.Domain</div>
+            <p class="card-desc">Entities, enums, interfaces, value objects, validators. Zero external dependencies — the pure business model.</p>
+            <p class="card-desc" style="margin-top:0.5rem;">Key entities: <code>Agent</code>, <code>Integration</code>, <code>Ticket</code>, <code>Workspace</code>, <code>ToolCategory</code>, <code>ToolAction</code></p>
+          </div>
+          <div class="card">
+            <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;">
+              <span class="badge badge-cyan">Application</span>
+            </div>
+            <div class="card-title">Orchestra.Application</div>
+            <p class="card-desc">Use cases and services — <code>AgentService</code>, <code>IntegrationService</code>, <code>McpIntegrationService</code>, <code>ToolService</code>, AI agent execution logic.</p>
+          </div>
+          <div class="card">
+            <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;">
+              <span class="badge badge-emerald">Infrastructure</span>
+            </div>
+            <div class="card-title">Orchestra.Infrastructure</div>
+            <p class="card-desc">EF Core DbContext, data access implementations, MCP client factory (HTTP + stdio), encryption service.</p>
+          </div>
+          <div class="card">
+            <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;">
+              <span class="badge badge-yellow">Presentation</span>
+            </div>
+            <div class="card-title">Orchestra.ApiService</div>
+            <p class="card-desc">REST controllers, SignalR hubs, JWT middleware, request/response models. Depends only on Application interfaces.</p>
+          </div>
+        </div>
+
+        <!-- Database -->
+        <h2 id="database" style="margin-top:2.5rem">Database Schema Overview</h2>
+        <p>Key entities and their relationships stored in PostgreSQL:</p>
+
+        <div class="table-wrap" style="margin-top:1rem;">
+          <table>
+            <thead>
+              <tr><th>Entity</th><th>Key Fields</th><th>Relationships</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Workspace</strong></td>
+                <td><code>Id</code>, <code>Name</code>, AI provider config</td>
+                <td>Has many Agents, Integrations, Tickets, Tools, Skills</td>
+              </tr>
+              <tr>
+                <td><strong>Agent</strong></td>
+                <td><code>Id</code>, <code>WorkspaceId</code>, <code>Name</code>, <code>Role</code>, <code>Model</code>, <code>TemplateIdentifier</code></td>
+                <td>Has many ToolActions (via AgentToolAction join table)</td>
+              </tr>
+              <tr>
+                <td><strong>Integration</strong></td>
+                <td><code>Id</code>, <code>WorkspaceId</code>, <code>Provider</code>, <code>IsMcpBacked</code>, <code>McpEndpointUrl</code></td>
+                <td>Has many ToolCategories (when MCP-backed)</td>
+              </tr>
+              <tr>
+                <td><strong>ToolCategory</strong></td>
+                <td><code>Id</code>, <code>Name</code>, <code>ProviderType</code>, <code>IntegrationId?</code></td>
+                <td>Has many ToolActions. <code>IntegrationId</code> = null for native tools</td>
+              </tr>
+              <tr>
+                <td><strong>ToolAction</strong></td>
+                <td><code>Id</code>, <code>ToolCategoryId</code>, <code>Name</code>, <code>DangerLevel</code>, <code>IsMcpTool</code></td>
+                <td>Referenced by AgentToolAction join records</td>
+              </tr>
+              <tr>
+                <td><strong>Ticket</strong></td>
+                <td><code>Id</code>, <code>WorkspaceId</code>, <code>ExternalId</code>, <code>Status</code>, <code>Priority</code></td>
+                <td>Sourced from Integration, optionally assigned to an Agent</td>
+              </tr>
+              <tr>
+                <td><strong>Job</strong></td>
+                <td><code>Id</code>, <code>AgentId</code>, <code>TicketId</code>, <code>Status</code></td>
+                <td>Created per agent execution, has many SubAgentInteractions</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="alert alert-info" style="margin-top:2rem;">
+          <span class="alert-icon">ℹ️</span>
+          <div>
+            <p><strong>Migrations:</strong> EF Core database migrations are applied automatically by the <code>Orchestra.Worker</code> service on startup — no manual <code>dotnet ef database update</code> is required.</p>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <footer>
+      <p>
+        <strong style="color:rgb(var(--text))">Orchestra</strong> · AI SDLC Automation Platform ·
+        <a href="https://github.com/arturhaikou/orchestra" target="_blank" rel="noopener">GitHub</a> ·
+        <a href="https://github.com/arturhaikou/orchestra/issues" target="_blank" rel="noopener">Report an Issue</a>
+      </p>
+    </footer>
+  </div>
+  <script src="assets/docs.js"></script>
+</body>
+</html>

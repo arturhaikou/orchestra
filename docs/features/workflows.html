@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Workflows — Orchestra Docs</title>
+  <meta name="description" content="Design multi-step automated workflows with the Orchestra visual workflow builder." />
+  <link rel="icon" href="../assets/orchestra_logo.png" />
+  <link rel="stylesheet" href="../assets/docs.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <a href="../index.html" class="navbar-brand">
+      <img src="../assets/orchestra_logo.png" alt="Orchestra" />
+      Orchestra <span style="color:rgba(148,163,184,0.6);font-weight:400;font-size:0.8rem;margin-left:0.25rem">Docs</span>
+    </a>
+    <ul class="navbar-links" id="nav-links">
+      <li><a href="../getting-started.html">Getting Started</a></li>
+      <li><a href="../architecture.html">Architecture</a></li>
+      <li><a href="agents.html" class="active">Features</a></li>
+      <li><a href="https://github.com/arturhaikou/orchestra" target="_blank" rel="noopener">GitHub ↗</a></li>
+    </ul>
+    <div class="hamburger" id="hamburger"><span></span><span></span><span></span></div>
+  </nav>
+
+  <div class="page-wrapper">
+    <div class="docs-layout">
+      <aside class="docs-sidebar">
+        <h5>Features</h5>
+        <ul>
+          <li><a href="agents.html">AI Agents</a></li>
+          <li><a href="integrations.html">Integrations &amp; MCP</a></li>
+          <li><a href="tickets.html">Ticket Management</a></li>
+          <li><a href="workflows.html" class="active">Workflows</a></li>
+          <li><a href="skills.html">Skills &amp; Tools</a></li>
+          <li><a href="jobs.html">Background Jobs</a></li>
+        </ul>
+        <h5 style="margin-top:1.5rem">On this page</h5>
+        <ul>
+          <li><a href="#overview">Overview</a></li>
+          <li><a href="#visual-builder">Visual Builder</a></li>
+          <li><a href="#node-types">Node Types</a></li>
+          <li><a href="#execution">Execution Tracking</a></li>
+        </ul>
+      </aside>
+
+      <main class="docs-content">
+        <div class="section-label">Features</div>
+        <h1 id="overview">Workflows</h1>
+        <p class="page-desc">
+          Workflows let you chain multiple agents together into automated pipelines. Use the visual canvas to define triggers, conditional branches, and sequential agent handoffs — then track per-step execution status in real time.
+        </p>
+
+        <div class="screenshot-frame">
+          <img src="../assets/screenshots/workflows.png" alt="Workflow Builder" loading="lazy" />
+          <div class="screenshot-caption">The Workflow Builder — design automated multi-step pipelines visually</div>
+        </div>
+
+        <h2 id="visual-builder" style="margin-top:2.5rem">Visual Workflow Builder</h2>
+        <p>
+          Workflows are built on a <strong>React Flow</strong> canvas. Nodes represent actions and agents; edges define the execution order and conditions. The builder supports drag-and-drop node placement with snap-to-grid alignment.
+        </p>
+
+        <div class="alert alert-tip">
+          <span class="alert-icon">💡</span>
+          <div>
+            <p><strong>Use case example:</strong> A typical SDLC workflow might look like: <em>Trigger (new Jira ticket)</em> → <em>Coding Agent</em> → <em>Code Review Agent</em> → <em>Update Jira status</em>. Each stage waits for the previous one to complete.</p>
+          </div>
+        </div>
+
+        <h2 id="node-types" style="margin-top:2.5rem">Node Types</h2>
+
+        <div class="feature-grid" style="margin-top:1rem;margin-bottom:2rem;">
+          <div class="card">
+            <span class="card-icon">⚡</span>
+            <div class="card-title">Trigger Node</div>
+            <p class="card-desc">Defines what starts the workflow. Triggered manually or by an event such as a new ticket matching certain criteria (status, priority, label).</p>
+          </div>
+          <div class="card">
+            <span class="card-icon">🤖</span>
+            <div class="card-title">Agent Node</div>
+            <p class="card-desc">Executes a deployed agent as a workflow step. The agent receives the ticket context from the trigger and produces output passed to the next node.</p>
+          </div>
+          <div class="card">
+            <span class="card-icon">🔀</span>
+            <div class="card-title">Condition Node</div>
+            <p class="card-desc">Branches the workflow based on a rule (e.g., if agent output contains "pass", route to Done; otherwise route to review queue).</p>
+          </div>
+          <div class="card">
+            <span class="card-icon">🏁</span>
+            <div class="card-title">End Node</div>
+            <p class="card-desc">Marks the terminal state of a workflow branch. Can trigger a status update on the originating ticket.</p>
+          </div>
+        </div>
+
+        <h2 id="execution" style="margin-top:2.5rem">Execution Tracking</h2>
+        <p>
+          Each workflow execution creates a Job per agent node. All steps appear in the <strong>Jobs</strong> view, showing per-step status so you can see exactly where the workflow is and what each agent did.
+        </p>
+
+        <div class="table-wrap" style="margin-top:1rem;">
+          <table>
+            <thead>
+              <tr><th>Status</th><th>Meaning</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><span class="badge badge-indigo">Pending</span></td><td>Step queued, waiting for the previous node to complete</td></tr>
+              <tr><td><span class="badge badge-cyan">Running</span></td><td>Agent is actively executing this step</td></tr>
+              <tr><td><span class="badge badge-emerald">Completed</span></td><td>Step finished successfully; output passed to next node</td></tr>
+              <tr><td><span class="badge" style="background:rgba(239,68,68,0.12);color:rgb(239,68,68);border:1px solid rgba(239,68,68,0.3);">Failed</span></td><td>Step encountered an error; workflow halted at this node</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+
+    <footer>
+      <p>
+        <strong style="color:rgb(var(--text))">Orchestra</strong> · AI SDLC Automation Platform ·
+        <a href="https://github.com/arturhaikou/orchestra" target="_blank" rel="noopener">GitHub</a>
+      </p>
+    </footer>
+  </div>
+  <script src="../assets/docs.js"></script>
+</body>
+</html>

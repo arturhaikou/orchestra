@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Getting Started — Orchestra Docs</title>
+  <meta name="description" content="How to install, configure, and run Orchestra — the AI SDLC Automation Platform." />
+  <link rel="icon" href="assets/orchestra_logo.png" />
+  <link rel="stylesheet" href="assets/docs.css" />
+</head>
+<body>
+  <!-- ── Navbar ─────────────────────────────────────── -->
+  <nav class="navbar">
+    <a href="index.html" class="navbar-brand">
+      <img src="assets/orchestra_logo.png" alt="Orchestra" />
+      Orchestra <span style="color:rgba(148,163,184,0.6);font-weight:400;font-size:0.8rem;margin-left:0.25rem">Docs</span>
+    </a>
+    <ul class="navbar-links" id="nav-links">
+      <li><a href="getting-started.html" class="active">Getting Started</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+      <li><a href="features/agents.html">Features</a></li>
+      <li><a href="https://github.com/arturhaikou/orchestra" target="_blank" rel="noopener">GitHub ↗</a></li>
+    </ul>
+    <div class="hamburger" id="hamburger"><span></span><span></span><span></span></div>
+  </nav>
+
+  <div class="page-wrapper">
+    <div class="docs-layout">
+
+      <!-- ── Sidebar ─────────────────────────────── -->
+      <aside class="docs-sidebar">
+        <h5>On this page</h5>
+        <ul>
+          <li><a href="#overview">Overview</a></li>
+          <li><a href="#prerequisites">Prerequisites</a></li>
+          <li><a href="#quick-start">Quick Start</a></li>
+          <li><a href="#configuration">Configuration</a></li>
+          <li><a href="#first-workspace">First Workspace</a></li>
+          <li><a href="#ai-providers">AI Providers</a></li>
+          <li><a href="#next-steps">Next Steps</a></li>
+        </ul>
+        <h5 style="margin-top:1.5rem">Other docs</h5>
+        <ul>
+          <li><a href="architecture.html">Architecture</a></li>
+          <li><a href="features/agents.html">AI Agents</a></li>
+          <li><a href="features/integrations.html">Integrations</a></li>
+          <li><a href="features/tickets.html">Tickets</a></li>
+          <li><a href="features/workflows.html">Workflows</a></li>
+          <li><a href="features/skills.html">Skills &amp; Tools</a></li>
+          <li><a href="features/jobs.html">Jobs</a></li>
+        </ul>
+      </aside>
+
+      <!-- ── Content ──────────────────────────────── -->
+      <main class="docs-content">
+        <div class="section-label">Documentation</div>
+        <h1 id="overview">Getting Started</h1>
+        <p class="page-desc">
+          Everything you need to get Orchestra up and running locally — from cloning the repo to creating your first AI-powered workspace.
+        </p>
+
+        <!-- Prerequisites -->
+        <h2 id="prerequisites">Prerequisites</h2>
+        <p>Before you start, ensure you have the following installed:</p>
+
+        <div class="table-wrap" style="margin-top:1rem;margin-bottom:2rem;">
+          <table>
+            <thead>
+              <tr><th>Tool</th><th>Version</th><th>Notes</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>.NET SDK</strong></td>
+                <td>10.0+</td>
+                <td><a href="https://dotnet.microsoft.com/download/dotnet/10.0" target="_blank" rel="noopener">Download from Microsoft ↗</a></td>
+              </tr>
+              <tr>
+                <td><strong>.NET Aspire workload</strong></td>
+                <td>Latest</td>
+                <td>Install via <code>dotnet workload install aspire</code></td>
+              </tr>
+              <tr>
+                <td><strong>Docker / Podman</strong></td>
+                <td>Any recent</td>
+                <td>Required for PostgreSQL and Redis containers</td>
+              </tr>
+              <tr>
+                <td><strong>Node.js</strong></td>
+                <td>v22+</td>
+                <td>Required for UI, CopilotKit Runtime, and ADF Generator</td>
+              </tr>
+              <tr>
+                <td><strong>AI Provider</strong></td>
+                <td>—</td>
+                <td>Azure OpenAI resource <em>or</em> a running Ollama instance</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="alert alert-tip">
+          <span class="alert-icon">💡</span>
+          <div>
+            <p><strong>Tip:</strong> If you prefer self-hosted models, <a href="https://ollama.com" target="_blank" rel="noopener">Ollama</a> is the easiest way to get started without an Azure account. Pull any compatible model and Orchestra will auto-discover it.</p>
+          </div>
+        </div>
+
+        <!-- Quick Start -->
+        <h2 id="quick-start" style="margin-top:2.5rem">Quick Start</h2>
+        <p>Clone the repository and run the distributed application with a single command:</p>
+
+        <pre><code># 1. Clone the repository
+git clone https://github.com/arturhaikou/orchestra.git
+cd orchestra
+
+# 2. Start the distributed application
+aspire run</code></pre>
+
+        <p>Aspire orchestrates all services automatically. Once all services report healthy, open the UI in your browser:</p>
+
+        <div class="table-wrap" style="margin-top:1rem;margin-bottom:2rem;">
+          <table>
+            <thead>
+              <tr><th>Service</th><th>URL</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>React UI</strong></td><td><code>http://localhost:3002</code></td><td>Main dashboard</td></tr>
+              <tr><td><strong>.NET API</strong></td><td><code>http://localhost:3000</code></td><td>REST API + SignalR</td></tr>
+              <tr><td><strong>CopilotKit Runtime</strong></td><td><code>http://localhost:3001</code></td><td>Agentic UI layer</td></tr>
+              <tr><td><strong>ADF Generator</strong></td><td><code>http://localhost:3300</code></td><td>Atlassian Document Format converter</td></tr>
+              <tr><td><strong>Aspire Dashboard</strong></td><td><code>http://localhost:15888</code></td><td>Service health &amp; logs</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="alert alert-info">
+          <span class="alert-icon">ℹ️</span>
+          <div>
+            <p><strong>Note:</strong> On first run, Aspire will pull the PostgreSQL and Redis container images. This may take a few minutes depending on your connection speed.</p>
+          </div>
+        </div>
+
+        <!-- Configuration -->
+        <h2 id="configuration" style="margin-top:2.5rem">Configuration</h2>
+        <p>
+          AI provider credentials are configured <strong>through the application UI</strong> — no environment variables are required for provider setup. However, the following fields in <code>src/Orchestra.ApiService/appsettings.json</code> should be set before running in any non-development environment:
+        </p>
+
+        <pre><code>{
+  "Encryption": {
+    "Key": "&lt;your-encryption-key&gt;"
+  },
+  "Jwt": {
+    "Issuer": "https://api.orchestra.local",
+    "Audience": "https://api.orchestra.local",
+    "SecretKey": "&lt;your-jwt-secret&gt;"
+  }
+}</code></pre>
+
+        <div class="alert alert-warn">
+          <span class="alert-icon">⚠️</span>
+          <div>
+            <p><strong>Security:</strong> Never commit real secrets to version control. Use environment variable substitution or a secrets manager in production deployments.</p>
+          </div>
+        </div>
+
+        <!-- First workspace -->
+        <h2 id="first-workspace" style="margin-top:2.5rem">Creating Your First Workspace</h2>
+        <p>
+          Once the app is running, navigate to <code>http://localhost:3002</code> and register an account. After logging in, you'll be guided through workspace creation:
+        </p>
+
+        <div class="steps" style="margin-top:1.5rem;margin-bottom:2rem;">
+          <div class="step">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <div class="step-title">Register an account</div>
+              <p class="step-desc">Click <em>Sign Up</em> on the login page and create your first user account.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <div class="step-title">Create a workspace</div>
+              <p class="step-desc">A workspace is your isolated environment — agents, tools, integrations, and skills are scoped per workspace.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-number">3</div>
+            <div class="step-content">
+              <div class="step-title">Configure an AI provider</div>
+              <p class="step-desc">Choose between Azure OpenAI (hosted) or Ollama (self-hosted). Enter your credentials in the workspace settings.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-number">4</div>
+            <div class="step-content">
+              <div class="step-title">Connect an integration</div>
+              <p class="step-desc">Go to <strong>Integrations</strong> and connect Jira, GitHub, or GitLab to start syncing tickets.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-number">5</div>
+            <div class="step-content">
+              <div class="step-title">Deploy an agent</div>
+              <p class="step-desc">Navigate to <strong>Agents</strong>, click <em>Deploy Agent</em>, and choose a built-in template or create from scratch.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="screenshot-frame">
+          <img src="assets/screenshots/tickets.png" alt="Orchestra workspace dashboard" loading="lazy" />
+          <div class="screenshot-caption">The Orchestra workspace — Tickets view with sidebar navigation</div>
+        </div>
+
+        <!-- AI Providers -->
+        <h2 id="ai-providers" style="margin-top:2.5rem">AI Provider Setup</h2>
+
+        <div class="feature-grid" style="margin-top:1rem;margin-bottom:2rem;">
+          <div class="card">
+            <span class="card-icon">☁️</span>
+            <div class="card-title">Azure OpenAI</div>
+            <p class="card-desc">Hosted model deployments. Requires an Azure subscription with an OpenAI resource and a deployed model (e.g., <code>gpt-4o</code>).</p>
+            <ul style="margin-top:0.75rem;font-size:0.85rem;">
+              <li>Endpoint URL</li>
+              <li>API Key</li>
+              <li>Deployment name</li>
+            </ul>
+          </div>
+          <div class="card">
+            <span class="card-icon">🦙</span>
+            <div class="card-title">Ollama</div>
+            <p class="card-desc">Self-hosted model server. Run locally with any compatible model. Orchestra auto-discovers available models.</p>
+            <pre style="margin-top:0.75rem;font-size:0.8rem;padding:0.75rem;"><code># Pull a model
+ollama pull llama3.2
+
+# Start Ollama
+ollama serve</code></pre>
+          </div>
+          <div class="card">
+            <span class="card-icon">⚡</span>
+            <div class="card-title">GitHub Copilot CLI</div>
+            <p class="card-desc">Connect Copilot as the agent execution runtime. Configured via <strong>CLI Integrations</strong> in the workspace sidebar.</p>
+            <ul style="margin-top:0.75rem;font-size:0.85rem;">
+              <li>Automatic model discovery</li>
+              <li>Configurable reasoning effort</li>
+              <li>Read-only or read/write access levels</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Next Steps -->
+        <h2 id="next-steps" style="margin-top:2.5rem">Next Steps</h2>
+        <p>Now that Orchestra is running, explore the rest of the documentation:</p>
+
+        <div class="feature-grid" style="margin-top:1.25rem;">
+          <a href="architecture.html" class="card" style="text-decoration:none;">
+            <span class="card-icon">🏗️</span>
+            <div class="card-title">Architecture Overview</div>
+            <p class="card-desc">Understand how all services connect, the data flow, and technology choices.</p>
+          </a>
+          <a href="features/agents.html" class="card" style="text-decoration:none;">
+            <span class="card-icon">🤖</span>
+            <div class="card-title">AI Agent System</div>
+            <p class="card-desc">Learn about agent templates, tool authorization, and custom instructions.</p>
+          </a>
+          <a href="features/integrations.html" class="card" style="text-decoration:none;">
+            <span class="card-icon">🔌</span>
+            <div class="card-title">Integrations &amp; MCP</div>
+            <p class="card-desc">Connect Jira, GitHub, GitLab, and configure MCP servers.</p>
+          </a>
+        </div>
+      </main>
+    </div>
+
+    <footer>
+      <p>
+        <strong style="color:rgb(var(--text))">Orchestra</strong> · AI SDLC Automation Platform ·
+        <a href="https://github.com/arturhaikou/orchestra" target="_blank" rel="noopener">GitHub</a> ·
+        <a href="https://github.com/arturhaikou/orchestra/issues" target="_blank" rel="noopener">Report an Issue</a>
+      </p>
+    </footer>
+  </div>
+  <script src="assets/docs.js"></script>
+</body>
+</html>

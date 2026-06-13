@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Skills &amp; Tools — Orchestra Docs</title>
+  <meta name="description" content="Define reusable skills and configure tools for Orchestra agents." />
+  <link rel="icon" href="../assets/orchestra_logo.png" />
+  <link rel="stylesheet" href="../assets/docs.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <a href="../index.html" class="navbar-brand">
+      <img src="../assets/orchestra_logo.png" alt="Orchestra" />
+      Orchestra <span style="color:rgba(148,163,184,0.6);font-weight:400;font-size:0.8rem;margin-left:0.25rem">Docs</span>
+    </a>
+    <ul class="navbar-links" id="nav-links">
+      <li><a href="../getting-started.html">Getting Started</a></li>
+      <li><a href="../architecture.html">Architecture</a></li>
+      <li><a href="agents.html" class="active">Features</a></li>
+      <li><a href="https://github.com/arturhaikou/orchestra" target="_blank" rel="noopener">GitHub ↗</a></li>
+    </ul>
+    <div class="hamburger" id="hamburger"><span></span><span></span><span></span></div>
+  </nav>
+
+  <div class="page-wrapper">
+    <div class="docs-layout">
+      <aside class="docs-sidebar">
+        <h5>Features</h5>
+        <ul>
+          <li><a href="agents.html">AI Agents</a></li>
+          <li><a href="integrations.html">Integrations &amp; MCP</a></li>
+          <li><a href="tickets.html">Ticket Management</a></li>
+          <li><a href="workflows.html">Workflows</a></li>
+          <li><a href="skills.html" class="active">Skills &amp; Tools</a></li>
+          <li><a href="jobs.html">Background Jobs</a></li>
+        </ul>
+        <h5 style="margin-top:1.5rem">On this page</h5>
+        <ul>
+          <li><a href="#overview">Overview</a></li>
+          <li><a href="#skills">Skills</a></li>
+          <li><a href="#skill-folders">Skill Folders</a></li>
+          <li><a href="#tools">Tools</a></li>
+          <li><a href="#enabling-disabling">Enable / Disable Tools</a></li>
+        </ul>
+      </aside>
+
+      <main class="docs-content">
+        <div class="section-label">Features</div>
+        <h1 id="overview">Skills &amp; Tools</h1>
+        <p class="page-desc">
+          Skills are reusable instruction sets that can be attached to agents, extending their behavior beyond the base system prompt. Tools are the actionable capabilities agents can invoke during execution.
+        </p>
+
+        <div class="screenshot-frame">
+          <img src="../assets/screenshots/skills.png" alt="Skills page" loading="lazy" />
+          <div class="screenshot-caption">Skills &amp; Folders — manage reusable instruction sets for agents</div>
+        </div>
+
+        <h2 id="skills" style="margin-top:2.5rem">Skills</h2>
+        <p>
+          A <strong>Skill</strong> is a named, reusable piece of guidance — think of it as a modular instruction block that agents can load at runtime. Skills allow you to encode domain knowledge once and reuse it across multiple agents without copy-pasting instructions.
+        </p>
+
+        <div class="feature-grid feature-grid-2" style="margin-top:1rem;margin-bottom:2rem;">
+          <div class="card">
+            <span class="card-icon">📖</span>
+            <div class="card-title">Named instruction blocks</div>
+            <p class="card-desc">Each skill has a name, description, and content body — a markdown-formatted block of guidance that agents receive as part of their context.</p>
+          </div>
+          <div class="card">
+            <span class="card-icon">♻️</span>
+            <div class="card-title">Reusable across agents</div>
+            <p class="card-desc">Assign the same skill to multiple agents. Update the skill once and all agents automatically use the updated instructions on next execution.</p>
+          </div>
+          <div class="card">
+            <span class="card-icon">🗂️</span>
+            <div class="card-title">Organized in folders</div>
+            <p class="card-desc">Group related skills into folders for easy navigation — e.g., a "Clean Code" folder with separate skills for naming, functions, and comments.</p>
+          </div>
+          <div class="card">
+            <span class="card-icon">🎯</span>
+            <div class="card-title">Scoped per workspace</div>
+            <p class="card-desc">Skills are workspace-scoped. Each workspace maintains its own skill library, keeping team-specific knowledge isolated.</p>
+          </div>
+        </div>
+
+        <h3 style="margin-bottom:0.75rem;">Skill fields</h3>
+        <div class="table-wrap" style="margin-bottom:2rem;">
+          <table>
+            <thead>
+              <tr><th>Field</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Name</strong></td><td>Unique identifier for the skill within the workspace</td></tr>
+              <tr><td><strong>Description</strong></td><td>Short summary of what this skill teaches the agent</td></tr>
+              <tr><td><strong>Content</strong></td><td>Markdown-formatted instruction body injected into the agent's context</td></tr>
+              <tr><td><strong>Folder</strong></td><td>Optional — assign to a skill folder for organization</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 id="skill-folders" style="margin-top:2.5rem">Skill Folders</h2>
+        <p>
+          Skill folders are organizational containers. They have no effect on agent behavior on their own — their purpose is to group related skills together in the UI for easier management.
+        </p>
+
+        <div class="alert alert-tip">
+          <span class="alert-icon">💡</span>
+          <div>
+            <p><strong>Recommended structure:</strong> Organize skills by category — e.g., <code>Clean Code</code>, <code>Security</code>, <code>Testing Standards</code>, <code>Domain Knowledge</code>. This makes it easy to onboard new agents with consistent standards.</p>
+          </div>
+        </div>
+
+        <h2 id="tools" style="margin-top:2.5rem">Tools</h2>
+        <p>
+          Tools are the actionable capabilities agents invoke during execution. Each tool category contains one or more tool actions with defined behavior and danger levels.
+        </p>
+
+        <div class="table-wrap" style="margin-top:1rem;margin-bottom:2rem;">
+          <table>
+            <thead>
+              <tr><th>Type</th><th>Source</th><th>Invocation</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Native Tools</strong></td>
+                <td>Built into Orchestra — GitHub, Jira, GitLab actions</td>
+                <td>Reflection-based — maps <code>MethodName</code> to a service class method</td>
+              </tr>
+              <tr>
+                <td><strong>MCP Tools</strong></td>
+                <td>Discovered from registered MCP servers</td>
+                <td>MCP client call via HTTP or stdio transport to the MCP server endpoint</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 id="enabling-disabling" style="margin-top:2.5rem">Enabling &amp; Disabling Tool Actions</h2>
+        <p>
+          Individual tool actions can be enabled or disabled at the workspace level via <code>PATCH /v1/tools/{toolActionId}/enabled</code>. Disabling a tool action prevents any agent from invoking it, regardless of whether the agent is authorized for it.
+        </p>
+
+        <div class="alert alert-warn">
+          <span class="alert-icon">⚠️</span>
+          <div>
+            <p><strong>Important:</strong> Disabling a tool action affects all agents in the workspace that have that action authorized. Use this as a workspace-wide safety switch for sensitive operations.</p>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <footer>
+      <p>
+        <strong style="color:rgb(var(--text))">Orchestra</strong> · AI SDLC Automation Platform ·
+        <a href="https://github.com/arturhaikou/orchestra" target="_blank" rel="noopener">GitHub</a>
+      </p>
+    </footer>
+  </div>
+  <script src="../assets/docs.js"></script>
+</body>
+</html>

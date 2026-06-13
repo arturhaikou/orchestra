@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Integrations &amp; MCP — Orchestra Docs</title>
+  <meta name="description" content="Connect Jira, GitHub, GitLab, and MCP servers to Orchestra workspaces." />
+  <link rel="icon" href="../assets/orchestra_logo.png" />
+  <link rel="stylesheet" href="../assets/docs.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <a href="../index.html" class="navbar-brand">
+      <img src="../assets/orchestra_logo.png" alt="Orchestra" />
+      Orchestra <span style="color:rgba(148,163,184,0.6);font-weight:400;font-size:0.8rem;margin-left:0.25rem">Docs</span>
+    </a>
+    <ul class="navbar-links" id="nav-links">
+      <li><a href="../getting-started.html">Getting Started</a></li>
+      <li><a href="../architecture.html">Architecture</a></li>
+      <li><a href="agents.html" class="active">Features</a></li>
+      <li><a href="https://github.com/arturhaikou/orchestra" target="_blank" rel="noopener">GitHub ↗</a></li>
+    </ul>
+    <div class="hamburger" id="hamburger"><span></span><span></span><span></span></div>
+  </nav>
+
+  <div class="page-wrapper">
+    <div class="docs-layout">
+      <aside class="docs-sidebar">
+        <h5>Features</h5>
+        <ul>
+          <li><a href="agents.html">AI Agents</a></li>
+          <li><a href="integrations.html" class="active">Integrations &amp; MCP</a></li>
+          <li><a href="tickets.html">Ticket Management</a></li>
+          <li><a href="workflows.html">Workflows</a></li>
+          <li><a href="skills.html">Skills &amp; Tools</a></li>
+          <li><a href="jobs.html">Background Jobs</a></li>
+        </ul>
+        <h5 style="margin-top:1.5rem">On this page</h5>
+        <ul>
+          <li><a href="#overview">Overview</a></li>
+          <li><a href="#native-integrations">Native Integrations</a></li>
+          <li><a href="#mcp-servers">MCP Servers</a></li>
+          <li><a href="#mcp-transport">Transport Types</a></li>
+          <li><a href="#cli-integrations">CLI Integrations</a></li>
+          <li><a href="#tool-discovery">Tool Discovery</a></li>
+        </ul>
+      </aside>
+
+      <main class="docs-content">
+        <div class="section-label">Features</div>
+        <h1 id="overview">Integrations &amp; MCP</h1>
+        <p class="page-desc">
+          Orchestra connects to external platforms through two integration types: <strong>native integrations</strong> (Jira, GitHub, GitLab) and <strong>MCP server integrations</strong>. Both are stored in the same Integration entity and surface as tool sources for agents.
+        </p>
+
+        <div class="screenshot-frame">
+          <img src="../assets/screenshots/integrations.png" alt="Integrations page" loading="lazy" />
+          <div class="screenshot-caption">The Integrations page — manage all connected platforms</div>
+        </div>
+
+        <!-- Native -->
+        <h2 id="native-integrations" style="margin-top:2.5rem">Native Integrations</h2>
+        <p>Native integrations connect to external issue trackers and source control platforms. Once connected, Orchestra syncs tickets in real time and makes the integration's tools available for agents.</p>
+
+        <div class="feature-grid" style="margin-top:1rem;margin-bottom:2rem;">
+          <div class="card">
+            <span class="card-icon">🔵</span>
+            <div class="card-title">Jira Cloud &amp; On-Premise</div>
+            <p class="card-desc">Connect to any Jira instance. Sync issues as tickets. Requires a Jira API token and the base URL of your instance.</p>
+            <ul style="margin-top:0.75rem;font-size:0.85rem;">
+              <li>Issue sync (create, update, comment)</li>
+              <li>ADF content conversion</li>
+              <li>Filter query support</li>
+            </ul>
+          </div>
+          <div class="card">
+            <span class="card-icon">⚫</span>
+            <div class="card-title">GitHub</div>
+            <p class="card-desc">Connect to GitHub repositories. Sync Issues and Pull Requests. Agents can create comments, review PRs, and open branches.</p>
+            <ul style="margin-top:0.75rem;font-size:0.85rem;">
+              <li>Issues &amp; Pull Requests</li>
+              <li>Branch creation</li>
+              <li>PR review comments</li>
+            </ul>
+          </div>
+          <div class="card">
+            <span class="card-icon">🟠</span>
+            <div class="card-title">GitLab</div>
+            <p class="card-desc">Connect to GitLab projects (Cloud or Self-managed). Sync Issues and Merge Requests with full tool access for agents.</p>
+            <ul style="margin-top:0.75rem;font-size:0.85rem;">
+              <li>Issues &amp; Merge Requests</li>
+              <li>Comment &amp; approve MRs</li>
+              <li>Pipeline status</li>
+            </ul>
+          </div>
+        </div>
+
+        <h3 style="margin-bottom:0.75rem;">Required fields</h3>
+        <div class="table-wrap" style="margin-bottom:2rem;">
+          <table>
+            <thead>
+              <tr><th>Provider</th><th>Required Fields</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Jira Cloud</strong></td>
+                <td>Base URL, Username (email), API Token</td>
+              </tr>
+              <tr>
+                <td><strong>Jira On-Premise</strong></td>
+                <td>Base URL, Username, Personal Access Token</td>
+              </tr>
+              <tr>
+                <td><strong>GitHub</strong></td>
+                <td>Repository URL, Personal Access Token (PAT)</td>
+              </tr>
+              <tr>
+                <td><strong>GitLab</strong></td>
+                <td>Project URL, Personal Access Token</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- MCP Servers -->
+        <h2 id="mcp-servers" style="margin-top:2.5rem">MCP Servers</h2>
+        <p>
+          Model Context Protocol (MCP) servers are registered as tool sources. Once connected, Orchestra discovers their available tools and adds them to the workspace tool catalog — making them available for agent authorization.
+        </p>
+
+        <div class="screenshot-frame">
+          <img src="../assets/screenshots/mcp-servers.png" alt="MCP Servers page" loading="lazy" />
+          <div class="screenshot-caption">MCP Servers — manage registered Model Context Protocol servers</div>
+        </div>
+
+        <div class="alert alert-info" style="margin-top:1.5rem;">
+          <span class="alert-icon">ℹ️</span>
+          <div>
+            <p><strong>Unified storage:</strong> Both native integrations and MCP servers are stored in the <code>Integration</code> table. The <code>IsMcpBacked</code> flag distinguishes them. This keeps the data model simple while supporting both paradigms.</p>
+          </div>
+        </div>
+
+        <!-- Transport -->
+        <h2 id="mcp-transport" style="margin-top:2.5rem">MCP Transport Types</h2>
+
+        <div class="feature-grid feature-grid-2" style="margin-top:1rem;margin-bottom:2rem;">
+          <div class="card">
+            <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem;">
+              <span class="badge badge-cyan">HTTP</span>
+            </div>
+            <div class="card-title">HTTP Transport</div>
+            <p class="card-desc">Connect to MCP servers exposed over HTTP/HTTPS. Suitable for remote or containerized MCP services.</p>
+            <div class="table-wrap" style="margin-top:0.75rem;">
+              <table>
+                <tbody>
+                  <tr><td><strong>Endpoint</strong></td><td>Full URL to the MCP server</td></tr>
+                  <tr><td><strong>Auth</strong></td><td>None, Basic, or Bearer token</td></tr>
+                  <tr><td><strong>API Key</strong></td><td>Optional; stored encrypted</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card">
+            <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem;">
+              <span class="badge badge-purple">Stdio</span>
+            </div>
+            <div class="card-title">Stdio Transport</div>
+            <p class="card-desc">Launch MCP servers as local processes communicating via standard I/O. Ideal for CLI-based MCP tools.</p>
+            <div class="table-wrap" style="margin-top:0.75rem;">
+              <table>
+                <tbody>
+                  <tr><td><strong>Command</strong></td><td>Executable command to launch the server</td></tr>
+                  <tr><td><strong>Env Vars</strong></td><td>Environment variables passed to the process</td></tr>
+                  <tr><td><strong>Timeout</strong></td><td>30-second discovery timeout</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- CLI Integrations -->
+        <h2 id="cli-integrations" style="margin-top:2.5rem">CLI Integrations — GitHub Copilot</h2>
+        <p>
+          CLI integrations connect a CLI-based AI runtime directly to Orchestra as an agent execution engine. Currently supports <strong>GitHub Copilot</strong>.
+        </p>
+
+        <div class="screenshot-frame">
+          <img src="../assets/screenshots/cli-integrations.png" alt="CLI Integrations page" loading="lazy" />
+          <div class="screenshot-caption">CLI Integrations — configure GitHub Copilot as the agent runtime</div>
+        </div>
+
+        <div class="feature-grid" style="margin-top:1rem;margin-bottom:2rem;">
+          <div class="card">
+            <span class="card-icon">⚡</span>
+            <div class="card-title">Automatic Model Discovery</div>
+            <p class="card-desc">Orchestra queries the Copilot subscription to discover available models and presents them as options in the agent model selector.</p>
+          </div>
+          <div class="card">
+            <span class="card-icon">🧠</span>
+            <div class="card-title">Reasoning Effort</div>
+            <p class="card-desc">Configure reasoning effort level per CLI integration: <strong>Low</strong> (fast, cheaper), <strong>Medium</strong> (balanced), or <strong>High</strong> (thorough, slower).</p>
+          </div>
+          <div class="card">
+            <span class="card-icon">🔒</span>
+            <div class="card-title">Access Levels</div>
+            <p class="card-desc">Choose between <strong>read-only</strong> (safe for search/review agents) or <strong>read/write</strong> (for coding agents that modify files).</p>
+          </div>
+        </div>
+
+        <!-- Tool Discovery -->
+        <h2 id="tool-discovery" style="margin-top:2.5rem">Tool Discovery &amp; Sync</h2>
+        <p>When you add an MCP server, Orchestra automatically discovers its tools. You can also manually trigger re-discovery:</p>
+
+        <div class="steps" style="margin-top:1rem;">
+          <div class="step">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <div class="step-title">Add MCP server</div>
+              <p class="step-desc">Fill in the server form. Orchestra calls <code>POST /v1/integrations/mcp/discover</code> to test connectivity and list tools before saving.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <div class="step-title">Tool catalog seeding</div>
+              <p class="step-desc">On success, <code>McpToolSeedingService</code> creates a <code>ToolCategory</code> for the server and a <code>ToolAction</code> for each discovered tool — automatically classified by danger level.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-number">3</div>
+            <div class="step-content">
+              <div class="step-title">Tools available in agent form</div>
+              <p class="step-desc">Discovered tools appear in the tool authorization panel of the agent form under the <em>MCP Tools</em> section.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-number">4</div>
+            <div class="step-content">
+              <div class="step-title">Sync tools</div>
+              <p class="step-desc">If the MCP server adds or removes tools, click <em>Sync Tools</em> on the server card to re-discover and update the tool catalog.</p>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <footer>
+      <p>
+        <strong style="color:rgb(var(--text))">Orchestra</strong> · AI SDLC Automation Platform ·
+        <a href="https://github.com/arturhaikou/orchestra" target="_blank" rel="noopener">GitHub</a>
+      </p>
+    </footer>
+  </div>
+  <script src="../assets/docs.js"></script>
+</body>
+</html>
